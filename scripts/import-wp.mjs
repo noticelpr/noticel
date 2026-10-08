@@ -82,6 +82,9 @@ for (const [slug, n] of [['opiniones', 4], ['gobierno', 3], ['deportes', 3], ['m
   posts.filter((p) => p.categories.includes(slug)).slice(0, n + 3).forEach((p) => pick.set(p.wpId, p));
 }
 
+// A few stories with deeper addresses (/noticias/la-calle/policiacas/20260808/...), to test those keep working
+posts.filter((p) => p.path.split('/').filter(Boolean).length > 3).slice(0, 3).forEach((p) => pick.set(p.wpId, p));
+
 const dir = 'src/content/noticias';
 mkdirSync(dir, { recursive: true });
 for (const f of readdirSync(dir)) if (f.startsWith('wp-')) unlinkSync(join(dir, f));

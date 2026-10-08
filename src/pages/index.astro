@@ -10,7 +10,7 @@ import Card from '../components/Card.astro';
 import Latest from '../components/Latest.astro';
 import Section from '../components/Section.astro';
 import AdSlot from '../components/AdSlot.astro';
-import { allStories, inCategory, categoryUrl, url, shortDate, type Story } from '../lib/site';
+import { allStories, mostRead, inCategory, categoryUrl, url, shortDate, type Story } from '../lib/site';
 
 const all = await allStories();
 const used = new Set<string>();
@@ -33,9 +33,7 @@ const tagCount = new Map<string, number>();
 all.filter((s) => s.data.date.valueOf() > newest - 7 * DAY).forEach((s) => s.data.tags.forEach((t) => tagCount.set(t, (tagCount.get(t) ?? 0) + 1)));
 const topics = [...tagCount].filter(([t]) => t !== 'Puerto Rico' && t.length > 3).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t);
 
-// Lo más leído: most views in the 7 days before the newest story (60 days if there are too few)
-const byViews = (days: number) => all.filter((s) => s.data.date.valueOf() > newest - days * DAY).sort((a, b) => b.data.views - a.data.views);
-const mostRead = (byViews(7).length >= 5 ? byViews(7) : byViews(60)).slice(0, 5);
+const top5 = mostRead(all, 5);
 
 const breaking = all.find((s) => inCategory(s, 'ultima-hora')) ?? null;
 const ultima = take(all.filter((s) => inCategory(s, 'ultima-hora')), 8);
@@ -71,10 +69,10 @@ const pairs = [['gobierno', 'deportes'], ['mundo', 'policiacas'], ['el-tiempo', 
       <div class="topics"><span>Temas</span>{topics.map((t) => <a href={url(`buscar?q=${encodeURIComponent(t)}`)}>{t}</a>)}</div>
     )}
 
-    {mostRead.length > 0 && (
+    {top5.length > 0 && (
       <>
         <div class="sec-h"><h2>Lo más leído</h2></div>
-        <div class="mostread">{mostRead.map((s, i) => <a href={url(s.data.path)}><b>{i + 1}</b><span class="hl">{s.data.title}</span></a>)}</div>
+        <div class="mostread">{top5.map((s, i) => <a href={url(s.data.path)}><b>{i + 1}</b><span class="hl">{s.data.title}</span></a>)}</div>
       </>
     )}
 

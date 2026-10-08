@@ -1,0 +1,206 @@
+{
+ "agricultura": {
+  "name": "Agricultura",
+  "path": "economia/agricultura"
+ },
+ "atletismo": {
+  "name": "Atletismo",
+  "path": "deportes/mas-deportes/atletismo"
+ },
+ "auto": {
+  "name": "Auto",
+  "path": "economia/auto"
+ },
+ "baloncesto": {
+  "name": "Baloncesto",
+  "path": "deportes/baloncesto"
+ },
+ "beisbol": {
+  "name": "Béisbol",
+  "path": "deportes/beisbol"
+ },
+ "boxeo": {
+  "name": "Boxeo",
+  "path": "deportes/boxeo"
+ },
+ "ciencia": {
+  "name": "Ciencia",
+  "path": "mas/ciencia"
+ },
+ "cine": {
+  "name": "Cine",
+  "path": "entretenimiento/cine"
+ },
+ "clima": {
+  "name": "Clima",
+  "path": "el-tiempo/clima"
+ },
+ "comercio": {
+  "name": "Comercio",
+  "path": "economia/comercio"
+ },
+ "cultura": {
+  "name": "Cultura",
+  "path": "entretenimiento/cultura"
+ },
+ "deportes": {
+  "name": "Deportes",
+  "path": "deportes"
+ },
+ "economia": {
+  "name": "Economía",
+  "path": "economia"
+ },
+ "educacion": {
+  "name": "Educación",
+  "path": "noticias/educacion"
+ },
+ "el-tiempo": {
+  "name": "El Tiempo",
+  "path": "el-tiempo"
+ },
+ "elecciones": {
+  "name": "Elecciones",
+  "path": "noticias/politica/elecciones"
+ },
+ "empresarismo": {
+  "name": "Empresarismo",
+  "path": "economia/empresarismo"
+ },
+ "energia": {
+  "name": "Energía",
+  "path": "noticias/energia"
+ },
+ "entretenimiento": {
+  "name": "Entretenimiento",
+  "path": "entretenimiento"
+ },
+ "estados-unidos": {
+  "name": "Estados Unidos",
+  "path": "noticias/estados-unidos"
+ },
+ "fama": {
+  "name": "Fama",
+  "path": "entretenimiento/fama"
+ },
+ "finanzas-y-banca": {
+  "name": "Finanzas y Banca",
+  "path": "economia/finanzas-y-banca"
+ },
+ "fotos": {
+  "name": "Fotos",
+  "path": "videos-y-fotos/fotos"
+ },
+ "futbol": {
+  "name": "Fútbol",
+  "path": "deportes/futbol"
+ },
+ "gobierno": {
+  "name": "Gobierno",
+  "path": "noticias/gobierno"
+ },
+ "hipismo": {
+  "name": "Hipismo",
+  "path": "deportes/mas-deportes/hipismo"
+ },
+ "huracanes": {
+  "name": "Huracanes",
+  "path": "el-tiempo/huracanes"
+ },
+ "judicatura": {
+  "name": "Judicatura",
+  "path": "noticias/judicatura"
+ },
+ "la-calle": {
+  "name": "La Calle",
+  "path": "noticias/la-calle"
+ },
+ "legislatura": {
+  "name": "Legislatura",
+  "path": "noticias/legislatura"
+ },
+ "lucha-libre": {
+  "name": "Lucha Libre",
+  "path": "deportes/mas-deportes/lucha-libre"
+ },
+ "mas": {
+  "name": "Más",
+  "path": "mas"
+ },
+ "mas-deportes": {
+  "name": "Más Deportes",
+  "path": "deportes/mas-deportes"
+ },
+ "mundo": {
+  "name": "Mundo",
+  "path": "noticias/mundo"
+ },
+ "musica": {
+  "name": "Música",
+  "path": "entretenimiento/musica"
+ },
+ "nfl": {
+  "name": "NFL",
+  "path": "deportes/nfl"
+ },
+ "noticias": {
+  "name": "Noticias",
+  "path": "noticias"
+ },
+ "opiniones": {
+  "name": "Opiniones",
+  "path": "opiniones"
+ },
+ "policiacas": {
+  "name": "Policíacas",
+  "path": "noticias/la-calle/policiacas"
+ },
+ "politica": {
+  "name": "Política",
+  "path": "noticias/politica"
+ },
+ "softbol": {
+  "name": "Sóftbol",
+  "path": "deportes/mas-deportes/softbol"
+ },
+ "tecnologia": {
+  "name": "Tecnología",
+  "path": "economia/tecnologia"
+ },
+ "television": {
+  "name": "Televisión",
+  "path": "entretenimiento/television"
+ },
+ "tenis": {
+  "name": "Tenis",
+  "path": "deportes/tenis"
+ },
+ "tribunales": {
+  "name": "Tribunales",
+  "path": "noticias/tribunales"
+ },
+ "turismo": {
+  "name": "Turismo",
+  "path": "economia/turismo"
+ },
+ "ultima-hora": {
+  "name": "Última Hora",
+  "path": "ultima-hora"
+ },
+ "uncategorized": {
+  "name": "Uncategorized",
+  "path": "uncategorized"
+ },
+ "vida-y-bienestar": {
+  "name": "Vida y Bienestar",
+  "path": "vida-y-bienestar"
+ },
+ "videos-y-fotos": {
+  "name": "Videos y Fotos",
+  "path": "videos-y-fotos"
+ },
+ "voleibol": {
+  "name": "Voleibol",
+  "path": "deportes/voleibol"
+ }
+}

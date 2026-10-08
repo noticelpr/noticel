@@ -1,0 +1,17 @@
+---
+// Right column on story and category pages: Lo último, an ad space and Lo más leído
+import Latest from './Latest.astro';
+import AdSlot from './AdSlot.astro';
+import { allStories, mostRead, url } from '../lib/site';
+const all = await allStories();
+const top = mostRead(all, 5);
+---
+<aside>
+  <Latest stories={all.slice(0, 6)} />
+  <AdSlot style="aspect-ratio:auto;height:250px" />
+  {top.length > 0 && (
+    <div class="box"><h2 class="box-h">Lo más leído</h2>
+      <ol class="mini-list">{top.map((s, i) => <li><b>{i + 1}</b><a href={url(s.data.path)} class="hl">{s.data.title}</a></li>)}</ol>
+    </div>
+  )}
+</aside>

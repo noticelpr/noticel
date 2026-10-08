@@ -1,8 +1,10 @@
 ---
 import '../styles/global.css';
-import { SITE, MENU, CATEGORIES, url, categoryUrl, longDate, type Story } from '../lib/site';
-interface Props { title?: string; description?: string; breaking?: Story | null; current?: string }
-const { title, description = SITE.description, breaking = null, current } = Astro.props;
+import { SITE, MENU, CATEGORIES, CATEGORY_INFO, url, categoryUrl, longDate, type Story } from '../lib/site';
+// `current`: the menu button to highlight (a category slug; its top-level menu entry lights up)
+interface Props { title?: string; description?: string; breaking?: Story | null; current?: string; image?: string; article?: { published: Date; section?: string } }
+const { title, description = SITE.description, breaking = null, current, image, article } = Astro.props;
+const active = current ? (CATEGORY_INFO[current]?.path.split('/')[0] ?? current) : undefined;
 const pageTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
 const today = longDate(new Date());
 ---
@@ -16,6 +18,15 @@ const today = longDate(new Date());
   <meta name="description" content={description} />
   <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
   <link rel="icon" href={url('logo.png')} />
+  <meta property="og:site_name" content={SITE.name} />
+  <meta property="og:title" content={title ?? pageTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:type" content={article ? 'article' : 'website'} />
+  <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />
+  {image && <meta property="og:image" content={image} />}
+  <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
+  {article && <meta property="article:published_time" content={article.published.toISOString()} />}
+  {article?.section && <meta property="article:section" content={article.section} />}
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Merriweather:wght@400;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet" />
@@ -42,7 +53,7 @@ const today = longDate(new Date());
   </header>
 
   <nav class="nav" aria-label="Secciones"><div class="wrap">
-    {MENU.map((slug) => <a href={categoryUrl(slug)} aria-current={current === slug ? 'page' : undefined}>{CATEGORIES[slug]}</a>)}
+    {MENU.map((slug) => <a href={categoryUrl(slug)} aria-current={active === slug ? 'page' : undefined}>{CATEGORIES[slug]}</a>)}
   </div></nav>
 
   {breaking && (

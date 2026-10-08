@@ -1,0 +1,229 @@
+---
+// Story page, at the story's exact old WordPress address: /noticias/20260930/mi-noticia/,
+// /noticias/la-calle/policiacas/20260808/mi-noticia/, ...
+// Layout from the 2026 theme's single.php; reading tools (save, text size, listen, share, progress bar)
+// work the same as on Noticias Xtra.
+import { render } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import Ph from '../components/Ph.astro';
+import Card from '../components/Card.astro';
+import Sidebar from '../components/Sidebar.astro';
+import AdSlot from '../components/AdSlot.astro';
+import { allStories, kicker, parentOf, categoryUrl, url, CATEGORIES, SITE, longDate, timeOnly, inCategory, type Story } from '../lib/site';
+
+export async function getStaticPaths() {
+  const stories = await allStories();
+  return stories.map((story) => ({ params: { path: story.data.path.replace(/^\/|\/$/g, '') }, props: { story, stories } }));
+}
+
+interface Props { story: Story; stories: Story[] }
+const { story, stories } = Astro.props;
+const d = story.data;
+const { Content } = await render(story);
+const k = kicker(story);
+const parent = k ? parentOf(k.slug) : undefined;
+const words = (story.body ?? '').replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
+const minutes = Math.max(1, Math.round(words / 200));
+const isOpinion = inCategory(story, 'opiniones');
+// "Sigue leyendo": newest stories from the same category, then any newest
+const more = [...stories.filter((x) => k && inCategory(x, k.slug)), ...stories].filter((x, i, arr) => x.id !== story.id && arr.indexOf(x) === i).slice(0, 3);
+const fecha = `${longDate(d.date)}, ${timeOnly(d.date)}`;
+---
+<Base title={d.title} description={d.description || d.title} current={k?.slug} image={d.image} article={{ published: d.date, section: k?.name }}>
+  <div class="read-progress" aria-hidden="true"><span data-progress></span></div>
+  <main id="main" class="wrap" tabindex="-1">
+    <div class="art-grid">
+      <article class="art" data-url={url(d.path)} data-title={d.title} data-date={d.date.toISOString()} data-image={d.image ?? ''} data-section={k?.name ?? ''}>
+        <div class="crumbs">
+          <a href={url()}>Portada</a>
+          {parent && <> / <a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a></>}
+          {k && <> / <a href={categoryUrl(k.slug)}>{k.name}</a></>}
+        </div>
+        <h1>{d.title}</h1>
+        {d.description && <p class="dek">{d.description}</p>}
+        <div class="byline">
+          <div class="by-who">
+            <strong>Por {d.author}</strong>
+            <span><time datetime={d.date.toISOString()}>{fecha.charAt(0).toUpperCase() + fecha.slice(1)}</time> · {minutes} min de lectura</span>
+          </div>
+          <div class="by-actions" role="toolbar" aria-label="Herramientas de lectura y compartir">
+            <button type="button" class="tool" data-save aria-pressed="false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+              <span data-save-label>Guardar</span>
+            </button>
+            <span class="tool-group" role="group" aria-label="Tamaño del texto">
+              <button type="button" class="tool" data-font="-1" aria-label="Letra más pequeña">A−</button>
+              <button type="button" class="tool" data-font="1" aria-label="Letra más grande">A+</button>
+            </span>
+            <button type="button" class="tool" data-listen hidden aria-pressed="false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" /></svg>
+              <span data-listen-label>Escuchar</span>
+            </button>
+            <span class="by-sep" aria-hidden="true"></span>
+            <span class="share" role="group" aria-label="Compartir">
+              <button type="button" class="tool icon" data-share="facebook" aria-label="Compartir en Facebook" title="Facebook">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 8.5V6.8c0-.8.5-1.3 1.4-1.3H17V2.2h-2.6C11.6 2.2 10.6 4 10.6 6.4v2.1H8v3.3h2.6V22H14V11.8h2.6l.4-3.3z" /></svg>
+              </button>
+              <button type="button" class="tool icon" data-share="whatsapp" aria-label="Compartir por WhatsApp" title="WhatsApp">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.2-.2-.5-.3z" /></svg>
+              </button>
+              <button type="button" class="tool icon" data-share="x" aria-label="Compartir en X" title="X">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.2-8.3L2 3h6.4l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
+              </button>
+              <button type="button" class="tool icon" data-share="copy" aria-label="Copiar enlace" title="Copiar enlace">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
+              </button>
+            </span>
+          </div>
+        </div>
+        {d.image && (
+          <figure style="margin:0">
+            <Ph src={d.image} alt={d.imageCaption ?? ''} eager />
+            {d.imageCaption && <figcaption class="caption">{d.imageCaption}</figcaption>}
+          </figure>
+        )}
+        <div class="body"><Content /></div>
+        {d.pdfUrl && <a class="pdf-btn" href={d.pdfUrl} target="_blank" rel="noopener">📄 {d.pdfTitle || 'Ver documento (PDF)'}</a>}
+        {isOpinion && <div class="ai"><strong>Columna de opinión</strong>Este texto expresa la opinión de su autor.</div>}
+        {d.tags.length > 0 && <div class="tags" aria-label="Temas">{d.tags.map((t) => <a href={url(`buscar?q=${encodeURIComponent(t)}`)}>{t}</a>)}</div>}
+        <AdSlot style="aspect-ratio:auto;height:120px;margin-top:28px" />
+
+        <a class="tip-cta" href={url('contacto')}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z" /><path d="M12 7v4M12 13.5h.01" /></svg>
+          <span><b>¿Sabes algo que debemos investigar?</b> Envía tu denuncia a la redacción.</span>
+          <span class="tip-go" aria-hidden="true">›</span>
+        </a>
+
+        {more.length > 0 && (
+          <>
+            <div class="sec-h"><h2>Sigue leyendo</h2></div>
+            <div class="grid3">{more.map((x) => <Card story={x} dek={false} />)}</div>
+          </>
+        )}
+      </article>
+      <Sidebar />
+    </div>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // Reading tools. Everything is kept only in this browser (same as Noticias Xtra).
+    const art = document.querySelector<HTMLElement>('.art')!;
+    const store = {
+      get: <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || '') ?? d; } catch { return d; } },
+      set: (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } },
+    };
+    const toast = (msg: string) => {
+      const t = document.getElementById('toast')!;
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    };
+
+    // Save for later
+    type Saved = { u: string; t: string; s: string; d: string; i: string; at: number };
+    const saveBtn = document.querySelector<HTMLButtonElement>('[data-save]')!;
+    const me = art.dataset.url!;
+    const paint = () => {
+      const on = store.get<Saved[]>('nc-saved', []).some((x) => x.u === me);
+      saveBtn.setAttribute('aria-pressed', String(on));
+      saveBtn.querySelector('[data-save-label]')!.textContent = on ? 'Guardada' : 'Guardar';
+    };
+    const setSaved = (on: boolean) => {
+      const list = store.get<Saved[]>('nc-saved', []).filter((x) => x.u !== me);
+      const entry = { u: me, t: art.dataset.title!, s: art.dataset.section!, d: art.dataset.date!, i: art.dataset.image!, at: Date.now() };
+      store.set('nc-saved', on ? [entry, ...list].slice(0, 100) : list);
+      paint();
+    };
+    let tip: HTMLElement | null = null, tipTimer = 0;
+    saveBtn.addEventListener('click', () => {
+      const on = !store.get<Saved[]>('nc-saved', []).some((x) => x.u === me);
+      setSaved(on);
+      tip?.remove(); clearTimeout(tipTimer);
+      tip = document.createElement('div'); tip.className = 'save-tip'; tip.setAttribute('role', 'status');
+      tip.innerHTML = `<span>${on ? '🔖 Guardada en tu lista' : 'Quitada de tus guardadas'}</span><button type="button">Deshacer</button>`;
+      tip.querySelector('button')!.addEventListener('click', () => { setSaved(!on); tip?.remove(); });
+      const host = saveBtn.closest<HTMLElement>('.byline')!; host.style.position = 'relative'; host.append(tip);
+      const b = saveBtn.getBoundingClientRect(), h = host.getBoundingClientRect();
+      tip.style.left = `${Math.max(0, Math.min(b.left - h.left, h.width - tip.offsetWidth))}px`; tip.style.top = `${b.bottom - h.top + 8}px`;
+      tipTimer = window.setTimeout(() => { tip?.classList.add('out'); setTimeout(() => tip?.remove(), 250); }, 4500);
+    });
+    paint();
+
+    // Text size: 5 steps, remembered for every story
+    const sizes = [0.9, 1, 1.12, 1.25, 1.4];
+    let step = Math.min(sizes.length - 1, Math.max(0, store.get<number>('nc-font', 1)));
+    const applySize = () => {
+      document.documentElement.style.setProperty('--read-scale', String(sizes[step]));
+      document.querySelectorAll<HTMLButtonElement>('[data-font]').forEach((b) => {
+        b.disabled = b.dataset.font === '-1' ? step === 0 : step === sizes.length - 1;
+      });
+    };
+    document.querySelectorAll<HTMLButtonElement>('[data-font]').forEach((b) => b.addEventListener('click', () => {
+      step = Math.min(sizes.length - 1, Math.max(0, step + Number(b.dataset.font)));
+      store.set('nc-font', step);
+      applySize();
+    }));
+    applySize();
+
+    // Listen: the browser reads the story aloud in Spanish
+    const listen = document.querySelector<HTMLButtonElement>('[data-listen]');
+    if (listen && 'speechSynthesis' in window) {
+      listen.hidden = false;
+      const label = listen.querySelector('[data-listen-label]')!;
+      const stop = () => { speechSynthesis.cancel(); listen.setAttribute('aria-pressed', 'false'); label.textContent = 'Escuchar'; };
+      listen.addEventListener('click', () => {
+        if (speechSynthesis.speaking) return stop();
+        const text = [document.querySelector('.art h1'), document.querySelector('.art .dek'), ...document.querySelectorAll('.art .body p')]
+          .map((el) => el?.textContent?.trim()).filter(Boolean).join('. ');
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'es-PR';
+        const voice = speechSynthesis.getVoices().find((v) => v.lang.startsWith('es'));
+        if (voice) u.voice = voice;
+        u.onend = stop;
+        speechSynthesis.speak(u);
+        listen.setAttribute('aria-pressed', 'true');
+        label.textContent = 'Detener';
+      });
+      addEventListener('pagehide', stop);
+    }
+
+    // Share
+    const link = location.origin + location.pathname;
+    const title = art.dataset.title!;
+    const targets: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title} ${link}`)}`,
+      x: `https://x.com/intent/post?text=${encodeURIComponent(title)}&url=${encodeURIComponent(link)}`,
+    };
+    document.querySelectorAll<HTMLButtonElement>('[data-share]').forEach((b) => b.addEventListener('click', async () => {
+      const where = b.dataset.share!;
+      if (where === 'copy') {
+        try { await navigator.clipboard.writeText(link); toast('Enlace copiado'); } catch { toast(link); }
+      } else window.open(targets[where], '_blank', 'noopener,width=620,height=560');
+    }));
+
+    // Reading progress bar
+    const bar = document.querySelector<HTMLElement>('[data-progress]');
+    const body = document.querySelector<HTMLElement>('.art .body');
+    if (bar && body) {
+      const onScroll = () => {
+        const r = body.getBoundingClientRect();
+        const p = Math.min(1, Math.max(0, (innerHeight - r.top) / (r.height + innerHeight * 0.5)));
+        bar.style.transform = `scaleX(${p})`;
+      };
+      addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    }
+  </script>
+  <script type="application/ld+json" set:html={JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': isOpinion ? 'OpinionNewsArticle' : 'NewsArticle',
+    headline: d.title,
+    description: d.description || undefined,
+    image: d.image ? [d.image] : undefined,
+    datePublished: d.date.toISOString(),
+    author: { '@type': d.author === SITE.name || d.author === 'EFE' ? 'Organization' : 'Person', name: d.author },
+    publisher: { '@type': 'Organization', name: SITE.name, logo: { '@type': 'ImageObject', url: new URL('logo.png', Astro.site).href } },
+    mainEntityOfPage: new URL(d.path, Astro.site).href,
+  })} />
+</Base>
