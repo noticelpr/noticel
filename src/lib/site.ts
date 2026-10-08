@@ -10,6 +10,9 @@ export const SITE = {
   subtitle: 'Noticias de Puerto Rico',
   description: 'NotiCel: noticias de Puerto Rico. La verdad como es.',
   timeZone: 'America/Puerto_Rico',
+  // Test copy: every page asks search engines not to index it, so Google never sees a second copy
+  // of NotiCel's stories. Set to false only on the day the new site replaces WordPress at noticel.com.
+  testSite: true,
   // Set to true once an Anthropic API key is added for the automatic news writer (the panel's Salud tab reads it)
   aiKeyConnected: false,
 };
