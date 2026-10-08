@@ -1,0 +1,11 @@
+---
+import { url, timeOnly, type Story } from '../lib/site';
+interface Props { stories: Story[] }
+---
+<div class="latest"><h2 class="box-h">Lo último</h2>
+  <ul class="timeline">
+    {Astro.props.stories.map((s) => (
+      <li><span class="time">{timeOnly(s.data.date)}</span><a href={url(s.data.path)} class="hl">{s.data.title}</a></li>
+    ))}
+  </ul>
+</div>

@@ -1,0 +1,6 @@
+---
+import { shortDate, type Story } from '../lib/site';
+interface Props { story: Story }
+const { date, author } = Astro.props.story.data;
+---
+<div class="time"><time datetime={date.toISOString()}>{shortDate(date)}</time>{author && <> · <span class="au">{author}</span></>}</div>

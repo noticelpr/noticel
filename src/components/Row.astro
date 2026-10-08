@@ -1,0 +1,13 @@
+---
+import Ph from './Ph.astro';
+import Kicker from './Kicker.astro';
+import Meta from './Meta.astro';
+import { url, type Story } from '../lib/site';
+interface Props { story: Story }
+const { story } = Astro.props;
+const href = url(story.data.path);
+---
+<article class="row">
+  <div><Kicker story={story} /><a href={href}><h3 class="hl">{story.data.title}</h3></a><Meta story={story} /></div>
+  <a href={href} tabindex="-1" aria-hidden="true"><Ph src={story.data.image} /></a>
+</article>

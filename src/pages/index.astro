@@ -1,0 +1,121 @@
+---
+// Home page. Same blocks and rules as the 2026 WordPress theme's front-page.php:
+// top stories (is_post_top_stories), Lo último, Temas, Lo más leído (post_views_count), Destacadas,
+// Última Hora rail, Opiniones and category blocks. A story appears only once on the page.
+import Base from '../layouts/Base.astro';
+import Ph from '../components/Ph.astro';
+import Kicker from '../components/Kicker.astro';
+import Meta from '../components/Meta.astro';
+import Card from '../components/Card.astro';
+import Latest from '../components/Latest.astro';
+import Section from '../components/Section.astro';
+import AdSlot from '../components/AdSlot.astro';
+import { allStories, inCategory, categoryUrl, url, shortDate, type Story } from '../lib/site';
+
+const all = await allStories();
+const used = new Set<string>();
+const take = (list: Story[], n: number) => {
+  const out = list.filter((s) => !used.has(s.id)).slice(0, n);
+  out.forEach((s) => used.add(s.id));
+  return out;
+};
+const DAY = 864e5;
+
+const tops = all.filter((s) => s.data.topStory);
+const [lead] = take(tops.length ? tops : all, 1);
+const subs = take(tops, 3);
+const feat = take(tops, 6);
+const latest = all.slice(0, 7);
+
+// Topics: the most used tags in the last week of stories
+const newest = all[0]?.data.date.valueOf() ?? 0;
+const tagCount = new Map<string, number>();
+all.filter((s) => s.data.date.valueOf() > newest - 7 * DAY).forEach((s) => s.data.tags.forEach((t) => tagCount.set(t, (tagCount.get(t) ?? 0) + 1)));
+const topics = [...tagCount].filter(([t]) => t !== 'Puerto Rico' && t.length > 3).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t);
+
+// Lo más leído: most views in the 7 days before the newest story (60 days if there are too few)
+const byViews = (days: number) => all.filter((s) => s.data.date.valueOf() > newest - days * DAY).sort((a, b) => b.data.views - a.data.views);
+const mostRead = (byViews(7).length >= 5 ? byViews(7) : byViews(60)).slice(0, 5);
+
+const breaking = all.find((s) => inCategory(s, 'ultima-hora')) ?? null;
+const ultima = take(all.filter((s) => inCategory(s, 'ultima-hora')), 8);
+const opinions = all.filter((s) => inCategory(s, 'opiniones')).slice(0, 4);
+const initials = (name: string) => name.replace(/^Lcd[oa]\.?\s*/u, '').split(' ').slice(0, 2).map((w) => w.charAt(0)).join('');
+const block = (slug: string) => take(all.filter((s) => inCategory(s, slug)), 3);
+const pairs = [['gobierno', 'deportes'], ['mundo', 'policiacas'], ['el-tiempo', 'entretenimiento']].map((p) => p.map((slug) => ({ slug, stories: block(slug) })));
+---
+<Base breaking={breaking}>
+  <main id="main" class="wrap" tabindex="-1">
+    {lead && (
+      <div class="hero">
+        <div>
+          <a class="lead" href={url(lead.data.path)}>
+            <Ph src={lead.data.image} eager />
+            <div class="cap">
+              <Kicker story={lead} link={false} />
+              <h1 class="hl">{lead.data.title}</h1>
+              {lead.data.description && <p>{lead.data.description}</p>}
+            </div>
+          </a>
+          <div class="subleads">
+            {subs.map((s) => (
+              <article class="sublead"><Kicker story={s} /><a href={url(s.data.path)}><h3 class="hl">{s.data.title}</h3></a><Meta story={s} /></article>
+            ))}
+          </div>
+        </div>
+        <aside><Latest stories={latest} /><AdSlot style="height:250px;aspect-ratio:auto" /></aside>
+      </div>
+    )}
+
+    {topics.length > 0 && (
+      <div class="topics"><span>Temas</span>{topics.map((t) => <a href={url(`buscar?q=${encodeURIComponent(t)}`)}>{t}</a>)}</div>
+    )}
+
+    {mostRead.length > 0 && (
+      <>
+        <div class="sec-h"><h2>Lo más leído</h2></div>
+        <div class="mostread">{mostRead.map((s, i) => <a href={url(s.data.path)}><b>{i + 1}</b><span class="hl">{s.data.title}</span></a>)}</div>
+      </>
+    )}
+
+    {feat.length > 0 && (
+      <>
+        <div class="sec-h"><h2>Destacadas</h2></div>
+        <div class="grid3">{feat.map((s) => <Card story={s} />)}</div>
+      </>
+    )}
+  </main>
+
+  {ultima.length > 0 && (
+    <section class="vband"><div class="wrap">
+      <div class="sec-h"><h2 style="color:#fff">Última Hora</h2><a href={categoryUrl('ultima-hora')}>Ver todo →</a></div>
+      <div class="rail">
+        {ultima.map((s) => (
+          <article class="vcard"><a href={url(s.data.path)}><Ph src={s.data.image} /><h3 class="hl" style="color:#fff">{s.data.title}</h3></a><div class="time">{shortDate(s.data.date)}</div></article>
+        ))}
+      </div>
+    </div></section>
+  )}
+
+  <div class="wrap" style="padding-bottom:48px">
+    {opinions.length > 0 && (
+      <>
+        <div class="sec-h"><h2>Opiniones</h2><a href={categoryUrl('opiniones')}>Todas las opiniones →</a></div>
+        <div class="opinion">
+          {opinions.map((s) => (
+            <a class="col" href={url(s.data.path)}>
+              <div class="who"><span class="avatar">{initials(s.data.author)}</span><div><b>{s.data.author}</b><span>{shortDate(s.data.date)}</span></div></div>
+              <h3 class="hl">{s.data.title}</h3>
+            </a>
+          ))}
+        </div>
+      </>
+    )}
+    {pairs.map((pair, i) => (
+      <>
+        <div class="split">{pair.map((b) => <Section slug={b.slug} stories={b.stories} />)}</div>
+        {i === 0 && <AdSlot style="aspect-ratio:auto;height:120px;margin-top:40px" />}
+      </>
+    ))}
+  </div>
+</Base>

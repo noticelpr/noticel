@@ -1,0 +1,8 @@
+---
+// Category label over a headline. `link={false}` when it sits inside another link (a link can't hold a link).
+import { kicker, categoryUrl, type Story } from '../lib/site';
+interface Props { story: Story; link?: boolean }
+const { story, link = true } = Astro.props;
+const k = kicker(story);
+---
+{k && (link ? <a class="kicker" href={categoryUrl(k.slug)}>{k.name}</a> : <span class="kicker">{k.name}</span>)}

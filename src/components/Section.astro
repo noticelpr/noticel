@@ -1,0 +1,15 @@
+---
+// A home-page block for one category: one big card and two rows (the theme's "split" block)
+import Card from './Card.astro';
+import Row from './Row.astro';
+import { CATEGORIES, categoryUrl, type Story } from '../lib/site';
+interface Props { slug: string; stories: Story[] }
+const { slug, stories } = Astro.props;
+---
+{stories.length > 0 && (
+  <section>
+    <div class="sec-h"><h2>{CATEGORIES[slug]}</h2><a href={categoryUrl(slug)}>Ver más →</a></div>
+    <Card story={stories[0]} />
+    <div class="stack">{stories.slice(1).map((s) => <Row story={s} />)}</div>
+  </section>
+)}

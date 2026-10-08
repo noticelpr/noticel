@@ -1,0 +1,6 @@
+---
+// Photo block: the story's photo over a NotiCel-blue background (shown when there is no photo)
+interface Props { src?: string; alt?: string; eager?: boolean }
+const { src, alt = '', eager = false } = Astro.props;
+---
+<div class="ph" style="--c:#006FA6">{src && <img src={src} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" />}</div>
