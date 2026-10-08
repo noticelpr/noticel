@@ -1,0 +1,144 @@
+---
+// Full-document viewer for the document cards in stories (src/lib/doccard.mjs). The PDF is drawn page by page on the
+// site with PDF.js (Mozilla, loaded from cdnjs only when a document is opened), so it reads the same on phones and
+// computers instead of downloading. PDFs from sites that don't allow this (no CORS, e.g. some government sites) fall
+// back to the browser's own viewer in a frame on computers, or to clear "Abrir"/"Descargar" buttons on phones.
+---
+<dialog class="docv" data-docv aria-labelledby="docv-t">
+  <div class="docv-bar">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+    <b id="docv-t" data-docv-t></b>
+    <div class="docv-tools">
+      <span class="docv-pg" data-docv-pg aria-live="polite"></span>
+      <span class="docv-zoom" data-docv-zoom hidden>
+        <button type="button" data-z="-1" aria-label="Alejar">−</button><button type="button" data-z="1" aria-label="Acercar">+</button>
+      </span>
+      <a class="docv-btn" href="#" data-docv-dl download>Descargar</a>
+      <a class="docv-btn docv-tab" href="#" data-docv-tab target="_blank" rel="noopener">Abrir aparte ↗</a>
+    </div>
+    <button type="button" class="docv-x" data-docv-x aria-label="Cerrar documento">✕</button>
+  </div>
+  <div class="docv-pages" data-docv-pages tabindex="0" aria-label="Páginas del documento"></div>
+  <p class="docv-tip" data-docv-tip hidden>Toca dos veces para acercar</p>
+  <p class="docv-msg" data-docv-msg hidden></p>
+  <iframe data-docv-frame title="Documento" hidden></iframe>
+</dialog>
+<script>
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/';
+  const dlg = document.querySelector<HTMLDialogElement>('[data-docv]');
+  if (dlg) {
+    const $ = <T extends Element = HTMLElement>(s: string) => dlg.querySelector<T>(s)!;
+    const pagesBox = $('[data-docv-pages]'), frame = $<HTMLIFrameElement>('[data-docv-frame]'), msg = $('[data-docv-msg]'), pg = $('[data-docv-pg]');
+    const small = () => matchMedia('(max-width: 760px)').matches || /iPhone|iPad|Android/i.test(navigator.userAgent);
+    let lib: any = null, doc: any = null, zoom = 1, token = 0, io: IntersectionObserver | null = null;
+    const ZOOMS = [1, 1.5, 2, 2.5, 3];
+
+    async function pdfjs() {
+      if (!lib) {
+        lib = await import(/* @vite-ignore */ `${PDFJS}pdf.min.mjs`);
+        lib.GlobalWorkerOptions.workerSrc = `${PDFJS}pdf.worker.min.mjs`;
+      }
+      return lib;
+    }
+    // Draws one page at the width of the viewer (sharp on high-density screens)
+    async function draw(slot: HTMLElement, mine: number) {
+      if (slot.dataset.done === String(zoom) || !doc) return;
+      slot.dataset.done = String(zoom);
+      const page = await doc.getPage(Number(slot.dataset.n));
+      if (mine !== token) return;
+      const base = page.getViewport({ scale: 1 });
+      const cssW = (pagesBox.clientWidth - 32) * zoom;
+      const ratio = Math.min(2.5, window.devicePixelRatio || 1);
+      const vp = page.getViewport({ scale: (cssW / base.width) * ratio });
+      const c = document.createElement('canvas');
+      c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+      c.style.width = `${cssW}px`;
+      slot.style.aspectRatio = `${base.width} / ${base.height}`; slot.style.width = `${cssW}px`;
+      await page.render({ canvas: c, canvasContext: c.getContext('2d')!, viewport: vp }).promise;
+      if (mine !== token) return;
+      slot.replaceChildren(c);
+    }
+    function layout(n: number, ratio: number) {
+      const w = (pagesBox.clientWidth - 32) * zoom;
+      pagesBox.replaceChildren(...Array.from({ length: n }, (_, i) => {
+        const s = document.createElement('div');
+        s.className = 'docv-page'; s.dataset.n = String(i + 1);
+        s.style.width = `${w}px`; s.style.aspectRatio = String(ratio);
+        s.setAttribute('aria-label', `Página ${i + 1} de ${n}`);
+        s.innerHTML = '<span class="docv-wait">Cargando página…</span>';
+        return s;
+      }));
+      io?.disconnect();
+      const mine = token;
+      io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) void draw(e.target as HTMLElement, mine); }), { root: pagesBox, rootMargin: '800px 0px' });
+      pagesBox.querySelectorAll<HTMLElement>('.docv-page').forEach((s) => io!.observe(s));
+    }
+    // "Página 3 de 30" follows the scroll
+    pagesBox.addEventListener('scroll', () => {
+      if (!doc) return;
+      const mid = pagesBox.scrollTop + pagesBox.clientHeight / 3;
+      const s = [...pagesBox.querySelectorAll<HTMLElement>('.docv-page')].find((p) => p.offsetTop + p.offsetHeight > mid);
+      if (s) pg.textContent = `Página ${s.dataset.n} de ${doc.numPages}`;
+    }, { passive: true });
+    function setZoom(z: number, x = pagesBox.clientWidth / 2, y = pagesBox.clientHeight / 2) {
+      if (!doc || z === zoom) return;
+      const fx = (pagesBox.scrollLeft + x) / Math.max(1, pagesBox.scrollWidth), fy = (pagesBox.scrollTop + y) / Math.max(1, pagesBox.scrollHeight);
+      zoom = z; token++;
+      doc.getPage(1).then((p: any) => {
+        const v = p.getViewport({ scale: 1 }); layout(doc.numPages, v.width / v.height);
+        pagesBox.scrollLeft = fx * pagesBox.scrollWidth - x; pagesBox.scrollTop = fy * pagesBox.scrollHeight - y;
+      });
+    }
+    $('[data-docv-zoom]').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-z]'); if (!b) return;
+      setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + Number(b.dataset.z)))]);
+    });
+    // Double tap (or double click) zooms in on that spot, and back out
+    let lastTap = 0;
+    const toggleAt = (cx: number, cy: number) => { const r = pagesBox.getBoundingClientRect(); setZoom(zoom === 1 ? 2.5 : 1, cx - r.left, cy - r.top); tipEl.hidden = true; };
+    pagesBox.addEventListener('dblclick', (e) => toggleAt(e.clientX, e.clientY));
+    pagesBox.addEventListener('touchend', (e) => {
+      if (e.touches.length || e.changedTouches.length !== 1) return;
+      const now = Date.now(), t = e.changedTouches[0];
+      if (now - lastTap < 300) { e.preventDefault(); toggleAt(t.clientX, t.clientY); lastTap = 0; } else lastTap = now;
+    });
+    const tipEl = $('[data-docv-tip]');
+
+    function fallback(href: string) {
+      pagesBox.hidden = true; $('[data-docv-zoom]').hidden = true; pg.textContent = '';
+      if (small()) {
+        msg.innerHTML = 'Este documento no se puede mostrar aquí. <a class="docv-btn" target="_blank" rel="noopener"></a>';
+        const a = msg.querySelector('a')!; a.href = href; a.textContent = 'Abrir documento ↗';
+        msg.hidden = false;
+      } else { frame.hidden = false; frame.src = href; }
+    }
+    async function show(href: string) {
+      const mine = ++token; doc = null; zoom = 1;
+      pagesBox.hidden = false; frame.hidden = true; msg.hidden = true; $('[data-docv-zoom]').hidden = true;
+      pagesBox.innerHTML = '<p class="docv-load">Cargando documento…</p>'; pg.textContent = '';
+      try {
+        const pdf = await (await pdfjs()).getDocument({ url: href }).promise;
+        if (mine !== token) return;
+        doc = pdf;
+        const v = (await pdf.getPage(1)).getViewport({ scale: 1 });
+        layout(pdf.numPages, v.width / v.height);
+        pg.textContent = `Página 1 de ${pdf.numPages}`; $('[data-docv-zoom]').hidden = false;
+        if (small()) { tipEl.hidden = false; setTimeout(() => (tipEl.hidden = true), 3500); }
+      } catch { if (mine === token) fallback(href); }
+    }
+
+    document.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a.doc-open');
+      if (!a || e.metaKey || e.ctrlKey) return; // "open in new tab" keeps the normal link
+      e.preventDefault();
+      $('[data-docv-t]').textContent = a.dataset.docTitle || 'Documento';
+      $<HTMLAnchorElement>('[data-docv-dl]').href = a.href;
+      $<HTMLAnchorElement>('[data-docv-tab]').href = a.href;
+      dlg.showModal(); pagesBox.focus();
+      void show(a.href);
+    });
+    $('[data-docv-x]').addEventListener('click', () => dlg.close());
+    dlg.addEventListener('close', () => { token++; doc?.destroy?.(); doc = null; io?.disconnect(); pagesBox.replaceChildren(); frame.src = 'about:blank'; });
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // tap outside closes
+  }
+</script>

@@ -1,0 +1,1116 @@
+---
+// Article editor (staff panel → Escribir), close to WordPress: title, subtitle, featured photo with caption and credit,
+// a formatted body (subheadings, bold, italic, links, lists, quotes, separators, photos, embeds from YouTube, X,
+// Instagram, Facebook, TikTok, Spotify and Google Maps), section, place, author, publish date and time (schedule),
+// labels for editors, sources, related stories and corrections; live preview and a pre-publish checklist.
+// The output is the same Markdown story file the site already uses (src/content/noticias/, see content.config.ts).
+// Periodistas send to review; editors and the admin publish or schedule.
+// With Supabase connected (src/lib/backend.ts), articles are shared by the team (table `articles`, supabase/articles.sql),
+// photos and PDFs go to the "noticias" storage bucket, and Publicar/Aprobar call the "publicar" Edge Function
+// (supabase/functions/publicar/), which saves the story file in GitHub so the site rebuilds in about 2 minutes.
+// Without Supabase it's a preview: articles stay on this device ('nc-articles') and can be downloaded as story files.
+// NotiCel version: "Sección" is one of NotiCel's WordPress categories, and a new story gets an address in the same
+// style as WordPress (/<category path>/<YYYYMMDD>/<slug>/, kept forever once published). "Destacada" is `topStory`.
+import { SECTIONS, CATEGORY_INFO, PR_MUNICIPIOS, url } from '../../lib/site';
+import PhotoLibrary from './PhotoLibrary.astro';
+type Pub = { id: string; title: string; section: string; author: string; date: string; url: string; ai: boolean };
+interface Props { recent: Array<{ id: string; title: string }>; published: Pub[] }
+const { recent, published } = Astro.props;
+const secs = SECTIONS.map(({ id, name }) => ({ id, name }));
+const catPaths = Object.fromEntries(Object.entries(CATEGORY_INFO).map(([k, v]) => [k, v.path])); // for new story addresses
+const secPhotos = {}; // social image when a story has no photo (NotiCel has no default photos per category yet)
+const I = (d: string) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const TOOLS = [
+  ['bold', 'Negrita (Ctrl+B)', '<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"/>'],
+  ['italic', 'Cursiva (Ctrl+I)', '<path d="M11 5h6M7 19h6M14 5l-4 14"/>'],
+  ['link', 'Enlace', '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'],
+  ['ul', 'Lista', '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>'],
+  ['ol', 'Lista numerada', '<path d="M10 6h10M10 12h10M10 18h10M4 5l1.5-1V9M3.5 13.5a1.5 1.5 0 0 1 2.6 1L3.5 18h3"/>'],
+  ['quote', 'Cita', '<path d="M7 7h4v5c0 3-2 5-4 5M15 7h4v5c0 3-2 5-4 5"/>'],
+  ['hr', 'Línea separadora', '<path d="M3 12h18"/>'],
+  ['image', 'Foto', '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>'],
+  ['embed', 'Insertar video o publicación', '<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M13.5 5l-3 14"/>'],
+  ['doc', 'Documento (PDF)', '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'],
+  ['undo', 'Deshacer (Ctrl+Z)', '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'],
+  ['redo', 'Rehacer', '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>'],
+  ['clear', 'Quitar formato', '<path d="M6 5h12M12 5l-3 14M4 20L20 4"/>'],
+];
+---
+<section class="wr" data-wr data-secs={JSON.stringify(secs)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published)} data-base={url()} data-sec-photos={JSON.stringify(secPhotos)} data-cat-paths={JSON.stringify(catPaths)}>
+  <!-- List of my articles -->
+  <div data-wr-list-view>
+    <header class="sd-head">
+      <div><h1 class="pnl-h">Escribir</h1><p class="pnl-muted">Escribe y edita noticias como en WordPress. Los periodistas las programan para una hora futura o las envían a revisión; los editores las publican.</p></div>
+      <button type="button" class="adp-btn" data-wr-new>+ Nueva noticia</button>
+    </header>
+    <nav class="apn-tabs pnl-sub" role="tablist" aria-label="Estado">
+      <button type="button" role="tab" aria-selected="true" data-ws="draft">Borradores <b data-wn="draft"></b></button>
+      <button type="button" role="tab" aria-selected="false" data-ws="review">En revisión <b data-wn="review"></b></button>
+      <button type="button" role="tab" aria-selected="false" data-ws="scheduled">Programadas <b data-wn="scheduled"></b></button>
+      <button type="button" role="tab" aria-selected="false" data-ws="published">Publicadas <b data-wn="published"></b></button>
+    </nav>
+    <div class="wr-list" data-wr-list></div>
+  </div>
+
+  <!-- Editor -->
+  <div class="wr-ed" data-wr-editor hidden>
+    <div class="wr-bar">
+      <button type="button" class="pnl-link" data-wr-back>← Mis noticias</button>
+      <span class="wr-state" data-wr-state></span>
+      <span class="wr-saved" data-wr-saved aria-live="polite"></span>
+      <span class="wr-bar-sp"></span>
+      <button type="button" class="adp-btn ghost-dark" data-wr-preview>Vista previa</button>
+      <button type="button" class="adp-btn ghost-dark" data-wr-save>Guardar borrador</button>
+      <button type="button" class="adp-btn" data-wr-go>Publicar</button>
+    </div>
+    <div class="wr-cols">
+      <div class="wr-main">
+        <textarea class="wr-title" data-f="title" rows="1" maxlength="140" placeholder="Titular" aria-label="Titular"></textarea>
+        <p class="wr-count" data-cnt="title"></p>
+        <textarea class="wr-sub" data-f="description" rows="2" maxlength="260" placeholder="Subtítulo o resumen: una o dos oraciones que expliquen la noticia" aria-label="Subtítulo"></textarea>
+        <p class="wr-count" data-cnt="description"></p>
+
+        <div class="wr-photo" data-wr-photo>
+          <div class="wr-photo-empty" data-photo-empty>
+            <label class="adp-btn ghost-dark">Subir foto principal<input type="file" accept="image/*" class="sr" data-photo-file /></label>
+            <button type="button" class="adp-btn ghost-dark" data-photo-lib="main">Elegir de la biblioteca</button>
+            <span class="pnl-muted">o pega el enlace de una foto: <input type="url" data-f="imageUrl" placeholder="https://…" aria-label="Enlace de la foto" /></span>
+          </div>
+          <figure class="wr-photo-full" data-photo-full hidden>
+            <img alt="" data-photo-img />
+            <button type="button" class="wr-photo-x" data-photo-rm aria-label="Quitar foto">✕</button>
+          </figure>
+          <div class="wr-2" data-photo-meta hidden>
+            <label>Pie de foto<input data-f="imageCaption" maxlength="200" placeholder="Qué se ve en la foto" /></label>
+            <label>Crédito (obligatorio)<input data-f="imageCredit" maxlength="120" placeholder="Foto: Nombre / NotiCel" /></label>
+          </div>
+        </div>
+
+        <details class="wr-gal" data-wr-gal>
+          <summary><b>Galería de fotos</b> <span class="pnl-muted pnl-small" data-gal-n>(opcional)</span></summary>
+          <p class="pnl-muted pnl-small">Fotos adicionales: en la noticia se ven en una presentación junto a la foto principal (se deslizan en el celular). Cada una lleva su pie y su crédito.</p>
+          <ul class="wr-gal-list" data-gal-list></ul>
+          <div class="wr-gal-acts"><label class="adp-btn ghost-dark">+ Subir fotos<input type="file" accept="image/*" multiple class="sr" data-gal-file /></label><button type="button" class="adp-btn ghost-dark" data-photo-lib="gallery">Elegir de la biblioteca</button></div>
+        </details>
+
+        <div class="wr-tools" role="toolbar" aria-label="Formato">
+          <select data-block aria-label="Tipo de texto"><option value="p">Párrafo</option><option value="h2">Subtítulo grande</option><option value="h3">Subtítulo pequeño</option></select>
+          {TOOLS.map(([id, label, d]) => <button type="button" data-tool={id} title={label} aria-label={label}><Fragment set:html={I(d)} /></button>)}
+        </div>
+        <div class="wr-body body" data-body contenteditable="true" role="textbox" aria-multiline="true" aria-label="Texto de la noticia" data-ph="Escribe la noticia aquí. Pega un enlace de YouTube, X, Instagram, Facebook o TikTok en su propia línea y se inserta solo."></div>
+        <p class="wr-count" data-wcount></p>
+      </div>
+
+      <aside class="wr-side">
+        <div class="pnl-card"><h2 class="pnl-h3">Publicación</h2>
+          <label>Sección<select data-f="section">{secs.map((s) => <option value={s.id}>{s.name}</option>)}</select></label>
+          <label>Lugar<input data-f="place" list="wr-towns" maxlength="60" placeholder="San Juan" /></label>
+          <datalist id="wr-towns">{PR_MUNICIPIOS.map((t) => <option value={t} />)}<option value="Puerto Rico" /><option value="Washington" /><option value="Nueva York" /><option value="Orlando, Florida" /></datalist>
+          <label>Autor<input data-f="author" maxlength="60" /></label>
+          <label>Fecha y hora de publicación<input type="datetime-local" data-f="date" /></label>
+          <p class="pnl-muted pnl-small">Déjala en el pasado o ahora para publicar ya; ponla en el futuro para programarla.</p>
+        </div>
+        <div class="pnl-card wr-social"><h2 class="pnl-h3">Redes sociales</h2>
+          <label class="adb-check"><input type="checkbox" data-sc="ig" /> Instagram: imagen y texto automáticos</label>
+          <div class="wr-ig" data-ig-box hidden>
+            <canvas class="wr-ig-prev" data-ig-canvas width="1080" height="1350" aria-label="Imagen para Instagram"></canvas>
+            <textarea data-sc-text="ig" rows="7" maxlength="2200" aria-label="Texto para Instagram"></textarea>
+            <button type="button" class="pnl-link" data-ig-dl>Descargar la imagen</button>
+          </div>
+          <label class="adb-check"><input type="checkbox" data-sc="fb" /> Facebook: el enlace, con foto, titular y resumen</label>
+          <textarea data-sc-text="fb" rows="3" maxlength="1000" aria-label="Texto para Facebook" hidden></textarea>
+          <button type="button" class="adp-btn ghost-dark wr-x" data-sc-x>Publicar en 𝕏</button>
+          <p class="pnl-muted pnl-small">Instagram y Facebook salen solos al publicar la noticia (o a la hora programada). 𝕏 abre el mensaje listo: solo tocas “Post”.</p>
+          <ul class="wr-sc-status" data-sc-status></ul>
+        </div>
+        <div class="pnl-card" data-editor-only><h2 class="pnl-h3">Etiquetas</h2>
+          <label class="adb-check"><input type="checkbox" data-f="breaking" /> Última hora (barra verde y sección Última Hora)</label>
+          <label class="adb-check"><input type="checkbox" data-f="featured" /> Destacada en portada</label>
+          <p class="pnl-muted pnl-small wr-lead-h">Noticia principal (dura hasta 2 días o hasta que marques otra):</p>
+          <label class="adb-check"><input type="checkbox" data-f="pinned" /> 📌 Fijar arriba en la Portada (se queda hasta que la desfijes)</label>
+          <label class="adb-check"><input type="checkbox" data-f="homeLead" /> Principal de la Portada</label>
+          <label class="adb-check"><input type="checkbox" data-f="sectionPinned" /> 📌 Fijar arriba en su sección (se queda hasta que la desfijes)</label>
+          <label class="adb-check"><input type="checkbox" data-f="sectionLead" /> Principal de su sección</label>
+          <label class="adb-check"><input type="checkbox" data-f="live" /> En vivo / en desarrollo</label>
+        </div>
+        <div class="pnl-card"><h2 class="pnl-h3">Fuentes</h2>
+          <ul class="wr-srcs" data-srcs></ul>
+          <div class="wr-addsrc"><input data-src-name placeholder="Nombre (ej. Policía de PR)" aria-label="Nombre de la fuente" /><input data-src-url type="url" placeholder="Enlace (opcional)" aria-label="Enlace de la fuente" /><button type="button" class="pnl-link" data-src-add>Añadir</button></div>
+        </div>
+        <div class="pnl-card"><h2 class="pnl-h3">Noticias relacionadas</h2>
+          <p class="pnl-muted pnl-small">Salen al final de la noticia. Escoge las que quieras (hasta 6).</p>
+          <ul class="wr-srcs wr-rels" data-rels></ul>
+          <input type="search" class="wr-rel-q" data-rel-q placeholder="Buscar noticias publicadas…" aria-label="Buscar noticias relacionadas" />
+          <ul class="wr-rel-res" data-rel-res></ul>
+        </div>
+        <div class="pnl-card"><h2 class="pnl-h3">Corrección</h2>
+          <textarea data-f="correction" rows="2" maxlength="300" placeholder="Solo si corriges algo ya publicado: qué se corrigió y cuándo"></textarea>
+        </div>
+        <div class="pnl-card"><h2 class="pnl-h3">Antes de publicar</h2><ul class="pnl-checks" data-checks></ul></div>
+        <div class="pnl-card"><h2 class="pnl-h3">Archivo</h2>
+          <p class="pnl-muted pnl-small">La noticia como archivo del sitio (Markdown).</p>
+          <button type="button" class="pnl-link" data-dl>Descargar archivo</button>
+          <details class="wr-md"><summary>Ver el archivo</summary><textarea readonly rows="10" data-md></textarea></details>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Attach a document -->
+  <!-- Insert panels: they open right next to the toolbar button (or the block being edited) -->
+  <dialog class="wr-pop" data-pop="link" aria-labelledby="wr-link-h">
+    <form class="sd-form" data-link-form>
+      <header class="sd-dlg-h"><h2 id="wr-link-h">Enlace</h2><button type="button" class="sd-x" data-pop-close aria-label="Cerrar">✕</button></header>
+      <label>Dirección<input type="url" name="url" required placeholder="https://…" /></label>
+      <label class="adb-check"><input type="checkbox" name="newtab" checked /> Abrir en otra pestaña</label>
+      <footer class="sd-dlg-f"><button type="button" class="pnl-link" data-unlink>Quitar enlace</button><button type="submit" class="adp-btn">Aplicar</button></footer>
+    </form>
+  </dialog>
+  <dialog class="wr-pop wide" data-pop="embed" aria-labelledby="wr-emb-h">
+    <form class="sd-form" data-embed-form>
+      <header class="sd-dlg-h"><h2 id="wr-emb-h" data-embed-h>Insertar video o publicación</h2><button type="button" class="sd-x" data-pop-close aria-label="Cerrar">✕</button></header>
+      <label>Enlace<input type="url" name="url" required placeholder="YouTube, X, Instagram, Facebook, TikTok, Spotify o Google Maps" /></label>
+      <div class="wr-emb-prev" data-embed-prev><p class="pnl-muted pnl-small">Pega el enlace y verás la publicación aquí.</p></div>
+      <fieldset class="wr-lay"><legend>Tamaño</legend><label><input type="radio" name="size" value="" checked /> Automático</label><label><input type="radio" name="size" value="s" /> Pequeño</label><label><input type="radio" name="size" value="m" /> Mediano</label><label><input type="radio" name="size" value="l" /> Grande</label></fieldset>
+        <fieldset class="wr-lay"><legend>Posición</legend><label><input type="radio" name="align" value="l" /> Izquierda</label><label><input type="radio" name="align" value="" checked /> Centro</label><label><input type="radio" name="align" value="r" /> Derecha</label></fieldset>
+        <p class="pnl-muted pnl-small">Izquierda o derecha: el texto lo rodea en computadora; en celular va a lo ancho.</p>
+      <p class="cm-err" data-embed-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-pop-close>Cancelar</button><button type="submit" class="adp-btn" data-embed-go>Insertar</button></footer>
+    </form>
+  </dialog>
+  <dialog class="wr-pop wide" data-pop="image" aria-labelledby="wr-img-h">
+    <form class="sd-form" data-img-form>
+      <header class="sd-dlg-h"><h2 id="wr-img-h" data-img-h>Insertar foto</h2><button type="button" class="sd-x" data-pop-close aria-label="Cerrar">✕</button></header>
+      <label data-img-file-wrap>Foto<input type="file" name="file" accept="image/*" /></label>
+      <button type="button" class="pnl-link" data-photo-lib="inline" data-img-lib>o elegir de la biblioteca</button>
+      <img class="wr-img-prev" data-img-prev alt="" hidden />
+      <label>Pie de foto<input name="cap" maxlength="200" placeholder="Qué se ve en la foto" /></label>
+      <label>Crédito<input name="credit" maxlength="120" placeholder="Foto: Nombre / NotiCel" /></label>
+      <fieldset class="wr-lay"><legend>Tamaño</legend><label><input type="radio" name="size" value="" checked /> Automático</label><label><input type="radio" name="size" value="s" /> Pequeño</label><label><input type="radio" name="size" value="m" /> Mediano</label><label><input type="radio" name="size" value="l" /> Grande</label></fieldset>
+        <fieldset class="wr-lay"><legend>Posición</legend><label><input type="radio" name="align" value="l" /> Izquierda</label><label><input type="radio" name="align" value="" checked /> Centro</label><label><input type="radio" name="align" value="r" /> Derecha</label></fieldset>
+        <p class="pnl-muted pnl-small">Izquierda o derecha: el texto lo rodea en computadora; en celular va a lo ancho.</p>
+      <p class="cm-err" data-img-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-pop-close>Cancelar</button><button type="submit" class="adp-btn" data-img-go>Insertar</button></footer>
+    </form>
+  </dialog>
+  <dialog class="wr-pop wide" data-pop="doc" data-doc-dlg aria-labelledby="wr-doc-h">
+    <form class="sd-form" data-doc-form>
+      <header class="sd-dlg-h"><h2 id="wr-doc-h">Añadir documento</h2><button type="button" class="sd-x" data-pop-close aria-label="Cerrar">✕</button></header>
+      <p class="pnl-muted">En la noticia se ve como una tarjeta limpia; el lector toca “Ver documento” y lo lee completo.</p>
+      <label>Título que verá el lector<input name="title" maxlength="120" required placeholder="ej. Informe de la Contralora sobre el municipio de Ponce" /></label>
+      <label>Sube el PDF<input type="file" name="file" accept="application/pdf" /></label>
+      <p class="pnl-muted pnl-small">o pega el enlace de un PDF público (por ejemplo, de una agencia o un tribunal):</p>
+      <label>Enlace<input type="url" name="url" placeholder="https://…/documento.pdf" /></label>
+      <label>De dónde viene (opcional)<input name="source" maxlength="60" placeholder="ej. Oficina del Contralor" /></label>
+      <p class="cm-err" data-doc-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-pop-close>Cancelar</button><button type="submit" class="adp-btn">Insertar</button></footer>
+    </form>
+  </dialog>
+
+  <!-- Preview -->
+  <dialog class="wr-prev" data-wr-prev aria-label="Vista previa">
+    <div class="wr-prev-bar">
+      <span class="sp-demo">VISTA PREVIA</span><span class="wr-prev-t">La página real del sitio con esta noticia</span>
+      <div class="pnl-range" role="group" aria-label="Pantalla"><button type="button" data-dev="desk" aria-pressed="true">Computadora</button><button type="button" data-dev="phone" aria-pressed="false">Celular</button></div>
+      <a class="pnl-link" href={url('redaccion/vista-previa')} target="_blank" rel="noopener">Abrir en otra pestaña ↗</a>
+      <button type="button" class="adp-btn ghost-dark" data-prev-close>Cerrar</button>
+    </div>
+    <div class="wr-prev-stage" data-prev-stage><iframe title="Vista previa de la noticia" data-prev-frame></iframe></div>
+  </dialog>
+  <div class="apn-toast" data-wr-toast role="status" hidden></div>
+  <PhotoLibrary mode="picker" />
+</section>
+
+<script>
+  import { embedFor } from '../../lib/embeds.mjs';
+  import { docCard } from '../../lib/doccard.mjs';
+  import { ask, askText } from '../../lib/dialogs';
+  import { hasBackend, listArticles, putArticle, deleteArticle, uploadStoryFile, publishArticle, lastSaveError, logPanelError, getAnalytics, queueSocial, staffApi } from '../../lib/backend';
+  import { isDemo, demoAnalytics } from '../../lib/demo';
+  import { REPO, BRANCH } from '../../lib/repo';
+  import { drawInstagram, instagramCaption, facebookMessage, xComposeUrl, type SocialStory } from '../../lib/social';
+  const root = document.querySelector<HTMLElement>('[data-wr]');
+  if (root) {
+    type Src = { name: string; url?: string };
+    type Gal = { src: string; caption: string; credit: string; creditUrl?: string };
+    type Art = {
+      id: string; status: 'draft' | 'review' | 'scheduled' | 'published'; updated: number; owner: string; note?: string;
+      title: string; description: string; section: string; league: string; place: string; author: string; date: string;
+      image: string; imageUrl: string; imageCaption: string; imageCredit: string; breaking: boolean; trending: boolean; featured: boolean; live: boolean; pinned?: boolean; homeLead?: boolean; sectionLead?: boolean; sectionPinned?: boolean;
+      sources: Src[]; related: string[]; correction: string; body: string; slug?: string;
+      path?: string; cats?: string[]; // NotiCel: the story's address on the site and its other categories (kept from the story file)
+      gallery?: Gal[]; // extra photos shown as a slideshow with the main one
+      aiAssisted?: boolean; fmExtra?: string; // kept from an existing story file: the AI label and fields the editor doesn't show
+      social?: { ig?: boolean; fb?: boolean; igText?: string; fbText?: string }; // Redes sociales: saved with the article, never in the story file
+    };
+    const SECS: Array<{ id: string; name: string }> = JSON.parse(root.dataset.secs!);
+    const CAT_PATHS: Record<string, string> = JSON.parse(root.dataset.catPaths || '{}');
+    const BASE = root.dataset.base!.replace(/\/$/, '');
+    /** Address of a new story, like WordPress: /<category path>/<YYYYMMDD in Puerto Rico>/<words of the headline>/ */
+    const newPath = (a: Art) => {
+      const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Puerto_Rico', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(a.date || Date.now())).replace(/-/g, '');
+      const words = a.title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 90).replace(/-$/, '') || 'noticia';
+      return `/${CAT_PATHS[a.section] ?? 'noticias'}/${day}/${words}/`;
+    };
+    const pathOf = (a: Art) => a.path || newPath(a);
+    const RECENT: Array<{ id: string; title: string }> = JSON.parse(root.dataset.recent!);
+    type Pub = { id: string; title: string; section: string; author: string; date: string; url: string; ai: boolean; local?: boolean };
+    const PUBLISHED: Pub[] = JSON.parse(root.dataset.published!);
+    const $ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => el.querySelector<T>(s)!;
+    const $$ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => [...el.querySelectorAll<T>(s)];
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const toast = (m: string) => { const t = $('[data-wr-toast]'); t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 4000); };
+    const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
+    const canPublish = () => ['admin', 'editor'].includes(me()?.role ?? '');
+    // With Supabase (src/lib/backend.ts) articles are shared by the team; without it they stay on this device ('nc-articles')
+    const DB = hasBackend();
+    const DEMO = isDemo(); // sample stories, nothing is published (src/lib/demo.ts)
+    const PREV = DEMO ? 'Modo demo: en el panel real' : 'Vista previa: con Supabase';
+    const KEY = 'nc-articles';
+    let CACHE: Art[] = [];
+    const load = (): Art[] => { if (DB) return CACHE; try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } };
+    const saveLocal = (list: Art[]) => {
+      try { localStorage.setItem(KEY, JSON.stringify(list)); return true; }
+      catch { toast('No hay espacio en este dispositivo: usa fotos más pequeñas o borra borradores viejos.'); return false; }
+    };
+    /** Saves one article (shared database or this device). */
+    async function store(a: Art): Promise<boolean> {
+      const list = load(); const i = list.findIndex((x) => x.id === a.id);
+      if (i >= 0) list[i] = a; else list.unshift(a);
+      if (!DB) return saveLocal(list);
+      const { status, ...doc } = a;
+      const ok = await putArticle(a.id, status, doc, a.slug);
+      if (!ok) { toast(`No se pudo guardar en la base de datos. ${lastSaveError || 'Revisa la conexión e intenta otra vez.'}`); void logPanelError(me()?.name ?? '', `Guardar: ${a.title || 'Sin titular'}`, lastSaveError || 'sin conexión'); }
+      return ok;
+    }
+    async function drop(id: string): Promise<boolean> {
+      if (!DB) return saveLocal(load().filter((x) => x.id !== id));
+      const ok = await deleteArticle(id);
+      if (ok) CACHE = CACHE.filter((x) => x.id !== id); else toast('No se pudo borrar.');
+      return ok;
+    }
+    async function refresh() {
+      if (!DB) return;
+      const rows = await listArticles();
+      if (!rows) { toast('No pudimos cargar las noticias del equipo. Revisa la conexión.'); return; }
+      // A scheduled story counts as published once its time has passed
+      CACHE = rows.map((r) => ({ ...r.doc, id: r.id, slug: r.slug ?? undefined, updated: Date.parse(r.updated_at),
+        status: r.status === 'scheduled' && Date.parse(r.doc.date) <= Date.now() ? 'published' : r.status }));
+    }
+    /** Photos and PDFs go to the shared storage when Supabase is connected (a data URL stays as is otherwise). */
+    async function upload(data: string, kind: 'foto' | 'doc', ext: string): Promise<string> {
+      if (!DB || !data.startsWith('data:') || !cur) return data;
+      const url = await uploadStoryFile(`${cur.id.toLowerCase()}/${kind}-${Date.now().toString(36)}.${ext}`, data);
+      if (!url) toast('No se pudo subir el archivo. Intenta otra vez.');
+      return url ?? '';
+    }
+    const localNow = () => { const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+    const ago = (t: number) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`; };
+    const STATUS = { draft: 'Borrador', review: 'En revisión', scheduled: 'Programada', published: 'Publicada' };
+
+    // ---------- list ----------
+    let tab: Art['status'] = 'draft';
+    function renderList() {
+      const s = me(); const all = load().filter((a) => canPublish() || a.owner === s?.name); // periodistas see their own
+      (['draft', 'review', 'scheduled', 'published'] as const).forEach((k) => { const n = all.filter((a) => a.status === k).length; $(`[data-wn="${k}"]`).textContent = n ? String(n) : ''; });
+      const pubs = publishedList();
+      $('[data-wn="published"]').textContent = pubs.length ? String(pubs.length) : '';
+      if (tab === 'published') { renderPublished(pubs); return; }
+      const list = all.filter((a) => a.status === tab).sort((a, b) => b.updated - a.updated);
+      $('[data-wr-list]').innerHTML = list.map((a) => `<article class="pnl-row" data-id="${a.id}">
+        <div><p class="pnl-muted">${STATUS[a.status]} · ${esc(SECS.find((x) => x.id === a.section)?.name ?? '')} · ${esc(a.author || a.owner)} · ${ago(a.updated)}${a.status === 'scheduled' ? ` · sale el ${new Date(a.date).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}</p>
+          <h2>${esc(a.title || 'Sin titular')}</h2>${a.note ? `<p class="sd-warn">Nota del editor: ${esc(a.note)}</p>` : ''}</div>
+        <div class="pnl-row-acts">
+          ${a.status === 'review' && canPublish() ? '<button type="button" class="adp-btn" data-la="approve">Aprobar y publicar</button><button type="button" class="pnl-link" data-la="return">Devolver</button>' : ''}
+          <button type="button" class="adp-btn ghost-dark" data-la="preview">Vista previa</button>
+          <button type="button" class="adp-btn ghost-dark" data-la="edit">${a.status === 'published' ? 'Editar o corregir' : 'Editar'}</button>
+          <button type="button" class="pnl-link" data-la="dup">Duplicar</button>
+          ${DB && (a.status === 'published' || a.status === 'scheduled') ? '' : '<button type="button" class="apr-reject" data-la="del">Borrar</button>'}
+        </div></article>`).join('') || `<p class="apr-empty">${tab === 'draft' ? 'No tienes borradores. Toca “Nueva noticia” para empezar.' : 'Nada aquí todavía.'}</p>`;
+    }
+
+    // ---------- Publicadas: every published article (newest first) ----------
+    function publishedList(): Pub[] {
+      const s = me(); const mine = (p: Pub) => canPublish() || p.author === s?.name;
+      const mineHere = load().filter((a) => a.status === 'published');
+      const local = mineHere.map((a) => ({ id: a.id, title: a.title || 'Sin titular', section: SECS.find((x) => x.id === a.section)?.name ?? '', author: a.author || a.owner,
+        date: new Date(a.date || a.updated).toISOString(), url: a.slug ? `${BASE}${pathOf(a)}` : '', ai: false, local: !DB }));
+      const slugs = new Set(mineHere.map((a) => a.slug).filter(Boolean));
+      return [...local, ...PUBLISHED.filter((p) => !slugs.has(p.id))].filter(mine);
+    }
+    const LIVE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
+    // Real views per story (last 28 days, Google Analytics), for editors and the admin; loaded once
+    let VIEWS: Map<string, number> | null = null; let viewsAsked = false;
+    function loadViews() {
+      if (viewsAsked || (!DB && !DEMO) || !canPublish()) return; viewsAsked = true;
+      const pathname = (u: string) => new URL(u, location.origin).pathname;
+      void (DEMO ? Promise.resolve(demoAnalytics(28, PUBLISHED.map((p) => pathname(p.url)), 1000)) : getAnalytics(28, 1000)).then((d) => {
+        if ('error' in d) return;
+        VIEWS = new Map(); for (const p of d.pages) { const k = p.path.split('?')[0]; VIEWS.set(k, (VIEWS.get(k) ?? 0) + p.views); }
+        if (tab === 'published') renderList();
+      });
+    }
+    function renderPublished(pubs: Pub[]) {
+      loadViews();
+      const rows = pubs.slice().sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+      const viewsOf = (p: Pub) => (VIEWS && p.url ? ` · <span class="wr-views">👁 ${(VIEWS.get(new URL(p.url, location.origin).pathname) ?? 0).toLocaleString('es-PR')} vistas en 28 días</span>` : '');
+      $('[data-wr-list]').innerHTML = rows.map((p) => {
+        const mineArt = load().some((a) => a.id === p.id);
+        const siteStory = !mineArt && !p.local && canPublish(); // a story already on the site (AI or older): editors and admins
+        return `<article class="pnl-row wr-pub" data-pid="${esc(p.id)}"${mineArt ? ` data-id="${esc(p.id)}"` : ''}>
+          <span class="wr-pub-ic" title="Publicada" aria-label="Publicada">${LIVE}</span>
+          <div class="wr-pub-main"><p class="pnl-muted">${esc(p.section)} · ${esc(p.author)} · ${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}${p.local ? ' · <span class="wr-ai">desde el editor</span>' : ''}${viewsOf(p)}</p>
+            <h2>${p.url ? `<a href="${p.url}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)}</h2>
+          </div>
+          <div class="pnl-row-acts">${mineArt ? '<button type="button" class="adp-btn" data-la="edit">Editar o corregir</button>' : siteStory ? `<button type="button" class="adp-btn" data-import="${esc(p.id)}">Editar o corregir</button>` : ''}${p.url ? `<a class="adp-btn ghost-dark" href="${p.url}" target="_blank" rel="noopener">Ver en el sitio ↗</a>` : ''}</div>
+        </article>`;
+      }).join('') || '<p class="apr-empty">Todavía no hay noticias publicadas.</p>';
+    }
+
+    // ---------- editor ----------
+    const body = $('[data-body]');
+    let cur: Art | null = null, dirty = false, timer = 0;
+    const blank = (): Art => ({ id: `A-${Date.now().toString(36)}`, status: 'draft', updated: Date.now(), owner: me()?.name ?? '', title: '', description: '', section: 'noticias', league: '',
+      place: '', author: me()?.name ?? 'NotiCel', date: localNow(), image: '', imageUrl: '', imageCaption: '', imageCredit: '', breaking: false, trending: false, featured: false, live: false, pinned: false, homeLead: false, sectionLead: false, sectionPinned: false,
+      sources: [], related: [], correction: '', body: '' });
+    const field = (k: string) => $<HTMLInputElement>(`[data-f="${k}"]`);
+    function openEditor(a: Art) {
+      cur = structuredClone(a);
+      $('[data-gal-list]').dataset.sig = ''; ($('[data-wr-gal]') as HTMLDetailsElement).open = !!cur.gallery?.length;
+      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction'] as const).forEach((k) => (field(k).value = String(cur![k] ?? '')));
+      (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (field(k).checked = !!cur![k]));
+      body.innerHTML = cur.body || '<p><br></p>';
+      body.querySelectorAll<HTMLElement>('figure.wr-embed').forEach(paintEmbed);
+      $$('[data-editor-only]').forEach((e) => (e.hidden = !canPublish()));
+      $('[data-wr-list-view]').hidden = true; $('[data-wr-editor]').hidden = false;
+      sync(); dirty = false; $('[data-wr-saved]').textContent = ''; scrollTo({ top: 0 });
+      paintSocial(true); void paintSocialStatus();
+      ($('[data-f="title"]') as HTMLTextAreaElement).focus();
+    }
+    function closeEditor() { if (dirty) void persist(); cur = null; $('[data-wr-editor]').hidden = true; $('[data-wr-list-view]').hidden = false; renderList(); }
+    function readEditor() {
+      if (!cur) return;
+      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction'] as const).forEach((k) => ((cur as any)[k] = field(k).value.trim()));
+      (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (cur![k] = field(k).checked));
+      const c = body.cloneNode(true) as HTMLElement; c.querySelectorAll('.wr-mv').forEach((x) => x.remove()); // the move controls aren't part of the story
+      cur.body = c.innerHTML;
+    }
+    async function persist(status?: Art['status']) {
+      readEditor(); if (!cur) return false;
+      if (status) cur.status = status;
+      // A reporter's change to a published story goes back to an editor (their scheduled stories stay scheduled)
+      if (!canPublish() && cur.status === 'published') cur.status = 'review';
+      cur.updated = Date.now();
+      const a = structuredClone(cur);
+      if (!(await store(a))) return false;
+      dirty = false; $('[data-wr-saved]').textContent = `Guardado ${new Date().toLocaleTimeString('es-PR', { hour: 'numeric', minute: '2-digit' })}`;
+      return true;
+    }
+
+    // Everything that depends on the fields: counters, checklist, buttons, file
+    function sync() {
+      if (!cur) return;
+      readEditor();
+      const words = (body.innerText.trim().match(/\S+/g) || []).length;
+      $('[data-wcount]').textContent = `${words} palabras · ${Math.max(1, Math.round(words / 220))} min de lectura${words > 450 ? ' · nuestras noticias suelen tener 250 a 450 palabras' : ''}`;
+      $('[data-cnt="title"]').textContent = `${cur.title.length}/110 caracteres${cur.title.length > 110 ? ' · muy largo para Google y redes' : ''}`;
+      $('[data-cnt="description"]').textContent = `${cur.description.length}/200`;
+      const photo = cur.image || cur.imageUrl;
+      $('[data-photo-empty]').hidden = !!photo; $('[data-photo-full]').hidden = !photo; $('[data-photo-meta]').hidden = !photo;
+      if (photo) $<HTMLImageElement>('[data-photo-img]').src = /^(https?:|data:)/.test(photo) ? photo : `${root.dataset.base!.replace(/\/$/, '')}/${photo}`;
+      const gal = cur.gallery ?? [];
+      $('[data-gal-n]').textContent = gal.length ? `(${gal.length} ${gal.length === 1 ? 'foto' : 'fotos'})` : '(opcional)';
+      const gl = $('[data-gal-list]');
+      if (gl.dataset.sig !== JSON.stringify(gal.map((g) => g.src))) { // repaint only when photos change, so typing keeps focus
+        gl.dataset.sig = JSON.stringify(gal.map((g) => g.src));
+        const abs = (x: string) => (/^(https?:|data:)/.test(x) ? x : `${root.dataset.base!.replace(/\/$/, '')}/${x}`);
+        gl.innerHTML = gal.map((g, i) => `<li data-gi="${i}"><img src="${esc(abs(g.src))}" alt="" loading="lazy" />
+          <div class="wr-gal-f"><input data-gk="caption" value="${esc(g.caption)}" maxlength="200" placeholder="Pie de foto" aria-label="Pie de foto" /><input data-gk="credit" value="${esc(g.credit)}" maxlength="120" placeholder="Crédito (obligatorio)" aria-label="Crédito" /></div>
+          <span class="wr-gal-b"><button type="button" data-gm="-1" aria-label="Subir" ${i === 0 ? 'disabled' : ''}>↑</button><button type="button" data-gm="1" aria-label="Bajar" ${i === gal.length - 1 ? 'disabled' : ''}>↓</button><button type="button" data-grm aria-label="Quitar">✕</button></span></li>`).join('');
+      }
+      $('[data-srcs]').innerHTML = cur.sources.map((s, i) => `<li><span>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a>` : esc(s.name)}</span><button type="button" class="pnl-link" data-src-rm="${i}" aria-label="Quitar">✕</button></li>`).join('');
+      $('[data-rels]').innerHTML = cur.related.map((id, i) => `<li><span>${esc(PUBLISHED.find((r) => r.id === id)?.title ?? RECENT.find((r) => r.id === id)?.title ?? id)}</span><button type="button" class="pnl-link" data-rel-rm="${i}" aria-label="Quitar">✕</button></li>`).join('');
+      paintRelSearch();
+      const future = new Date(cur.date).valueOf() > Date.now() + 60000;
+      const go = $<HTMLButtonElement>('[data-wr-go]');
+      go.textContent = future || (!canPublish() && cur.status === 'scheduled') ? 'Programar' : !canPublish() ? 'Enviar a revisión' : cur.status === 'published' ? 'Actualizar' : 'Publicar';
+      $('[data-wr-state]').textContent = STATUS[cur.status];
+      $('[data-wr-state]').className = `wr-state ${cur.status}`;
+      const checks: Array<[boolean, string]> = [
+        [cur.title.length >= 20 && cur.title.length <= 110, 'Titular claro (20 a 110 caracteres)'],
+        [cur.description.length >= 40, 'Subtítulo de una o dos oraciones'],
+        [words >= 80, 'Al menos 80 palabras'],
+        [!!cur.place, 'Lugar'],
+        [!photo || !!cur.imageCredit, 'Crédito de la foto (si tiene foto)'],
+        ...((cur.gallery ?? []).length ? [[(cur.gallery ?? []).every((g) => g.credit.trim()), 'Crédito en cada foto de la galería'] as [boolean, string]] : []),
+        [cur.sources.length > 0, 'Al menos una fuente'],
+      ];
+      $('[data-checks]').innerHTML = checks.map(([ok, t]) => `<li class="${ok ? 'ok' : ''}"><span>${ok ? '✓' : '○'} ${t}</span></li>`).join('');
+      $<HTMLTextAreaElement>('[data-md]').value = toFile(cur);
+      return checks.every(([ok]) => ok);
+    }
+    const changed = () => { dirty = true; $('[data-wr-saved]').textContent = 'Cambios sin guardar'; clearTimeout(timer); timer = window.setTimeout(() => { if (cur && dirty) void persist(); }, 2500); sync(); };
+    $('[data-wr-editor]').addEventListener('input', changed);
+    $('[data-wr-editor]').addEventListener('change', changed);
+    $$<HTMLTextAreaElement>('.wr-title,.wr-sub').forEach((t) => t.addEventListener('input', () => { t.style.height = 'auto'; t.style.height = `${t.scrollHeight}px`; }));
+
+    // ---------- body: toolbar ----------
+    const exec = (cmd: string, val?: string) => { body.focus(); document.execCommand(cmd, false, val); changed(); };
+    let savedRange: Range | null = null;
+    body.addEventListener('blur', () => { const s = getSelection(); if (s?.rangeCount && body.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange(); });
+    const restore = () => { body.focus(); if (savedRange) { const s = getSelection()!; s.removeAllRanges(); s.addRange(savedRange); } };
+    const insertBlock = (html: string) => { restore(); document.execCommand('insertHTML', false, `${html}<p><br></p>`); body.querySelectorAll<HTMLElement>('figure.wr-embed:not([data-ready])').forEach(paintEmbed); body.querySelectorAll<HTMLElement>('figure.wr-img:not([data-ready])').forEach(paintImg); changed(); };
+    const LAY = { size: { '': '', s: 'Pequeño', m: 'Mediano', l: 'Grande' } as Record<string, string>, align: { '': '', l: 'Izquierda', r: 'Derecha' } as Record<string, string> };
+    const layClass = (f: HTMLElement) => `${f.dataset.size ? ` sz-${f.dataset.size}` : ''}${f.dataset.align ? ` al-${f.dataset.align}` : ''}`;
+    const layLabel = (f: HTMLElement) => [LAY.size[f.dataset.size || ''], LAY.align[f.dataset.align || '']].filter(Boolean).join(' · ');
+    $<HTMLSelectElement>('[data-block]').addEventListener('change', (e) => { const v = (e.target as HTMLSelectElement).value; exec('formatBlock', v === 'p' ? 'P' : v.toUpperCase()); (e.target as HTMLSelectElement).value = 'p'; });
+    function paintEmbed(fig: HTMLElement) {
+      const u = fig.dataset.url!; fig.setAttribute('contenteditable', 'false'); fig.dataset.ready = '1';
+      fig.className = `wr-embed${layClass(fig)}`;
+      fig.innerHTML = `${embedFor(u) ?? ''}<figcaption><span>${esc(layLabel(fig) || u)}</span><span><button type="button" class="pnl-link" data-block-edit>Editar</button> <button type="button" class="pnl-link" data-embed-rm>Quitar</button></span></figcaption>`;
+    }
+    function paintImg(fig: HTMLElement) {
+      fig.setAttribute('contenteditable', 'false'); fig.dataset.ready = '1'; fig.className = `wr-img${layClass(fig)}`;
+      const cap = [fig.dataset.cap, fig.dataset.credit].filter(Boolean).join(' ');
+      fig.innerHTML = `<img src="${esc(fig.dataset.src!)}" alt="${esc(fig.dataset.cap || '')}"><figcaption><span>${esc(cap)}${layLabel(fig) ? ` <small>(${esc(layLabel(fig))})</small>` : ''}</span><span><button type="button" class="pnl-link" data-block-edit>Editar</button></span></figcaption><button type="button" class="wr-photo-x" data-img-rm aria-label="Quitar foto">✕</button>`;
+    }
+    root.addEventListener('click', (e) => {
+      const rm = (e.target as HTMLElement).closest('[data-embed-rm],[data-img-rm]');
+      if (rm) { rm.closest('figure')!.remove(); changed(); }
+    });
+    $$<HTMLButtonElement>('[data-tool]').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
+    $$<HTMLButtonElement>('[data-tool]').forEach((b) => b.addEventListener('click', async () => {
+      const t = b.dataset.tool;
+      if (t === 'bold') exec('bold'); if (t === 'italic') exec('italic');
+      if (t === 'ul') exec('insertUnorderedList'); if (t === 'ol') exec('insertOrderedList');
+      if (t === 'quote') exec('formatBlock', 'BLOCKQUOTE');
+      if (t === 'hr') { exec('insertHorizontalRule'); }
+      if (t === 'undo') exec('undo'); if (t === 'redo') exec('redo');
+      if (t === 'clear') { exec('removeFormat'); exec('formatBlock', 'P'); exec('unlink'); }
+      if (t === 'link') {
+        const sel = getSelection(); if (!sel || sel.isCollapsed) { toast('Primero selecciona las palabras que quieres convertir en enlace.'); return; }
+        linkRange = sel.getRangeAt(0).cloneRange();
+        const cur = (sel.anchorNode?.parentElement?.closest('a') as HTMLAnchorElement | null);
+        linkForm.reset(); (linkForm.elements.namedItem('url') as HTMLInputElement).value = cur?.getAttribute('href') ?? '';
+        openPop('link', b);
+      }
+      if (t === 'doc') { docForm.reset(); $('[data-doc-err]').hidden = true; openPop('doc', b); }
+      if (t === 'embed') { editing = null; embedForm.reset(); $('[data-embed-h]').textContent = 'Insertar video o publicación'; $('[data-embed-go]').textContent = 'Insertar'; embedPrev(); openPop('embed', b); }
+      if (t === 'image') { editing = null; imgForm.reset(); imgData = ''; $('[data-img-prev]').hidden = true; $('[data-img-file-wrap]').hidden = false; $('[data-img-lib]').hidden = false; $('[data-img-h]').textContent = 'Insertar foto'; $('[data-img-go]').textContent = 'Insertar'; openPop('image', b); }
+    }));
+    // Paste: plain text only (no stray styles from other sites); a lone supported link becomes an embed
+    body.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      if (/^https?:\/\/\S+$/.test(text.trim()) && embedFor(text.trim())) { insertBlock(`<figure class="wr-embed" data-url="${esc(text.trim())}"></figure>`); return; }
+      const html = text.split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+      document.execCommand('insertHTML', false, html); changed();
+    });
+
+    // ---------- photos ----------
+    function shrink(file: File, max: number): Promise<string> {
+      return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => { const k = Math.min(1, max / img.naturalWidth); const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+          c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(img.src); res(c.toDataURL('image/jpeg', 0.82)); };
+        img.onerror = () => rej(new Error('read')); img.src = URL.createObjectURL(file);
+      });
+    }
+    $<HTMLInputElement>('[data-photo-file]').addEventListener('change', async (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0]; (e.target as HTMLInputElement).value = ''; if (!f || !cur) return;
+      try { const data = await shrink(f, 1400); cur.image = await upload(data, 'foto', 'jpg'); cur.imageUrl = ''; field('imageUrl').value = ''; changed(); } catch { toast('No pudimos leer esa imagen.'); }
+    });
+    $('[data-photo-rm]').addEventListener('click', () => { if (!cur) return; cur.image = ''; field('imageUrl').value = ''; changed(); });
+    // ---------- gallery: extra photos (upload several, or pick from the library), each with caption and credit ----------
+    $<HTMLInputElement>('[data-gal-file]').addEventListener('change', async (e) => {
+      const inp = e.target as HTMLInputElement; const files = [...(inp.files ?? [])]; inp.value = ''; if (!cur || !files.length) return;
+      toast(files.length === 1 ? 'Subiendo la foto…' : `Subiendo ${files.length} fotos…`);
+      for (const f of files.slice(0, 30)) {
+        try { const data = await shrink(f, 1600); const src = await upload(data, 'foto', 'jpg'); if (src) (cur.gallery ??= []).push({ src, caption: '', credit: '' }); } catch { toast(`No pudimos leer ${f.name}.`); }
+      }
+      changed(); ($('[data-wr-gal]') as HTMLDetailsElement).open = true;
+    });
+    $('[data-gal-list]').addEventListener('input', (e) => {
+      const t = e.target as HTMLInputElement; const i = Number(t.closest<HTMLElement>('[data-gi]')?.dataset.gi); const k = t.dataset.gk as 'caption' | 'credit';
+      if (!cur?.gallery?.[i] || !k) return; cur.gallery[i][k] = t.value;
+    });
+    $('[data-gal-list]').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button'); if (!b || !cur?.gallery) return;
+      const i = Number(b.closest<HTMLElement>('[data-gi]')!.dataset.gi);
+      if (b.hasAttribute('data-grm')) cur.gallery.splice(i, 1);
+      else { const j = i + Number(b.dataset.gm); if (j < 0 || j >= cur.gallery.length) return; [cur.gallery[i], cur.gallery[j]] = [cur.gallery[j], cur.gallery[i]]; }
+      changed();
+    });
+    // Photo library (PhotoLibrary.astro): the main photo, or a photo inside the story, with its caption and credit
+    let libAnchor: HTMLElement | null = null;
+    $$<HTMLButtonElement>('[data-photo-lib]').forEach((b) => b.addEventListener('click', () => { libAnchor = popAnchor; dispatchEvent(new CustomEvent('nc-photo-open', { detail: { target: b.dataset.photoLib } })); }));
+    addEventListener('nc-photo-pick', (e) => {
+      const { photo, target } = (e as CustomEvent).detail as { photo: { src: string; caption?: string; credit?: string }; target: string };
+      if (!cur) return;
+      if (target === 'gallery') { (cur.gallery ??= []).push({ src: photo.src, caption: photo.caption ?? '', credit: photo.credit ?? '' }); changed(); ($('[data-wr-gal]') as HTMLDetailsElement).open = true; toast('Foto añadida a la galería.'); return; }
+      if (target === 'main') {
+        cur.image = ''; field('imageUrl').value = photo.src; field('imageCaption').value = photo.caption ?? ''; field('imageCredit').value = photo.credit ?? ''; changed();
+        toast('Foto principal escogida de la biblioteca.'); return;
+      }
+      // A photo inside the story: back to the "Insertar foto" panel with it ready
+      imgData = photo.src; const pv = $<HTMLImageElement>('[data-img-prev]'); pv.src = photo.src; pv.hidden = false;
+      (imgForm.elements.namedItem('cap') as HTMLInputElement).value = photo.caption ?? '';
+      (imgForm.elements.namedItem('credit') as HTMLInputElement).value = photo.credit ?? '';
+      if (libAnchor) openPop('image', libAnchor);
+    });
+
+    // ---------- sources and related ----------
+    root.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement; if (!cur) return;
+      if (t.closest('[data-src-add]')) {
+        const n = $<HTMLInputElement>('[data-src-name]'), u = $<HTMLInputElement>('[data-src-url]');
+        let name = n.value.trim(), link = u.value.trim();
+        if (name.length < 2) { n.focus(); return; }
+        if (/^https?:\/\/\S+$/i.test(name)) { if (!link) link = name; try { name = new URL(name).hostname.replace(/^www\./, ''); } catch { /* keep as typed */ } }
+        cur.sources.push({ name: name.slice(0, 80), ...(link ? { url: link } : {}) }); n.value = ''; u.value = ''; changed();
+      }
+      const sr = t.closest<HTMLElement>('[data-src-rm]'); if (sr) { cur.sources.splice(Number(sr.dataset.srcRm), 1); changed(); }
+      const rr = t.closest<HTMLElement>('[data-rel-rm]'); if (rr) { cur.related.splice(Number(rr.dataset.relRm), 1); changed(); }
+    });
+    // Related stories: search every published story and tick as many as you want (up to 6)
+    const plainTxt = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    function paintRelSearch() {
+      if (!cur) return;
+      const q = plainTxt($<HTMLInputElement>('[data-rel-q]').value.trim()); const words = q.split(/\s+/).filter(Boolean);
+      const own = cur.slug;
+      const hits = PUBLISHED.filter((p) => p.id !== own && words.every((w) => plainTxt(`${p.title} ${p.section}`).includes(w))).slice(0, q ? 30 : 8);
+      $('[data-rel-res]').innerHTML = hits.map((p) => { const on = cur!.related.includes(p.id); return `<li><label class="${on ? 'on' : ''}"><input type="checkbox" data-rel-id="${esc(p.id)}" ${on ? 'checked' : ''} ${!on && cur!.related.length >= 6 ? 'disabled' : ''} />
+        <span><b>${esc(p.title)}</b><small>${esc(p.section)} · ${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}</small></span></label></li>`; }).join('')
+        || `<li class="pnl-muted pnl-small">${q ? 'No encontramos noticias con esas palabras.' : ''}</li>`;
+    }
+    $('[data-rel-q]').addEventListener('input', paintRelSearch);
+    $('[data-rel-res]').addEventListener('change', (e) => {
+      const c = e.target as HTMLInputElement; const id = c.dataset.relId; if (!cur || !id) return;
+      if (c.checked && !cur.related.includes(id)) { if (cur.related.length >= 6) { c.checked = false; toast('Puedes escoger hasta 6 relacionadas.'); return; } cur.related.push(id); }
+      if (!c.checked) cur.related = cur.related.filter((x) => x !== id);
+      changed();
+    });
+
+    // ---------- the story file (same shape as src/content.config.ts) ----------
+    const md = {
+      text: (s: string) => s.replace(/ /g, ' ').replace(/([*_`[\]\\])/g, '\\$1'),
+      inline(n: Node): string {
+        if (n.nodeType === 3) return md.text(n.textContent ?? '');
+        if (!(n instanceof HTMLElement)) return '';
+        const inner = [...n.childNodes].map(md.inline).join('');
+        const tag = n.tagName;
+        if (tag === 'STRONG' || tag === 'B') return inner.trim() ? `**${inner}**` : inner;
+        if (tag === 'EM' || tag === 'I') return inner.trim() ? `*${inner}*` : inner;
+        if (tag === 'A') return `[${inner}](${(n as HTMLAnchorElement).getAttribute('href')})`;
+        if (tag === 'BR') return '  \n';
+        return inner;
+      },
+      block(n: Node): string {
+        if (n.nodeType === 3) return (n.textContent ?? '').trim() ? md.text(n.textContent!.trim()) : '';
+        if (!(n instanceof HTMLElement)) return '';
+        const tag = n.tagName, line = () => [...n.childNodes].map(md.inline).join('').trim();
+        if (n.classList.contains('wr-raw')) return decodeURIComponent(n.dataset.html || '');
+        if (n.classList.contains('wr-embed')) return n.dataset.size || n.dataset.align ? embedFor(n.dataset.url!, { size: n.dataset.size, align: n.dataset.align }) ?? '' : n.dataset.url ?? '';
+        if (n.classList.contains('wr-doc')) { // an uploaded PDF goes to public/documentos/ when published (with accounts)
+          const d = docOf(n); if (d.src.startsWith('data:')) d.src = `${root.dataset.base!.replace(/\/$/, '')}/documentos/${(cur?.id ?? 'doc').toLowerCase()}-${d.title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.pdf`;
+          return docCard(d);
+        }
+        if (n.classList.contains('wr-img')) {
+          const cap = [n.dataset.cap, n.dataset.credit].filter(Boolean).join(' ') || (n.querySelector('figcaption span')?.textContent ?? n.querySelector('figcaption')?.textContent ?? '').trim();
+          const src = n.dataset.src || n.querySelector('img')?.getAttribute('src') || '';
+          return `<figure class="${layClass(n).trim()}"><img src="${src}" alt="${esc(n.dataset.cap || '')}" loading="lazy" />${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`;
+        }
+        if (tag === 'H2') return `## ${line()}`;
+        if (tag === 'H3' || tag === 'H4') return `### ${line()}`;
+        if (tag === 'HR') return '---';
+        if (tag === 'BLOCKQUOTE') return line().split('\n').map((l) => `> ${l}`).join('\n');
+        if (tag === 'UL' || tag === 'OL') return [...n.children].map((li, i) => `${tag === 'OL' ? `${i + 1}.` : '-'} ${[...li.childNodes].map(md.inline).join('').trim()}`).join('\n');
+        return line(); // P, DIV and anything else become a paragraph
+      },
+      body: (html: string) => { const d = document.createElement('div'); d.innerHTML = html; return [...d.childNodes].map(md.block).filter((b) => b.trim()).join('\n\n'); },
+    };
+    const y = (v: string) => JSON.stringify(v);
+
+    // ---------- open a story that is already on the site (AI or older) in the editor ----------
+    // The story file: from NotiCel's GitHub repository when it exists (newest), else from the site itself (redaccion/archivo/)
+    const RAW = REPO ? `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/content/noticias/` : `${BASE}/redaccion/archivo/`;
+    const MANAGED = new Set(['title', 'description', 'categories', 'path', 'place', 'date', 'author', 'image', 'imageCaption', 'imageCredit',
+      'breaking', 'topStory', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned', 'aiAssisted', 'draft', 'sources', 'related', 'correction', 'gallery']);
+    const BROAD = ['noticias', 'ultima-hora', 'uncategorized']; // never the main category when a story has a more specific one
+    const unq = (v: string) => { v = v.trim(); try { return v.startsWith('"') ? JSON.parse(v) : v.replace(/^'(.*)'$/, '$1'); } catch { return v; } };
+    const inline = (t: string) => esc(t.replace(/\\([*_`[\]\\])/g, '$1'))
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, '$1<i>$2</i>')
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>').replace(/ {2}\n/g, '<br>');
+    /** Markdown story body → the editor's HTML (blocks it can't edit are kept as they are). */
+    function mdToHtml(src: string) {
+      return src.trim().split(/\n{2,}/).map((b) => {
+        const t = b.trim();
+        if (t.startsWith('<')) return `<figure class="wr-raw" contenteditable="false" data-html="${encodeURIComponent(t)}">${t}</figure>`;
+        if (/^https?:\/\/\S+$/.test(t)) return `<figure class="wr-embed" contenteditable="false" data-url="${esc(t)}"></figure>`;
+        if (/^###\s/.test(t)) return `<h3>${inline(t.replace(/^###\s+/, ''))}</h3>`;
+        if (/^##\s/.test(t)) return `<h2>${inline(t.replace(/^##\s+/, ''))}</h2>`;
+        if (t === '---') return '<hr>';
+        if (/^>\s?/.test(t)) return `<blockquote>${inline(t.replace(/^>\s?/gm, ''))}</blockquote>`;
+        const lines = t.split('\n');
+        if (lines.every((l) => /^[-*]\s/.test(l))) return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^[-*]\s+/, ''))}</li>`).join('')}</ul>`;
+        if (lines.every((l) => /^\d+\.\s/.test(l))) return `<ol>${lines.map((l) => `<li>${inline(l.replace(/^\d+\.\s+/, ''))}</li>`).join('')}</ol>`;
+        return `<p>${inline(t)}</p>`;
+      }).join('');
+    }
+    /** A story file from the site → an article in the editor that updates that same story when published. */
+    function fromFile(id: string, text: string): Art | null {
+      const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/); if (!m) return null;
+      const fm: Record<string, string> = {}; const sources: Src[] = []; const related: string[] = []; const extra: string[] = []; const gallery: Gal[] = [];
+      let key = '';
+      for (const line of m[1].split('\n')) {
+        const top = line.match(/^([A-Za-z]\w*):\s*(.*)$/);
+        if (top) { key = top[1]; if (MANAGED.has(key)) fm[key] = top[2]; else extra.push(line); continue; }
+        if (!MANAGED.has(key)) { extra.push(line); continue; }
+        const nm = line.match(/^\s*-\s*name:\s*(.*)$/), ur = line.match(/^\s+url:\s*(.*)$/), li = line.match(/^\s*-\s*(.*)$/);
+        if (key === 'sources' && nm) sources.push({ name: unq(nm[1]) });
+        else if (key === 'sources' && ur && sources.length) sources[sources.length - 1].url = unq(ur[1]);
+        else if (key === 'related' && li) related.push(unq(li[1]));
+        else if (key === 'gallery') {
+          const gs = line.match(/^\s*-\s*src:\s*(.*)$/), gk = line.match(/^\s+(caption|credit|creditUrl):\s*(.*)$/);
+          if (gs) gallery.push({ src: unq(gs[1]), caption: '', credit: '' });
+          else if (gk && gallery.length) (gallery[gallery.length - 1] as Record<string, string>)[gk[1]] = unq(gk[2]);
+        }
+      }
+      const yes = (k: string) => fm[k] === 'true';
+      let cats: string[] = []; try { cats = JSON.parse(fm.categories || '[]'); } catch { /* not a list */ }
+      const main = cats.find((c) => !BROAD.includes(c)) ?? cats[0] ?? 'noticias';
+      const d = new Date(unq(fm.date || '')); const local = isNaN(+d) ? localNow() : new Date(+d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      return { id: `A-${Date.now().toString(36)}`, status: 'published', updated: Date.now(), owner: me()?.name ?? '', slug: id,
+        title: unq(fm.title || ''), description: unq(fm.description || ''), section: main, league: '', path: unq(fm.path || '') || undefined, cats: cats.filter((c) => c !== main),
+        place: unq(fm.place || ''), author: unq(fm.author || 'NotiCel'), date: local, image: unq(fm.image || ''), imageUrl: '',
+        imageCaption: unq(fm.imageCaption || ''), imageCredit: unq(fm.imageCredit || ''),
+        breaking: yes('breaking'), trending: false, featured: yes('topStory'), live: yes('live'), pinned: yes('pinned'), homeLead: yes('homeLead'), sectionLead: yes('sectionLead'), sectionPinned: yes('sectionPinned'),
+        aiAssisted: yes('aiAssisted'), fmExtra: extra.join('\n').trim() || undefined,
+        sources, related, gallery, correction: unq(fm.correction || ''), body: mdToHtml(m[2]) };
+    }
+    /** A story on the site as an article of the team (opened before, or brought from its file now). */
+    async function storyArt(id: string): Promise<Art | null> {
+      if (DB) await refresh(); // the team's latest: someone may have opened this story already
+      const have = load().find((a) => a.slug === id); if (have) return have;
+      toast('Abriendo la noticia…');
+      const r = await fetch(`${RAW}${encodeURIComponent(id)}.md?t=${Date.now()}`).catch(() => null);
+      const a = r?.ok ? fromFile(id, await r.text()) : null;
+      if (!a) { toast('No pudimos abrir esa noticia. Intenta otra vez en un minuto.'); return null; }
+      if (!(await store(a))) return null; // saved for the team, linked to the story on the site
+      return a;
+    }
+    async function importStory(id: string) {
+      const a = await storyArt(id); if (!a) return;
+      openEditor(a); toast('Lista para editar. Al tocar “Actualizar”, se corrige la misma noticia en el sitio.');
+    }
+    /** Takes a story off the site (its file gets draft: true; the site rebuilds in about 2 minutes). It stays in
+     *  Escribir → Borradores, so it can be corrected and published again. Editors and the admin only. */
+    async function takeDown(id: string): Promise<boolean> {
+      if (!canPublish()) { toast('Solo los editores y el administrador pueden quitar noticias del sitio.'); return false; }
+      const a = await storyArt(id); if (!a || !a.slug) return false;
+      if (!DB) { toast(`${PREV}, la noticia se quita del sitio.`); return false; }
+      const file = toFile(a).replace(/^draft: false$/m, 'draft: true');
+      const r = await publishArticle({ id: a.id, slug: a.slug, file, title: a.title, scheduled: false });
+      if (!r.ok) { toast(`No se pudo quitar: ${r.error}`); void logPanelError(me()?.name ?? '', `Quitar: ${a.title}`, r.error ?? ''); return false; }
+      await store({ ...a, status: 'draft', updated: Date.now(), note: `Quitada del sitio el ${new Date().toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}. Corrígela y publícala otra vez si hace falta.` });
+      await refresh(); renderList(); dispatchEvent(new Event('nc-articles-changed'));
+      toast('Quitada. Desaparece del sitio en unos 2 minutos. Está en Escribir → Borradores.');
+      return true;
+    }
+    addEventListener('nc-takedown', async (e) => {
+      const id = (e as CustomEvent).detail.id as string;
+      const ok = await takeDown(id);
+      dispatchEvent(new CustomEvent('nc-takedown-done', { detail: { id, ok } }));
+    });
+    root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-import]'); if (b) void importStory(b.dataset.import!); });
+    addEventListener('nc-edit-story', (e) => void importStory((e as CustomEvent).detail.id)); // "Editar" in Noticias → Vistazo rápido
+
+    /** The gallery in the story file. Without a main photo, the first gallery photo becomes the main one (toFile). */
+    const galleryYaml = (a: Art) => {
+      const g = (a.gallery ?? []).filter((x) => x.src && !x.src.startsWith('data:'));
+      const list = a.image || a.imageUrl ? g : g.slice(1);
+      return list.length ? ['gallery:', ...list.flatMap((x) => [`  - src: ${y(x.src)}`, `    caption: ${y(x.caption || '')}`, `    credit: ${y(x.credit || '')}`, ...(x.creditUrl ? [`    creditUrl: ${y(x.creditUrl)}`] : [])])] : [];
+    };
+    function toFile(a: Art) {
+      const gy = galleryYaml(a); // before the first gallery photo is promoted, so it isn't listed twice
+      if (!(a.image || a.imageUrl) && a.gallery?.[0]?.src && !a.gallery[0].src.startsWith('data:')) a = { ...a, imageUrl: a.gallery[0].src, imageCaption: a.gallery[0].caption, imageCredit: a.gallery[0].credit };
+      const date = new Date(a.date || Date.now());
+      // Main category first (the label over the headline), then the story's other categories; Última hora adds that category
+      const cats = [...new Set([a.section, ...(a.cats ?? []).filter((c) => c !== a.section), ...(a.breaking ? ['ultima-hora'] : [])])];
+      return ['---', `title: ${y(a.title)}`, `description: ${y(a.description)}`, `date: ${date.toISOString()}`, `author: ${y(a.author || 'NotiCel')}`,
+        `path: ${y(pathOf(a))}`, `categories: ${JSON.stringify(cats)}`, ...(a.place ? [`place: ${y(a.place)}`] : []),
+        ...(a.image || a.imageUrl ? [`image: ${y(a.imageUrl || (a.image.startsWith('data:') ? `imagenes/${a.id.toLowerCase()}.jpg` : a.image))}`, ...(a.imageCaption ? [`imageCaption: ${y(a.imageCaption)}`] : []), ...(a.imageCredit ? [`imageCredit: ${y(a.imageCredit)}`] : [])] : []),
+        ...gy,
+        ...(a.featured ? ['topStory: true'] : []),
+        ...(['breaking', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).filter((k) => a[k]).map((k) => `${k}: true`),
+        `aiAssisted: ${a.aiAssisted ?? false}`, 'draft: false', ...(a.fmExtra ? [a.fmExtra] : []),
+        ...(a.sources.length ? ['sources:', ...a.sources.flatMap((s) => [`  - name: ${y(s.name)}`, ...(s.url ? [`    url: ${y(s.url)}`] : [])])] : []),
+        ...(a.related.length ? ['related:', ...a.related.map((r) => `  - ${y(r)}`)] : []),
+        ...(a.correction ? [`correction: ${y(a.correction)}`] : []),
+        '---', '', md.body(a.body), ''].join('\n');
+    }
+    const slug = (a: Art) => `${new Date(a.date || Date.now()).toISOString().slice(0, 10)}-${a.title.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70) || 'noticia'}`;
+    $('[data-dl]').addEventListener('click', () => {
+      if (!cur) return; readEditor();
+      const blob = new Blob([toFile(cur)], { type: 'text/markdown' }); const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `${slug(cur)}.md`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
+
+    // ---------- insert panels, opened next to the button (or the block) that called them ----------
+    const pops = Object.fromEntries($$<HTMLDialogElement>('[data-pop]').map((d) => [d.dataset.pop!, d]));
+    let popAnchor: HTMLElement | null = null, editing: HTMLElement | null = null, linkRange: Range | null = null, imgData = '';
+    function placePop(d: HTMLDialogElement) {
+      if (!popAnchor) return;
+      if (innerWidth < 640) { d.style.left = '8px'; d.style.right = '8px'; d.style.top = 'auto'; d.style.bottom = '8px'; return; } // phones: a sheet at the bottom
+      const r = popAnchor.getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight;
+      const left = Math.min(Math.max(8, r.left), innerWidth - w - 8);
+      const below = r.bottom + 8, top = below + h > innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : Math.min(below, innerHeight - h - 8);
+      Object.assign(d.style, { left: `${left}px`, top: `${Math.max(8, top)}px`, right: 'auto', bottom: 'auto' });
+    }
+    function openPop(name: string, anchor: HTMLElement) {
+      Object.values(pops).forEach((d) => d.open && d.close());
+      popAnchor = anchor; const d = pops[name];
+      d.show(); placePop(d);
+      d.querySelector<HTMLInputElement>('input:not([type=radio]):not([type=checkbox])')?.focus({ preventScroll: true });
+    }
+    const closePops = () => Object.values(pops).forEach((d) => d.open && d.close());
+    addEventListener('scroll', () => Object.values(pops).forEach((d) => d.open && placePop(d)), { passive: true });
+    addEventListener('resize', () => Object.values(pops).forEach((d) => d.open && placePop(d)));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePops(); });
+    document.addEventListener('mousedown', (e) => {
+      const t = e.target as Node;
+      if (Object.values(pops).some((d) => d.open && d.contains(t)) || (popAnchor && popAnchor.contains(t))) return;
+      closePops();
+    });
+    $$('[data-pop-close]').forEach((b) => b.addEventListener('click', closePops));
+    const radio = (f: HTMLFormElement, n: string, v: string) => $$<HTMLInputElement>(`input[name="${n}"]`, f).forEach((r) => (r.checked = r.value === v));
+    const val = (f: HTMLFormElement, n: string) => String(new FormData(f).get(n) ?? '').trim();
+
+    // Link
+    const linkForm = $<HTMLFormElement>('[data-link-form]');
+    linkForm.addEventListener('submit', (e) => {
+      e.preventDefault(); const href = val(linkForm, 'url'); if (!/^https?:\/\/\S+\.\S+/.test(href)) return;
+      closePops(); body.focus(); if (linkRange) { const s2 = getSelection()!; s2.removeAllRanges(); s2.addRange(linkRange); }
+      exec('createLink', href);
+      const a = getSelection()?.anchorNode?.parentElement?.closest('a'); if (a) { a.target = new FormData(linkForm).get('newtab') ? '_blank' : ''; if (a.target) a.rel = 'noopener'; else a.removeAttribute('target'); }
+    });
+    $('[data-unlink]').addEventListener('click', () => { closePops(); body.focus(); if (linkRange) { const s2 = getSelection()!; s2.removeAllRanges(); s2.addRange(linkRange); } exec('unlink'); });
+
+    // Video or post: live preview at the chosen size and position
+    const embedForm = $<HTMLFormElement>('[data-embed-form]');
+    function embedPrev() {
+      const u = val(embedForm, 'url'); const box = $('[data-embed-prev]'); $('[data-embed-err]').hidden = true;
+      const html = u ? embedFor(u, { size: val(embedForm, 'size'), align: val(embedForm, 'align') }) : null;
+      box.innerHTML = html ? `<div class="body wr-emb-body">${html}<p class="wr-lorem">El texto de la noticia sigue aquí y rodea la publicación cuando está a la izquierda o a la derecha.</p></div>` : `<p class="pnl-muted pnl-small">${u ? 'Ese enlace no se puede insertar.' : 'Pega el enlace y verás la publicación aquí.'}</p>`;
+      if (pops.embed.open) placePop(pops.embed);
+    }
+    embedForm.addEventListener('input', embedPrev); embedForm.addEventListener('change', embedPrev);
+    embedForm.addEventListener('submit', (e) => {
+      e.preventDefault(); const u = val(embedForm, 'url');
+      if (!embedFor(u)) { const er = $('[data-embed-err]'); er.textContent = 'Ese enlace no se puede insertar. Prueba con YouTube, X, Instagram, Facebook, TikTok, Spotify o Google Maps.'; er.hidden = false; return; }
+      const size = val(embedForm, 'size'), align = val(embedForm, 'align'); closePops();
+      if (editing) { Object.assign(editing.dataset, { url: u, size, align }); paintEmbed(editing); changed(); editing = null; return; }
+      insertBlock(`<figure class="wr-embed" data-url="${esc(u)}" data-size="${size}" data-align="${align}"></figure>`);
+    });
+
+    // Photo inside the story
+    const imgForm = $<HTMLFormElement>('[data-img-form]');
+    imgForm.addEventListener('change', async (e) => {
+      const inp = e.target as HTMLInputElement; if (inp.name !== 'file' || !inp.files?.[0]) return;
+      imgData = await shrink(inp.files[0], 1200).catch(() => ''); const pv = $<HTMLImageElement>('[data-img-prev]');
+      if (imgData) { pv.src = imgData; pv.hidden = false; } else toast('No pudimos leer esa imagen.');
+      placePop(pops.image);
+    });
+    imgForm.addEventListener('submit', async (e) => {
+      e.preventDefault(); const cap = val(imgForm, 'cap'), credit = val(imgForm, 'credit'), size = val(imgForm, 'size'), align = val(imgForm, 'align');
+      if (editing) { Object.assign(editing.dataset, { cap, credit, size, align }); paintImg(editing); changed(); editing = null; closePops(); return; }
+      if (!imgData) { const er = $('[data-img-err]'); er.textContent = 'Escoge una foto.'; er.hidden = false; return; }
+      closePops();
+      const src = await upload(imgData, 'foto', 'jpg'); if (!src) return;
+      insertBlock(`<figure class="wr-img" data-src="${esc(src)}" data-cap="${esc(cap)}" data-credit="${esc(credit)}" data-size="${size}" data-align="${align}"></figure>`);
+    });
+    // "Editar" on a video, post or photo already in the story: the same panel, next to it
+    body.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-block-edit]'); if (!b) return;
+      const fig = b.closest<HTMLElement>('figure')!; editing = fig;
+      if (fig.classList.contains('wr-embed')) {
+        embedForm.reset(); (embedForm.elements.namedItem('url') as HTMLInputElement).value = fig.dataset.url!;
+        radio(embedForm, 'size', fig.dataset.size || ''); radio(embedForm, 'align', fig.dataset.align || '');
+        $('[data-embed-h]').textContent = 'Editar publicación'; $('[data-embed-go]').textContent = 'Guardar'; embedPrev(); openPop('embed', b);
+      } else {
+        imgForm.reset(); (imgForm.elements.namedItem('cap') as HTMLInputElement).value = fig.dataset.cap || ''; (imgForm.elements.namedItem('credit') as HTMLInputElement).value = fig.dataset.credit || '';
+        radio(imgForm, 'size', fig.dataset.size || ''); radio(imgForm, 'align', fig.dataset.align || '');
+        const pv = $<HTMLImageElement>('[data-img-prev]'); pv.src = fig.dataset.src!; pv.hidden = false; $('[data-img-file-wrap]').hidden = true; $('[data-img-lib]').hidden = true;
+        $('[data-img-h]').textContent = 'Editar foto'; $('[data-img-go]').textContent = 'Guardar'; openPop('image', b);
+      }
+    });
+
+    // ---------- documents (PDF) ----------
+    const docDlg = $<HTMLDialogElement>('[data-doc-dlg]'); const docForm = $<HTMLFormElement>('[data-doc-form]');
+    const docOf = (f: HTMLElement) => ({ src: f.dataset.src!, title: f.dataset.title!, pages: Number(f.dataset.pages) || 0, size: Number(f.dataset.size) || 0, source: f.dataset.source || '' });
+    // Rough page count straight from the PDF file (counts its page objects)
+    const pdfPages = (buf: ArrayBuffer) => (new TextDecoder('latin1').decode(buf).match(/\/Type\s*\/Page[^s]/g) || []).length;
+    docForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = new FormData(docForm); const err = $('[data-doc-err]');
+      const title = String(d.get('title') || '').trim(), link = String(d.get('url') || '').trim(), source = String(d.get('source') || '').trim();
+      const file = d.get('file') as File | null;
+      if (title.length < 4) { err.textContent = 'Escribe un título para el documento.'; err.hidden = false; return; }
+      let src = '', size = 0, pages = 0;
+      if (file && file.size) {
+        if (file.type !== 'application/pdf') { err.textContent = 'Sube el documento en PDF.'; err.hidden = false; return; }
+        if (file.size > 8 * 1048576) { err.textContent = 'El PDF pasa de 8 MB. Pega un enlace o comprímelo.'; err.hidden = false; return; }
+        const buf = await file.arrayBuffer(); pages = pdfPages(buf); size = file.size;
+        src = await new Promise<string>((r) => { const fr = new FileReader(); fr.onload = () => r(String(fr.result)); fr.readAsDataURL(file); });
+        err.textContent = 'Subiendo el PDF…'; err.hidden = false;
+        src = await upload(src, 'doc', 'pdf');
+        if (!src) { err.textContent = 'No se pudo subir el PDF. Revisa tu conexión, o pega el enlace del documento.'; return; }
+        err.hidden = true;
+      } else if (/^https?:\/\/\S+$/.test(link)) src = link;
+      else { err.textContent = 'Sube un PDF o pega su enlace.'; err.hidden = false; return; }
+      docDlg.close();
+      insertBlock(`<figure class="wr-doc" contenteditable="false" data-src="${esc(src)}" data-title="${esc(title)}" data-pages="${pages}" data-size="${size}" data-source="${esc(source)}"></figure>`);
+    });
+    // In the editor the block shows the same card readers will see, plus a remove button
+    const paintDocs = () => body.querySelectorAll<HTMLElement>('figure.wr-doc:not([data-ready])').forEach((f) => {
+      f.dataset.ready = '1'; f.innerHTML = `${docCard(docOf(f)).replace(/^<figure class="doc-card">|<\/figure>$/g, '')}<button type="button" class="wr-photo-x" data-img-rm aria-label="Quitar documento">✕</button>`;
+    });
+    new MutationObserver(paintDocs).observe(body, { childList: true, subtree: true });
+
+    // ---------- move photos, videos, posts and documents inside the story: ↑ ↓ buttons, or drag them ----------
+    const MV = '<span class="wr-mv" contenteditable="false"><button type="button" class="wr-mv-h" draggable="true" data-drag title="Arrastra para moverlo" aria-label="Arrastrar para mover">⠿</button><button type="button" data-move="-1" title="Subir" aria-label="Subir">↑</button><button type="button" data-move="1" title="Bajar" aria-label="Bajar">↓</button></span>';
+    const isBlock = (el: Element | null): el is HTMLElement => !!el && el.matches('figure.wr-img, figure.wr-embed, figure.wr-doc, figure.wr-raw');
+    const addMovers = () => [...body.children].forEach((f) => { if (isBlock(f) && !f.querySelector(':scope > .wr-mv')) f.insertAdjacentHTML('afterbegin', MV); });
+    new MutationObserver(addMovers).observe(body, { childList: true, subtree: true });
+    const emptyLine = (el: Element) => !isBlock(el) && !(el.textContent ?? '').trim() && !el.querySelector('img,iframe');
+    /** One step up or down, skipping empty lines. */
+    function moveBlock(f: HTMLElement, dir: number) {
+      let sib = dir < 0 ? f.previousElementSibling : f.nextElementSibling;
+      while (sib && emptyLine(sib)) sib = dir < 0 ? sib.previousElementSibling : sib.nextElementSibling;
+      if (!sib) { toast(dir < 0 ? 'Ya está al principio.' : 'Ya está al final.'); return; }
+      if (dir < 0) sib.before(f); else sib.after(f);
+      f.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); f.classList.add('wr-moved'); setTimeout(() => f.classList.remove('wr-moved'), 700);
+      changed();
+    }
+    body.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-move]'); if (!b) return;
+      e.preventDefault(); moveBlock(b.closest<HTMLElement>('figure')!, Number(b.dataset.move));
+    });
+    let dragging: HTMLElement | null = null, dropAt: { el: HTMLElement; after: boolean } | null = null;
+    const clearDrop = () => body.querySelectorAll('.wr-drop-before,.wr-drop-after').forEach((x) => x.classList.remove('wr-drop-before', 'wr-drop-after'));
+    body.addEventListener('dragstart', (e) => {
+      const h = (e.target as HTMLElement).closest?.('[data-drag]'); if (!h) return;
+      dragging = h.closest<HTMLElement>('figure'); dragging?.classList.add('wr-dragging');
+      e.dataTransfer!.effectAllowed = 'move'; e.dataTransfer!.setData('text/plain', ' ');
+    });
+    body.addEventListener('dragover', (e) => {
+      if (!dragging) return; e.preventDefault();
+      let t = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      while (t && t.parentElement !== body) t = t.parentElement;
+      clearDrop(); if (!t || t === dragging) { dropAt = null; return; }
+      const r = t.getBoundingClientRect(); const after = e.clientY > r.top + r.height / 2;
+      t.classList.add(after ? 'wr-drop-after' : 'wr-drop-before'); dropAt = { el: t, after };
+    });
+    body.addEventListener('drop', (e) => {
+      if (!dragging) return; e.preventDefault(); clearDrop();
+      if (dropAt) { if (dropAt.after) dropAt.el.after(dragging); else dropAt.el.before(dragging); changed(); }
+      dragging.classList.remove('wr-dragging'); dragging = null; dropAt = null;
+    });
+    body.addEventListener('dragend', () => { clearDrop(); dragging?.classList.remove('wr-dragging'); dragging = null; dropAt = null; });
+    body.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('.doc-open')) e.preventDefault(); }); // no navigation while editing
+
+    // ---------- preview: the real story page (/redaccion/vista-previa/) in a frame, at computer or phone width ----------
+    const prevDlg = $<HTMLDialogElement>('[data-wr-prev]'); const frame = $<HTMLIFrameElement>('[data-prev-frame]');
+    const PREVIEW_URL = `${root.dataset.base!.replace(/\/$/, '')}/redaccion/vista-previa/`;
+    const sendPreview = (a: Art) => { try { localStorage.setItem('nc-preview', JSON.stringify(a)); } catch { toast('No se pudo preparar la vista previa: hay demasiadas fotos grandes.'); } };
+    function showPreview(a: Art) {
+      sendPreview(a);
+      if (!frame.src) frame.src = PREVIEW_URL; else frame.contentWindow?.location.reload();
+      prevDlg.showModal();
+    }
+    $('[data-wr-preview]').addEventListener('click', () => { if (!cur) return; readEditor(); showPreview(cur); });
+    $$<HTMLButtonElement>('[data-dev]').forEach((b) => b.addEventListener('click', () => {
+      $$('[data-dev]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      $('[data-prev-stage]').classList.toggle('phone', b.dataset.dev === 'phone');
+    }));
+    $('[data-prev-close]').addEventListener('click', () => prevDlg.close());
+    // While the preview is open in another tab, typing updates it
+    $('[data-wr-editor]').addEventListener('input', () => { if (cur) { clearTimeout((sendPreview as any).t); (sendPreview as any).t = setTimeout(() => { readEditor(); sendPreview(cur!); }, 600); } });
+
+    // ---------- save / send / publish ----------
+    $('[data-wr-save]').addEventListener('click', async () => { if (await persist(cur?.status === 'published' ? 'published' : cur?.status === 'review' ? 'review' : 'draft')) toast('Borrador guardado.'); });
+    const when = (d: string) => new Date(d).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).replace(/\.$/, ''); // "a. m." would end in two periods
+    /** Puts a saved article on the site: the "publicar" function saves its file in GitHub (shared database only). */
+    /** Only one story is pinned (📌) in the Portada: publishing a pinned story unpins the others for real. */
+    async function unpinOthers(a: Art): Promise<string[]> {
+      if (!a.pinned && !a.sectionPinned) return [];
+      const live = (x: Art) => x.id !== a.id && (x.status === 'published' || x.status === 'scheduled');
+      const old = load().filter((x) => live(x) && ((a.pinned && x.pinned) || (a.sectionPinned && x.sectionPinned && x.section === a.section)));
+      const done: string[] = [];
+      for (const o of old) {
+        const u: Art = structuredClone(o); u.updated = Date.now();
+        // The replaced story moves to the first spot under the new one (Portada and/or its section)
+        if (a.pinned && u.pinned) { u.pinned = false; u.homeLead = true; }
+        if (a.sectionPinned && u.sectionPinned && u.section === a.section) { u.sectionPinned = false; u.sectionLead = true; }
+        if (!(await store(u))) continue;
+        if (DB && u.slug) { const r = await publishArticle({ id: u.id, slug: u.slug, file: toFile(u), title: u.title, scheduled: u.status === 'scheduled' }); if (!r.ok) continue; }
+        done.push(u.title || 'Sin titular');
+      }
+      return done;
+    }
+    const unpinNote = (titles: string[]) => (titles.length ? ` Se desfijó “${titles.join('”, “')}”.` : '');
+    async function goLive(a: Art): Promise<boolean> {
+      const future = new Date(a.date).valueOf() > Date.now() + 60000;
+      if (!DB) {
+        a.path = pathOf(a); a.status = future ? 'scheduled' : 'published'; a.updated = Date.now(); await store(a);
+        const un = await unpinOthers(a);
+        toast((future ? `Programada para el ${when(a.date)}. ${PREV}, sale sola a esa hora.` : `Publicada. ${PREV}, aparece en el sitio en unos 2 minutos.`) + unpinNote(un)
+          + (a.social?.ig || a.social?.fb ? ` ${DEMO ? 'Modo demo' : 'Vista previa'}: Instagram y Facebook no se envían.` : ''));
+        return true;
+      }
+      toast('Publicando…');
+      a.path = pathOf(a); // the address is fixed from the first publication on
+      const r = await publishArticle({ id: a.id, slug: slug(a), file: toFile(a), title: a.title, scheduled: future });
+      if (!r.ok) { toast(`No se publicó: ${r.error}`); void logPanelError(me()?.name ?? '', `${future ? 'Programar' : 'Publicar'}: ${a.title || 'Sin titular'}`, r.error ?? ''); return false; }
+      a.status = future ? 'scheduled' : 'published'; a.slug = r.slug; a.updated = Date.now();
+      await refresh();
+      const un = await unpinOthers(a);
+      if (un.length) await refresh();
+      toast((future ? `Programada: sale sola el ${when(a.date)}.` : 'Publicada. Aparece en el sitio en unos 2 minutos.') + unpinNote(un));
+      if (a.social?.ig || a.social?.fb) void sendSocial(a);
+      return true;
+    }
+
+    // ---------- Redes sociales: Instagram (image + caption) and Facebook (link) go out with the story; X opens ready to post ----------
+    const SEC_PHOTOS: Record<string, { src: string; credit: string }> = JSON.parse(root.dataset.secPhotos || '{}');
+    const absUrl = (p: string) => (/^(https?:|data:)/.test(p) ? p : new URL(`${root.dataset.base!.replace(/\/$/, '')}/${p.replace(/^\//, '')}`, location.origin).href);
+    function socialStory(a: Art): SocialStory {
+      const own = a.imageUrl || a.image, def = SEC_PHOTOS[a.section];
+      return { title: a.title || 'Sin titular', description: a.description, section: a.section, sectionName: SECS.find((x) => x.id === a.section)?.name ?? '',
+        photo: own ? absUrl(own) : def ? absUrl(def.src) : '', credit: own ? a.imageCredit : def?.credit ?? '',
+        url: new URL(`${BASE}${pathOf(a)}`, location.origin).href };
+    }
+    const igCanvas = $<HTMLCanvasElement>('[data-ig-canvas]'); let igTimer = 0;
+    /** Shows the social settings of the open story; fills the texts unless someone edited them. */
+    function paintSocial(redraw = false) {
+      if (!cur) return;
+      const sc = (cur.social ??= {}), st = socialStory(cur);
+      $<HTMLInputElement>('[data-sc="ig"]').checked = !!sc.ig; $<HTMLInputElement>('[data-sc="fb"]').checked = !!sc.fb;
+      $('[data-ig-box]').hidden = !sc.ig; $('[data-sc-text="fb"]').hidden = !sc.fb;
+      const ig = $<HTMLTextAreaElement>('[data-sc-text="ig"]'), fb = $<HTMLTextAreaElement>('[data-sc-text="fb"]');
+      if (document.activeElement !== ig) ig.value = sc.igText ?? instagramCaption(st);
+      if (document.activeElement !== fb) fb.value = sc.fbText ?? facebookMessage(st);
+      if (sc.ig && redraw) { clearTimeout(igTimer); igTimer = window.setTimeout(() => void drawInstagram(igCanvas, socialStory(cur!), absUrl('logo.png')), 400); }
+    }
+    root.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement; const k = t.dataset.sc as 'ig' | 'fb' | undefined;
+      if (!k || !cur) return;
+      (cur.social ??= {})[k] = t.checked; paintSocial(true); changed();
+    });
+    root.addEventListener('input', (e) => {
+      const t = e.target as HTMLTextAreaElement; const k = t.dataset.scText as 'ig' | 'fb' | undefined;
+      if (!k || !cur) return;
+      (cur.social ??= {})[k === 'ig' ? 'igText' : 'fbText'] = t.value; // edited by hand: keep it as written
+    });
+    // The image follows the headline, section and photo as they change
+    ['title', 'description', 'section', 'imageUrl', 'imageCredit'].forEach((k) => field(k).addEventListener('input', () => { if (cur?.social?.ig) { readEditor(); paintSocial(true); } }));
+    $('[data-ig-dl]').addEventListener('click', () => { const a = document.createElement('a'); a.href = igCanvas.toDataURL('image/jpeg', 0.92); a.download = `${cur ? slug(cur) : 'noticia'}-instagram.jpg`; a.click(); });
+    $('[data-sc-x]').addEventListener('click', () => {
+      if (!cur) return; readEditor();
+      if (cur.status !== 'published' && cur.status !== 'scheduled' && !cur.slug) { toast('Primero publica la noticia; luego abre 𝕏 con el enlace listo.'); return; }
+      window.open(xComposeUrl(socialStory(cur)), '_blank', 'noopener');
+    });
+    /** After publishing: makes the Instagram image, saves it, and asks the server to post (now, or at the scheduled time). */
+    async function sendSocial(a: Art) {
+      const sc = a.social ?? {}, st = socialStory(a);
+      let image = '';
+      if (sc.ig) {
+        const c = document.createElement('canvas'); await drawInstagram(c, st, absUrl('logo.png'));
+        let data = ''; try { data = c.toDataURL('image/jpeg', 0.9); } catch { /* a photo that blocks reuse */ }
+        image = (data && (await uploadStoryFile(`social/${a.slug}-${Date.now().toString(36)}.jpg`, data))) || '';
+        if (!image) { toast('No se pudo preparar la imagen de Instagram. Descárgala desde Redes sociales y súbela a mano.'); }
+      }
+      const r = await queueSocial({ id: a.id, slug: a.slug!, due: new Date(a.date || Date.now()).toISOString(),
+        ig: sc.ig && image ? { image, caption: sc.igText ?? instagramCaption(st) } : undefined,
+        fb: sc.fb ? { message: sc.fbText ?? facebookMessage(st), link: st.url } : undefined });
+      if (r.error) { toast(`Redes sociales: ${r.error}`); void logPanelError(me()?.name ?? '', `Redes: ${a.title}`, r.error); }
+      else if (r.note) toast(r.note);
+    }
+    async function paintSocialStatus() {
+      const ul = $('[data-sc-status]'); ul.innerHTML = '';
+      if (!DB || !cur) return;
+      const res = await staffApi(`social_posts?article_id=eq.${encodeURIComponent(cur.id)}&select=network,status,result,due_at,sent_at`);
+      const rows: Array<{ network: string; status: string; result: string; due_at: string; sent_at: string | null }> = res?.ok ? await res.json() : [];
+      const NAME: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook' };
+      const ST: Record<string, string> = { sent: '✓ publicada', pending: '⏳ sale', error: '⚠ no salió', skipped: '— no se envió' };
+      ul.innerHTML = rows.map((x) => `<li><b>${NAME[x.network] ?? x.network}</b> ${ST[x.status] ?? x.status}${x.status === 'pending' ? ` el ${when(x.due_at)}` : x.sent_at ? ` el ${when(x.sent_at)}` : ''}${x.result && x.status !== 'sent' ? `<small>${esc(x.result)}</small>` : ''}</li>`).join('');
+    }
+    const goBtn = $<HTMLButtonElement>('[data-wr-go]');
+    goBtn.addEventListener('click', async () => {
+      if (!cur) return;
+      const ok = sync();
+      if (!ok && !(await ask('Faltan cosas en “Antes de publicar”. ¿Seguir de todos modos?', { ok: 'Seguir' }))) return;
+      goBtn.disabled = true;
+      try {
+        const future = new Date(cur.date).valueOf() > Date.now() + 60000;
+        if (!canPublish() && cur.status === 'scheduled' && !future) { toast('Escoge una fecha y hora futura. Para publicarla ahora, pídele a un editor.'); return; }
+        if (!canPublish() && future) { // periodistas schedule their own stories; labels and pins are for editors
+          (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (cur![k] = false)); cur.note = '';
+          if (!(await persist(cur.status === 'scheduled' ? 'scheduled' : 'draft'))) return;
+          if (await goLive(structuredClone(cur))) { closeEditor(); dispatchEvent(new Event('nc-articles-changed')); }
+          return;
+        }
+        if (!canPublish()) { cur.note = ''; if (await persist('review')) { toast('Enviada a revisión. Un editor la revisará.'); closeEditor(); dispatchEvent(new Event('nc-articles-changed')); } return; }
+        // Save first (as it is now), then publish the saved copy
+        if (!(await persist(cur.status === 'published' || cur.status === 'scheduled' ? cur.status : 'draft'))) return;
+        if (await goLive(structuredClone(cur))) { closeEditor(); dispatchEvent(new Event('nc-articles-changed')); }
+      } finally { goBtn.disabled = false; }
+    });
+    $('[data-wr-back]').addEventListener('click', closeEditor);
+    $('[data-wr-new]').addEventListener('click', () => openEditor(blank()));
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const st = t.closest<HTMLElement>('[data-ws]');
+      if (st) { tab = st.dataset.ws as Art['status']; $$('[data-ws]').forEach((b) => b.setAttribute('aria-selected', String(b === st))); renderList(); return; }
+      const la = t.closest<HTMLElement>('[data-la]'); if (!la) return;
+      const id = t.closest<HTMLElement>('[data-id]')!.dataset.id!; const all = load(); const a = all.find((x) => x.id === id)!;
+      if (la.dataset.la === 'edit') openEditor(a);
+      if (la.dataset.la === 'preview') showPreview(a);
+      if (la.dataset.la === 'dup') { const { slug: _s, path: _p, ...copy } = structuredClone(a); /* a copy is a new story with its own address */ await store({ ...copy, id: `A-${Date.now().toString(36)}`, status: 'draft', title: `${a.title} (copia)`, updated: Date.now(), owner: me()?.name ?? a.owner }); renderList(); }
+      if (la.dataset.la === 'del') { if (await ask(`¿Borrar “${a.title || 'Sin titular'}”?`, { ok: 'Borrar', danger: true })) { await drop(id); renderList(); } }
+      if (la.dataset.la === 'approve') { (la as HTMLButtonElement).disabled = true; await goLive(structuredClone(a)); renderList(); dispatchEvent(new Event('nc-articles-changed')); }
+      if (la.dataset.la === 'return') { const n = await askText('¿Qué debe corregir el periodista?', { placeholder: 'ej. Falta la fuente oficial del dato.', ok: 'Devolver', multiline: true }); if (n === null) return; await store({ ...a, status: 'draft', note: n, updated: Date.now() }); renderList(); dispatchEvent(new Event('nc-articles-changed')); }
+    });
+    // Noticias → Por aprobar: the same actions as this list, from the editor's queue
+    const reviewArt = async (id: string) => { await refresh(); const a = load().find((x) => x.id === id); if (!a) toast('Esa noticia ya no está en revisión.'); return a; };
+    addEventListener('nc-open-article', async (e) => { const a = await reviewArt((e as CustomEvent).detail.id); if (a) openEditor(a); });
+    addEventListener('nc-approve-article', async (e) => { const a = await reviewArt((e as CustomEvent).detail.id); if (a) await goLive(structuredClone(a)); renderList(); dispatchEvent(new Event('nc-articles-changed')); });
+    addEventListener('nc-return-article', async (e) => {
+      const { id, note } = (e as CustomEvent).detail; const a = await reviewArt(id); if (!a) return;
+      if (await store({ ...a, status: 'draft', note, updated: Date.now() })) toast('Devuelta al periodista con tu nota.');
+      renderList(); dispatchEvent(new Event('nc-articles-changed'));
+    });
+    addEventListener('beforeunload', () => { if (cur && dirty) void persist(); });
+    addEventListener('nc-staff-change', () => { if (!cur) renderList(); }); // signed in or out: show that person's list
+    // Demo mode: a few sample stories in every list, the first time (they stay on this device only)
+    if (DEMO && !load().length) {
+      const ago = (h: number) => Date.now() - h * 36e5, at = (h: number) => new Date(Date.now() + h * 36e5 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      const p = (t: string) => t.split('\n').map((x) => `<p>${x}</p>`).join('');
+      const S = (o: Partial<Art>): Art => ({ ...blank(), owner: 'Periodista (ejemplo)', author: 'Periodista (ejemplo)', sources: [{ name: 'Comunicado de prensa (ejemplo)' }], ...o } as Art);
+      [
+        S({ id: 'A-EJ1', status: 'review', updated: ago(1), section: 'noticias', title: '(Ejemplo) Municipio inaugura una cancha bajo techo en el barrio Pueblo', description: 'La obra costó $1.2 millones y estará abierta al público desde el lunes, según el alcalde.', place: 'Caguas',
+          body: p('Esta es una noticia de ejemplo para mostrar cómo trabaja el panel. Un periodista la escribió y la envió a revisión.\nEl editor la lee, la corrige si hace falta y la aprueba con un toque. En el panel real, la noticia sale en el sitio en unos 2 minutos.') }),
+        S({ id: 'A-EJ2', status: 'review', updated: ago(3), section: 'voleibol', title: '(Ejemplo) Equipo juvenil de voleibol clasifica a la final del torneo regional', description: 'Las jugadoras ganaron en cuatro sets y buscan el título el sábado.', place: 'Ponce',
+          body: p('Noticia de ejemplo de la sección de Deportes, esperando la aprobación de un editor.\nDesde aquí el editor puede aprobarla, abrirla en el editor o devolverla al periodista con una nota.') }),
+        S({ id: 'A-EJ3', status: 'scheduled', updated: ago(5), section: 'economia', date: at(20), title: '(Ejemplo) Feria de empleo con 40 patronos se celebra mañana en el centro de convenciones', description: 'Habrá entrevistas en el momento y talleres para preparar el resumé.', place: 'San Juan',
+          body: p('Noticia de ejemplo programada: sale sola a la hora escogida, sin que nadie tenga que estar despierto para publicarla.') }),
+        S({ id: 'A-EJ4', status: 'draft', updated: ago(0.5), owner: me()?.name ?? 'Invitado', author: me()?.name ?? 'Invitado', section: 'entretenimiento', title: '(Ejemplo) Festival de bomba y plena llena la plaza este fin de semana', description: 'Borrador de ejemplo: el editor guarda solo, cada pocos segundos.', place: 'Loíza',
+          body: p('Borrador de ejemplo. Prueba a escribir aquí: el texto se guarda solo, y puedes añadir fotos, videos y publicaciones de redes.') }),
+        S({ id: 'A-EJ5', status: 'draft', updated: ago(26), section: 'gobierno', title: '(Ejemplo) Agencia anuncia horario extendido para renovar licencias', description: 'Las oficinas abrirán los sábados durante octubre.', place: 'Bayamón',
+          body: p('Otro borrador de ejemplo, de un periodista del equipo.') }),
+      ].forEach((a) => void store(a));
+      setTimeout(() => dispatchEvent(new Event('nc-articles-changed')), 0); // Noticias → Por aprobar picks them up
+    }
+    if (DB) { $('[data-wr-list]').innerHTML = '<p class="apr-empty">Cargando las noticias del equipo…</p>'; refresh().then(renderList); } else renderList();
+  }
+</script>

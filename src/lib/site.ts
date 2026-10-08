@@ -10,6 +10,8 @@ export const SITE = {
   subtitle: 'Noticias de Puerto Rico',
   description: 'NotiCel: noticias de Puerto Rico. La verdad como es.',
   timeZone: 'America/Puerto_Rico',
+  // Set to true once an Anthropic API key is added for the automatic news writer (the panel's Salud tab reads it)
+  aiKeyConnected: false,
 };
 
 /* NotiCel's categories, exactly as WordPress has them, so every old category address keeps working.
@@ -56,6 +58,18 @@ export async function allStories(): Promise<Story[]> {
   return (await getCollection('noticias', (s) => !s.data.draft)).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 }
 
+/** Same as allStories (the name the staff panel files use, from Noticias Xtra). */
+export const getStories = allStories;
+
+/** A story's main category: its most specific one (also the panel's "Sección"). */
+export const mainCategory = (s: Story) => kicker(s)?.slug ?? 'noticias';
+
+/* The staff panel (copied from Noticias Xtra) lists "sections"; on NotiCel those are the categories. */
+export const SECTIONS = Object.entries(CATEGORY_INFO)
+  .filter(([slug]) => slug !== 'uncategorized')
+  .map(([id, c]) => ({ id, name: c.path.includes('/') ? `${CATEGORY_INFO[c.path.split('/')[0]]?.name ?? ''} › ${c.name}` : c.name, short: c.name, path: c.path }))
+  .sort((a, b) => a.path.localeCompare(b.path));
+
 export const inCategory = (s: Story, slug: string) => s.data.categories.includes(slug);
 
 /** Label over a headline: the story's most specific category. */
@@ -80,3 +94,12 @@ export function mostRead(all: Story[], n = 5): Story[] {
 
 /** Stories per category page (/category/deportes/page/2/ ...) */
 export const CATEGORY_PAGE_SIZE = 20;
+
+/** Puerto Rico's 78 towns (staff panel: the "Lugar" list). Same list as Noticias Xtra. */
+export const PR_MUNICIPIOS = ['Adjuntas', 'Aguada', 'Aguadilla', 'Aguas Buenas', 'Aibonito', 'Añasco', 'Arecibo', 'Arroyo', 'Barceloneta', 'Barranquitas',
+  'Bayamón', 'Cabo Rojo', 'Caguas', 'Camuy', 'Canóvanas', 'Carolina', 'Cataño', 'Cayey', 'Ceiba', 'Ciales', 'Cidra', 'Coamo', 'Comerío', 'Corozal',
+  'Culebra', 'Dorado', 'Fajardo', 'Florida', 'Guánica', 'Guayama', 'Guayanilla', 'Guaynabo', 'Gurabo', 'Hatillo', 'Hormigueros', 'Humacao', 'Isabela',
+  'Jayuya', 'Juana Díaz', 'Juncos', 'Lajas', 'Lares', 'Las Marías', 'Las Piedras', 'Loíza', 'Luquillo', 'Manatí', 'Maricao', 'Maunabo', 'Mayagüez',
+  'Moca', 'Morovis', 'Naguabo', 'Naranjito', 'Orocovis', 'Patillas', 'Peñuelas', 'Ponce', 'Quebradillas', 'Rincón', 'Río Grande', 'Sabana Grande',
+  'Salinas', 'San Germán', 'San Juan', 'San Lorenzo', 'San Sebastián', 'Santa Isabel', 'Toa Alta', 'Toa Baja', 'Trujillo Alto', 'Utuado',
+  'Vega Alta', 'Vega Baja', 'Vieques', 'Villalba', 'Yabucoa', 'Yauco'];

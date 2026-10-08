@@ -1,0 +1,799 @@
+---
+// Staff panel ("Panel de la redacción"): one login for everything waiting on the newsroom.
+// Tabs: Inicio, Noticias (approve, quick look, every published story), Escribir, Fotos (photo library), Ventas, Comentarios,
+// Anuncios, Analítica (Google Analytics through the 'analitica' Edge Function), Salud del sitio, Equipo. What each person
+// sees depends on their role. Ingresos comes back when Stripe/ATH are connected.
+// NotiCel version: same panel as Noticias Xtra, with NotiCel's categories and story addresses.
+// Login: Supabase email + password, role from the `staff` table. "Por aprobar" lists the stories reporters sent for
+// review (table `articles`) and the automatic news waiting as pull requests in GitHub; Salud reads the real GitHub status.
+import Base from '../../layouts/Base.astro';
+import '../../styles/panel.css';
+import AdQueue from '../../components/AdQueue.astro';
+import CommentQueue from '../../components/CommentQueue.astro';
+import SalesDesk from '../../components/panel/SalesDesk.astro';
+import Writer from '../../components/panel/Writer.astro';
+import Tasks from '../../components/panel/Tasks.astro';
+import PhotoLibrary from '../../components/panel/PhotoLibrary.astro';
+import { getStories, url, SECTIONS, SITE, mainCategory, inCategory } from '../../lib/site';
+import { hasBackend } from '../../lib/backend';
+import { getCollection } from 'astro:content';
+import fs from 'node:fs';
+
+const stories = await getStories();
+const hasBackendBuild = hasBackend(); // Supabase connected: real accounts and team
+const secName = (id: string) => SECTIONS.find((x) => x.id === id)?.short ?? '';
+// Everything on the site, for Escribir → Publicadas (with views once analytics is connected)
+const published = stories.map((s) => ({ id: s.id, title: s.data.title, section: secName(mainCategory(s)), author: s.data.author, date: s.data.date.toISOString(), url: url(s.data.path), ai: s.data.aiAssisted }));
+// The story pinned (📌) in the home page's main spot, for the reminder on Inicio
+const pinnedStory = stories.filter((s) => s.data.pinned).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())[0];
+const pin = pinnedStory ? { title: pinnedStory.data.title, date: pinnedStory.data.date.toISOString(), url: url(pinnedStory.data.path) } : null;
+// Stories pinned at the top of each category (newest pin per category), for the same reminder
+const sectionPins = SECTIONS.map((sec) => {
+  const p = stories.filter((s) => mainCategory(s) === sec.id && s.data.sectionPinned).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())[0];
+  return p ? { section: sec.short, title: p.data.title, url: url(p.data.path) } : null;
+}).filter(Boolean);
+const recent = stories.filter((s) => !inCategory(s, 'opiniones')).slice(0, 12)
+  .map((s) => ({ id: s.id, title: s.data.title, section: secName(mainCategory(s)), url: url(s.data.path), date: s.data.date.toISOString(), author: s.data.author }));
+// Automatic news sources (official and primary only). None yet on NotiCel; same shape as Noticias Xtra's scripts/sources.json.
+const srcs: Array<{ name: string; section: string; review: string }> = [];
+// Salud del sitio: stories missing something, every web photo (checked in the browser) and story files scheduled ahead
+const words = (t = '') => (t.replace(/<[^>]+>/g, ' ').match(/[\p{L}\p{N}]+/gu) || []).length;
+const isWeb = (x = '') => /^https?:/.test(x);
+const problems = stories.map((s) => {
+  const d = s.data; const p: string[] = [];
+  if (!d.image) p.push('sin foto propia');
+  else if (!isWeb(d.image) && !fs.existsSync(`public/${d.image.replace(/^\//, '')}`)) p.push('la foto no existe');
+  else if (!d.imageCredit && !d.imageCaption) p.push('foto sin crédito'); // WordPress captions carry the credit (e.g. "EFE/...")
+  if (d.gallery.some((g) => !g.credit)) p.push('galería sin crédito');
+  const w = words(s.body); if (w < 150) p.push(`solo ${w} palabras`);
+  if (d.aiAssisted && !d.sources.length) p.push('sin fuentes'); // automated news must cite its official sources
+  return p.length ? { id: s.id, title: d.title, date: d.date.toISOString(), p } : null;
+}).filter(Boolean);
+const webPhotos = stories.flatMap((s) => [s.data.image ?? '', ...s.data.gallery.map((g) => g.src)].filter(isWeb).map((src) => ({ id: s.id, title: s.data.title, src })));
+const aheadFiles = (await getCollection('noticias', ({ data }) => !data.draft && data.date.valueOf() > Date.now()))
+  .map((s) => ({ title: s.data.title, author: s.data.author, date: s.data.date.toISOString() }));
+const TABS = [
+  ['inicio', 'Inicio', '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>'],
+  ['noticias', 'Noticias', '<path d="M4 5h13v14H6a2 2 0 0 1-2-2zM17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5"/>'],
+  ['escribir', 'Escribir', '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'],
+  ['fotos', 'Fotos', '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/>'],
+  ['comentarios', 'Comentarios', '<path d="M4 5h16v11H9l-5 4z"/>'],
+  ['ventas', 'Ventas', '<path d="M3 7h18l-2 12H5z"/><path d="M8 7a4 4 0 0 1 8 0"/>'],
+  ['anuncios', 'Anuncios', '<path d="M3 11v2l13 5V6L3 11z"/><path d="M16 9a3 3 0 0 1 0 6"/>'],
+  ['analitica', 'Analítica', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
+  ['salud', 'Salud del sitio', '<path d="M3 12h4l2-5 4 10 2-5h6"/>'],
+  ['equipo', 'Equipo', '<circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0M16 4a3.5 3.5 0 0 1 0 7M22 20a7 7 0 0 0-4-6.3"/>'],
+];
+---
+<Base title="Panel de la redacción" description="Panel interno de NotiCel (uso del personal)." noindex staff>
+  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(SECTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url }) => ({ id, title, section, author, date, url })))} data-sources={JSON.stringify(srcs)} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()} data-aikey={String(SITE.aiKeyConnected)}>
+    <form class="pnl-login" data-login hidden>
+      <p class="pnl-kicker">NotiCel</p>
+      <h1>Panel de la redacción</h1>
+      <p class="pnl-muted">Todo lo que te espera en un solo lugar: noticias por aprobar, comentarios, anuncios, ingresos y analítica.</p>
+      {/* With the database: email and password; the role comes from the staff list. Preview: name and role. */}
+      <div class="pnl-real" data-real hidden>
+        <label for="pnl-mail">Correo</label>
+        <input id="pnl-mail" type="email" autocomplete="username" />
+        <label for="pnl-pass">Contraseña</label>
+        <input id="pnl-pass" type="password" autocomplete="current-password" />
+      </div>
+      <div class="pnl-prev" data-prevlogin>
+      <label for="pnl-name">Tu nombre</label>
+      <input id="pnl-name" maxlength="30" autocomplete="name" placeholder="ej. Alfredo" />
+      <label for="pnl-role">Rol</label>
+      <select id="pnl-role">
+        <option value="admin">Administrador: todo</option>
+        <option value="editor">Editor: noticias, comentarios y analítica</option>
+        <option value="ads">Ventas: clientes, anuncios e ingresos</option>
+        <option value="reporter">Periodista: escribir sus noticias</option>
+      </select>
+      </div>
+      <p class="cm-err" data-err hidden></p>
+      <button type="submit" class="adp-btn">Entrar</button>
+      <p class="pnl-note" data-prevlogin><span class="sp-demo">VISTA PREVIA</span> Sin contraseña por ahora. Con las cuentas, cada persona entra con su correo y su contraseña, y su rol lo asigna el administrador.</p>
+    </form>
+
+    <div class="pnl-app" data-pnl-app hidden>
+      <aside class="pnl-side">
+        <div class="pnl-me"><span class="pnl-av" data-av></span><span><b data-me></b><small data-role></small></span></div>
+        <nav class="pnl-nav" aria-label="Secciones del panel">
+          {TABS.map(([id, name, d]) => (
+            <button type="button" data-tab={id} aria-current="false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><Fragment set:html={d} /></svg>
+              <span>{name}</span><b class="pnl-n" data-count={id}></b>
+            </button>
+          ))}
+        </nav>
+        <button type="button" class="pnl-out" data-logout>Salir</button>
+      </aside>
+
+      <div class="pnl-main">
+
+        <!-- Inicio -->
+        <section class="pnl-pane" data-pane="inicio">
+          <h1 class="pnl-h">Buenos días, <span data-me></span></h1>
+          <p class="pnl-muted" data-today></p>
+          <div class="pnl-kpis" data-kpis></div>
+          <h2 class="pnl-h2">Lo que te espera</h2>
+          <ul class="pnl-todo" data-todo></ul>
+          <Tasks />
+        </section>
+
+        <!-- Noticias -->
+        <section class="pnl-pane" data-pane="noticias" hidden>
+          <h1 class="pnl-h">Noticias</h1>
+          <p class="pnl-muted">Aprueba lo que espera por ti, dale un vistazo a lo último que salió y busca cualquier noticia publicada para corregirla o quitarla.</p>
+          <nav class="apn-tabs pnl-sub" role="tablist" aria-label="Noticias">
+            <button type="button" role="tab" aria-selected="true" data-nf="pending">Por aprobar <b data-nn="pending"></b></button>
+            <button type="button" role="tab" aria-selected="false" data-nf="check">Vistazo rápido <b data-nn="check"></b></button>
+            <button type="button" role="tab" aria-selected="false" data-nf="pub">Publicadas <b data-nn="pub"></b></button>
+          </nav>
+          <div class="pnl-list" data-news></div>
+        </section>
+
+        <!-- Escribir -->
+        <section class="pnl-pane" data-pane="escribir" hidden>
+          <Writer recent={recent.map(({ id, title }) => ({ id, title }))} published={published} />
+        </section>
+
+        <!-- Fotos -->
+        <section class="pnl-pane" data-pane="fotos" hidden>
+          <PhotoLibrary />
+        </section>
+
+        <!-- Ventas -->
+        <section class="pnl-pane" data-pane="ventas" hidden>
+          <SalesDesk />
+        </section>
+
+        <!-- Comentarios -->
+        <section class="pnl-pane" data-pane="comentarios" hidden>
+          <CommentQueue embedded />
+        </section>
+
+        <!-- Anuncios -->
+        <section class="pnl-pane" data-pane="anuncios" hidden>
+          <AdQueue embedded />
+        </section>
+
+        <!-- Analítica: real visits from Google Analytics (Edge Function "analitica") -->
+        <section class="pnl-pane" data-pane="analitica" hidden>
+          <header class="sd-head"><div><h1 class="pnl-h">Analítica <span class="sp-demo" data-an-demo hidden>DEMO</span></h1><p class="pnl-muted"><span data-an-real>Visitas reales del sitio, de Google Analytics.</span> <span data-an-at></span></p><p class="pnl-note" data-an-demo hidden><span class="sp-demo">DEMO</span> Números de ejemplo para mostrar cómo funciona esta pestaña. Con el panel real, aquí salen las visitas de Google Analytics.</p></div>
+            <div class="pnl-range" role="group" aria-label="Período"><button type="button" data-range="1">Hoy</button><button type="button" data-range="7" aria-pressed="true">7 días</button><button type="button" data-range="28">28 días</button></div></header>
+          <div data-an-msg hidden></div>
+          <div data-an-body>
+            <div class="pnl-kpis" data-an-kpis></div>
+            <div class="pnl-card"><h2 class="pnl-h3" data-an-chart-h>Visitantes por día</h2><div class="pnl-chart" data-an-chart></div></div>
+            <div class="pnl-grid2">
+              <div class="pnl-card"><h2 class="pnl-h3">Noticias más leídas</h2><ol class="pnl-top" data-an-top></ol></div>
+              <div class="pnl-card"><h2 class="pnl-h3">De dónde llegan</h2><div data-an-ref></div></div>
+            </div>
+            <div class="pnl-grid2">
+              <div class="pnl-card"><h2 class="pnl-h3">Dónde están</h2><div data-an-geo></div></div>
+              <div class="pnl-card"><h2 class="pnl-h3">Dispositivos</h2><div data-an-dev></div></div>
+            </div>
+            <p class="pnl-muted pnl-small">“Ahora mismo” es al instante. Las visitas de hoy pueden tardar unas horas en aparecer completas. Mientras el sitio tenga clave de acceso, solo cuentan quienes la conocen.</p>
+          </div>
+        </section>
+
+        <!-- Salud -->
+        <section class="pnl-pane" data-pane="salud" hidden>
+          <h1 class="pnl-h">Salud del sitio</h1>
+          <p class="pnl-muted">Estado real del sitio en este momento.</p>
+          <div class="pnl-kpis" data-health></div>
+          <div class="pnl-grid2">
+            <div class="pnl-card"><h2 class="pnl-h3">¿Está todo en línea?</h2><ul class="sl-lights" data-lights></ul></div>
+            <div class="pnl-card"><h2 class="pnl-h3">Programadas <small data-sched-n></small></h2><ul class="sl-list" data-sched></ul></div>
+            <div class="pnl-card"><h2 class="pnl-h3">Comentarios y cuentas</h2><div data-sl-mod><p class="pnl-muted">Cargando…</p></div></div>
+            <div class="pnl-card"><h2 class="pnl-h3">Espacio usado <small>plan gratis de Supabase</small></h2><div data-space><p class="pnl-muted">Cargando…</p></div></div>
+          </div>
+          <div class="pnl-card"><h2 class="pnl-h3">Noticias con problemas <small data-prob-n></small></h2><p class="pnl-muted pnl-small">Les falta algo: foto, crédito de la foto, texto o fuentes. Toca “Corregir” para arreglarla en Escribir.</p><ul class="sl-list" data-prob></ul><button type="button" class="pnl-link" data-prob-more hidden>Ver todas</button></div>
+          <div class="pnl-grid2">
+            <div class="pnl-card"><h2 class="pnl-h3">Fotos rotas</h2><p class="pnl-muted pnl-small" data-ph-note></p><ul class="sl-list" data-sl-ph></ul><button type="button" class="adp-btn ghost-dark" data-ph-run>Revisar las fotos</button></div>
+            <div class="pnl-card"><h2 class="pnl-h3">Errores al publicar</h2><p class="pnl-muted pnl-small">Si publicar, programar o quitar una noticia falla, queda anotado aquí.</p><ul class="sl-list" data-errs></ul><button type="button" class="pnl-link" data-errs-clear hidden>Borrar la lista</button></div>
+          </div>
+          <div class="pnl-grid2">
+            <div class="pnl-card"><h2 class="pnl-h3">Cuentas y conexiones</h2><ul class="pnl-checks" data-accounts></ul></div>
+            <div class="pnl-card"><h2 class="pnl-h3">Fuentes de noticias <small data-src-n></small></h2><ul class="pnl-srcs" data-sl-srcs></ul></div>
+          </div>
+          <div class="pnl-card"><h2 class="pnl-h3">Herramientas de Google</h2><ul class="sl-tools">
+            <li><a href="https://search.google.com/search-console" target="_blank" rel="noopener">Search Console ↗</a><small>si Google encuentra las noticias nuevas y errores</small></li>
+            <li><a href="https://pagespeed.web.dev/analysis?url=https%3A%2F%2Fnoticel.com%2F" target="_blank" rel="noopener">Velocidad (PageSpeed) ↗</a><small>mide bien después del lanzamiento: mientras haya clave de acceso, Google ve la página de la clave</small></li>
+            <li><a href="https://analytics.google.com/" target="_blank" rel="noopener">Google Analytics ↗</a><small>visitantes: cuando lo conectes, sus números salen en este panel</small></li>
+          </ul></div>
+        </section>
+
+        <!-- Equipo -->
+        <section class="pnl-pane" data-pane="equipo" hidden>
+          <h1 class="pnl-h">Equipo</h1>
+          <p class="pnl-muted">Quién entra al panel y qué puede hacer.</p>
+          {hasBackendBuild && <p class="pnl-muted pnl-small">Para añadir a alguien: primero crea su cuenta en el sitio (Entrar → Crear cuenta). Luego escribe aquí su nombre, su correo o @usuario y su rol. Entra al panel con ese mismo correo y contraseña.</p>}
+          <ul class="pnl-team" data-team></ul>
+          <form class="pnl-add" data-add novalidate>
+            <input placeholder="Nombre" data-add-name maxlength="30" aria-label="Nombre" />
+            <input placeholder="Correo o @usuario" data-add-mail maxlength="60" aria-label="Correo o nombre de usuario" autocapitalize="off" />
+            <select data-add-role aria-label="Rol"><option value="editor">Editor</option><option value="ads">Ventas</option><option value="reporter">Periodista</option><option value="admin">Administrador</option></select>
+            <button type="submit" class="adp-btn">Añadir</button>
+          </form>
+          <h2 class="pnl-h2">Qué puede hacer cada rol</h2>
+          <div class="pnl-tablewrap" data-perms></div>
+        </section>
+      </div>
+    </div>
+    <div class="apn-toast" data-ptoast role="status" hidden></div>
+  </main>
+
+  <script>
+    import { ask, askText } from '../../lib/dialogs';
+    import { getReports } from '../../lib/moderation';
+    import { listRequests, loadRequests } from '../../lib/adrequests';
+    import { isDemo, demoAnalytics } from '../../lib/demo';
+    import { REPO } from '../../lib/repo';
+    import { BACKEND, getAnalytics, hasBackend, staffApi, staffLogin, staffLogout, staffProfile, syncTeam, addToTeam, removeFromTeam } from '../../lib/backend';
+    const root = document.querySelector<HTMLElement>('[data-pnl]')!;
+    const RECENT: Array<{ id: string; title: string; section: string; url: string; date: string; author: string }> = JSON.parse(root.dataset.recent!);
+    const SOURCES: Array<{ name: string; section: string; review: string }> = JSON.parse(root.dataset.sources!);
+    const PROBLEMS: Array<{ id: string; title: string; date: string; p: string[] }> = JSON.parse(root.dataset.problems || '[]');
+    const PHOTOS: Array<{ id: string; title: string; src: string }> = JSON.parse(root.dataset.photos || '[]');
+    const AHEAD: Array<{ title: string; author: string; date: string }> = JSON.parse(root.dataset.ahead || '[]');
+    const PIN: { title: string; date: string; url: string } | null = JSON.parse(root.dataset.pin || 'null');
+    const SECTION_PINS: Array<{ section: string; title: string; url: string }> = JSON.parse(root.dataset.sectionPins || '[]');
+    const $ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => el.querySelector<T>(s)!;
+    const $$ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => [...el.querySelectorAll<T>(s)];
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const get = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+    const set = (k: string, v: unknown) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
+    const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+    const num = (n: number) => Math.round(n).toLocaleString('es-PR');
+    const ago = (t: number) => { const m = Math.round((Date.now() - t) / 60000); return m < 60 ? `hace ${Math.max(1, m)} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`; };
+    const toast = (m: string) => { const t = $('[data-ptoast]'); t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3800); };
+
+    // ---------- login + roles ----------
+    type Staff = { name: string; role: 'admin' | 'editor' | 'ads' | 'reporter' };
+    const ROLE_NAME = { admin: 'Administrador', editor: 'Editor', ads: 'Ventas', reporter: 'Periodista' };
+    const ROLE_TABS: Record<Staff['role'], string[]> = {
+      admin: ['inicio', 'noticias', 'escribir', 'fotos', 'ventas', 'comentarios', 'anuncios', 'analitica', 'salud', 'equipo'],
+      editor: ['inicio', 'noticias', 'escribir', 'fotos', 'comentarios', 'analitica', 'salud'],
+      ads: ['inicio', 'ventas', 'anuncios', 'comentarios', 'analitica'],
+      reporter: ['inicio', 'escribir', 'fotos'],
+    };
+    const me = () => get<Staff | null>('nc-staff', null);
+
+    type NewsState = Record<string, { status: 'ok' | 'removed'; at: number }>; // Vistazo rápido: what this editor already checked
+    const news = () => get<NewsState>('nc-panel-news', {});
+    const setNews = (id: string, v: NewsState[string]) => { set('nc-panel-news', { ...news(), [id]: v }); };
+    const checkList = () => RECENT.slice(0, 6).filter((r) => !news()[`c-${r.id}`]);
+
+    // ---------- real work waiting: stories sent for review (Supabase), automatic news (GitHub), reported comments ----------
+    type Rev = { id: string; updated_at: string; doc: { title?: string; author?: string; owner?: string; section?: string; date?: string } };
+    type Pr = { number: number; title: string; html_url: string; created_at: string };
+    const LIVE: { review: Rev[]; prs: Pr[]; comments: number; at: number } = { review: [], prs: [], comments: 0, at: 0 };
+    // Automatic news waiting as pull requests in NotiCel's GitHub repository (none until REPO is set in src/lib/repo.ts)
+    const openPrs = (): Promise<Pr[]> => (REPO ? fetch(`https://api.github.com/repos/${REPO}/pulls?state=open&per_page=30`).then((r) => (r.ok ? r.json() : [])).catch(() => []) : Promise.resolve([]));
+    async function loadLive(force = false) {
+      if (!force && Date.now() - LIVE.at < 30000) return; LIVE.at = Date.now();
+      if (!hasBackend()) { // preview and demo: the stories waiting for review on this device, plus GitHub
+        LIVE.review = get<Array<{ id: string; status: string; updated: number } & Rev['doc']>>('nc-articles', []).filter((a) => a.status === 'review')
+          .map((a) => ({ id: a.id, updated_at: new Date(a.updated).toISOString(), doc: a }));
+        const pr = await openPrs();
+        LIVE.prs = Array.isArray(pr) ? pr : [];
+        paintCounts(); if (tab === 'inicio' || tab === 'noticias') paint[tab]?.(); return;
+      }
+      const [rv, cm, pr] = await Promise.all([
+        staffApi('articles?status=eq.review&select=id,updated_at,doc&order=updated_at.desc'),
+        staffApi('comments?status=eq.review&select=id', { headers: { Prefer: 'count=exact' } }),
+        openPrs(),
+      ]);
+      if (rv?.ok) LIVE.review = await rv.json();
+      if (cm?.ok) LIVE.comments = Number(cm.headers.get('content-range')?.split('/')[1]) || 0;
+      LIVE.prs = Array.isArray(pr) ? pr : [];
+      paintCounts(); if (tab === 'inicio' || tab === 'noticias') paint[tab]?.();
+    }
+    addEventListener('nc-articles-changed', () => void loadLive(true));
+    const SEC_NAME: Record<string, string> = JSON.parse(root.dataset.secs || '{}');
+
+    const kpi = (label: string, value: string, sub = '', tab = '', tone = '') => `<${tab ? 'button type="button" data-go="' + tab + '"' : 'div'} class="pnl-kpi ${tone}"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ''}</${tab ? 'button' : 'div'}>`;
+
+    // ---------- counts ----------
+    const counts = () => {
+      const rep = hasBackend() ? LIVE.comments : getReports().filter((r) => r.status === 'review').length;
+      const ads = listRequests().filter((r) => r.status === 'revisar' || r.status === 'disenar').length;
+      const td = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+      const leads = get<Array<{ stage: string; follow: string }>>('nc-leads', []).filter((l) => !['won', 'lost'].includes(l.stage) && l.follow && l.follow <= td).length;
+      const review = LIVE.review.length; const pending = review + LIVE.prs.length;
+      return { noticias: pending + checkList().length, pending, check: checkList().length, comentarios: rep, anuncios: ads, ventas: leads, escribir: review };
+    };
+
+    // ---------- tabs ----------
+    let tab = 'inicio';
+    function showTab(t: string) {
+      const s = me(); if (!s) return;
+      const allowed = ROLE_TABS[s.role];
+      if (!allowed.includes(t)) t = 'inicio';
+      tab = t;
+      $$('[data-tab]').forEach((b) => { b.hidden = !allowed.includes(b.dataset.tab!); b.setAttribute('aria-current', String(b.dataset.tab === t)); });
+      $$('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== t));
+      const nav = $('.pnl-nav'), cur = $(`[data-tab="${t}"]`); // phones: keep the current tab visible in the scrolling bar
+      if (nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - nav.clientWidth / 2 + cur.offsetWidth / 2;
+      if (location.hash.slice(1) !== t) history.replaceState(null, '', `#${t}`);
+      paint[t]?.();
+      if (t === 'inicio' || t === 'noticias') void loadLive();
+    }
+    root.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tab],[data-go]');
+      if (b) { showTab(b.dataset.tab || b.dataset.go!); scrollTo({ top: 0, behavior: 'smooth' }); }
+    });
+    addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+    addEventListener('nc-leads', () => paintCounts());
+    addEventListener('nc-tasks', () => { if (tab === 'inicio') paint.inicio(); });
+    root.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('[data-tk-scroll]')) document.querySelector('[data-tk]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
+    function paintCounts() {
+      const c = counts();
+      (Object.entries({ noticias: c.noticias, comentarios: c.comentarios, anuncios: c.anuncios, ventas: c.ventas, escribir: c.escribir }) as Array<[string, number]>)
+        .forEach(([k, n]) => { const el = $(`[data-count="${k}"]`); el.textContent = n ? String(n) : ''; });
+      const r = me()?.role ?? 'admin'; const mine = ROLE_TABS[r as Staff['role']];
+      set('nc-staff-pending', (['noticias', 'comentarios', 'anuncios', 'ventas'] as const).filter((k) => mine.includes(k)).reduce((a, k) => a + c[k], 0)); // profile menu badge (stories in review are counted in Noticias)
+      dispatchEvent(new Event('nc-staff-change'));
+    }
+
+    // ---------- panes ----------
+    // ---------- Analítica ----------
+    const charts = new Map<HTMLElement, () => void>();
+    const ro = new ResizeObserver((es) => es.forEach((e) => { const el = e.target as HTMLElement; const w = Math.round(el.clientWidth); if (w && el.dataset.w !== String(w)) { el.dataset.w = String(w); charts.get(el)?.(); } }));
+    function barChart(el: HTMLElement, data: Array<{ label: string; value: number; tip: string }>, fmt: (n: number) => string) {
+      // Drawn at the box's real width so the labels stay readable on phones; redrawn when the box resizes
+      charts.set(el, () => barChart(el, data, fmt));
+      const W = Math.max(280, el.clientWidth || 640), H = W < 420 ? 180 : 220, padL = 44, padB = 26, padT = 10;
+      const every = Math.ceil(data.length / Math.max(3, Math.floor(W / 70))); // label every n-th bar
+      const max = Math.max(...data.map((d) => d.value)) * 1.1 || 1;
+      const step = Math.pow(10, Math.floor(Math.log10(Math.max(1, max / 3)))); const tick = Math.max(1, Math.ceil(max / 3 / step) * step);
+      const bw = (W - padL) / Math.max(1, data.length); const y = (v: number) => padT + (H - padT - padB) * (1 - v / max);
+      const grid = [0, 1, 2, 3].map((i) => i * tick).filter((v) => v <= max)
+        .map((v) => `<line x1="${padL}" x2="${W}" y1="${y(v)}" y2="${y(v)}" class="pc-grid"/><text x="${padL - 6}" y="${y(v) + 4}" class="pc-ax" text-anchor="end">${fmt(v)}</text>`).join('');
+      const bars = data.map((d, i) => {
+        const x = padL + i * bw + 1, w = Math.max(2, bw - 2), top = y(d.value), r = Math.min(4, w / 2, Math.max(0, H - padB - top));
+        return `<g class="pc-bar" tabindex="0" data-tip="${esc(d.tip)}"><rect x="${x - 1}" y="${padT}" width="${bw}" height="${H - padB - padT}" class="pc-hit"/>`
+          + (d.value > 0 ? `<path d="M${x} ${H - padB}V${top + r}q0 -${r} ${r} -${r}h${w - 2 * r}q${r} 0 ${r} ${r}V${H - padB}z" class="pc-mark"/>` : '')
+          + (i % every === 0 || i === data.length - 1 ? `<text x="${x + w / 2}" y="${H - 8}" class="pc-ax" text-anchor="middle">${esc(d.label)}</text>` : '') + '</g>';
+      }).join('');
+      ro.observe(el); el.dataset.w = String(Math.round(el.clientWidth));
+      el.innerHTML = `<div class="pc-wrap"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Gráfica de barras">${grid}<line x1="${padL}" x2="${W}" y1="${H - padB}" y2="${H - padB}" class="pc-base"/>${bars}</svg><div class="pc-tip" hidden></div></div>`
+        + `<details class="pc-table"><summary>Ver como tabla</summary><table><tbody>${data.map((d) => `<tr><th scope="row">${esc(d.label)}</th><td>${esc(d.tip)}</td></tr>`).join('')}</tbody></table></details>`;
+      const tip = $('.pc-tip', el), wrap = $('.pc-wrap', el);
+      const show = (g: Element) => { const r = g.getBoundingClientRect(), wr = wrap.getBoundingClientRect(); tip.textContent = (g as HTMLElement).dataset.tip!; tip.hidden = false;
+        tip.style.left = `${Math.min(wr.width - tip.offsetWidth, Math.max(0, r.left - wr.left + r.width / 2 - tip.offsetWidth / 2))}px`; };
+      $$('.pc-bar', el).forEach((g) => { g.addEventListener('mouseenter', () => show(g)); g.addEventListener('focus', () => show(g)); g.addEventListener('mouseleave', () => (tip.hidden = true)); g.addEventListener('blur', () => (tip.hidden = true)); });
+    }
+    // Ranked list with a bar per row (one hue; the label and value are always written out)
+    const rankRows = (items: Array<[string, number]>, fmt = (n: number) => num(n)) => {
+      const max = Math.max(...items.map((i) => i[1])) || 1;
+      return items.length ? `<ul class="pc-rows">${items.map(([l, v]) => `<li><span class="pc-rl">${esc(l)}</span><span class="pc-rb"><i style="width:${(v / max) * 100}%"></i></span><b>${fmt(v)}</b></li>`).join('')}</ul>` : '<p class="pnl-muted">Todavía no hay datos.</p>';
+    };
+    const pct = (items: Array<[string, number]>) => { const t = items.reduce((a, i) => a + i[1], 0) || 1; return rankRows(items.map(([l, v]) => [l, Math.round((v / t) * 100)]), (n) => `${n}%`); };
+    const CHANNEL: Record<string, string> = { 'Organic Search': 'Google y otros buscadores', Direct: 'Directo (escriben la dirección o un enlace guardado)', 'Organic Social': 'Redes sociales', Referral: 'Enlaces en otros sitios', 'Organic Video': 'Video', Email: 'Correo electrónico', 'Paid Search': 'Anuncios en buscadores', 'Paid Social': 'Anuncios en redes', Unassigned: 'Sin identificar', 'Cross-network': 'Anuncios de Google' };
+    const DEVICE: Record<string, string> = { mobile: 'Celular', desktop: 'Computadora', tablet: 'Tableta', 'smart tv': 'Televisor' };
+    const COUNTRY: Record<string, string> = { 'United States': 'Estados Unidos', 'Dominican Republic': 'República Dominicana', Spain: 'España', Mexico: 'México', Canada: 'Canadá', '(not set)': 'Sin identificar' };
+    const minSec = (s: number) => (s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`);
+    let anRange: 1 | 7 | 28 = 7;
+    async function paintAnalytics(fresh = false) {
+      const msg = $('[data-an-msg]'), bodyEl = $('[data-an-body]');
+      const demo = isDemo(); $$('[data-an-demo]').forEach((e) => (e.hidden = !demo)); $('[data-an-real]').hidden = demo;
+      if (!hasBackend() && !demo) { msg.hidden = false; msg.innerHTML = '<p class="pnl-muted">Las visitas se ven cuando el panel está conectado a Supabase.</p>'; bodyEl.hidden = true; return; }
+      $('[data-an-kpis]').innerHTML = kpi('Ahora mismo', '…') + kpi('Visitantes', '…') + kpi('Páginas vistas', '…') + kpi('Tiempo promedio', '…');
+      const d = demo ? demoAnalytics(anRange, PUBLISHED.map((p) => new URL(p.url, location.origin).pathname)) : await getAnalytics(anRange, 50, fresh);
+      if ('error' in d) {
+        msg.hidden = false; bodyEl.hidden = true;
+        msg.innerHTML = `<div class="pnl-card"><h2 class="pnl-h3">Las visitas todavía no se pueden mostrar</h2><p class="pnl-muted">${esc(d.error)}</p><button type="button" class="adp-btn ghost-dark" data-an-retry>Intentar otra vez</button></div>`;
+        return;
+      }
+      msg.hidden = true; bodyEl.hidden = false;
+      $('[data-an-at]').textContent = `Actualizado a las ${new Date(d.at).toLocaleTimeString('es-PR', { hour: 'numeric', minute: '2-digit' }).replace(/\.$/, '')}.`;
+      const t = d.totals, ex = demo ? 'DEMO · ' : '';
+      $('[data-an-kpis]').innerHTML = [
+        kpi('Ahora mismo', num(d.now), `${ex}en los últimos 30 minutos`, '', d.now ? 'good' : ''),
+        kpi('Visitantes', num(t.users), ex + (anRange === 1 ? 'hoy' : `últimos ${anRange} días · ${num(t.newUsers)} nuevos`)),
+        kpi('Páginas vistas', num(t.views), ex + (t.users ? `${(t.views / t.users).toFixed(1)} por visitante` : '')),
+        kpi('Tiempo promedio', minSec(t.avgSeconds), `${ex}por visita`),
+      ].join('');
+      // Every day (or every hour today) appears, even with no visits
+      let series: Array<{ label: string; value: number; tip: string }>;
+      if (anRange === 1) {
+        const by = new Map(d.series.map((x) => [Number(x.at), x.users])); const h = new Date().getHours();
+        series = Array.from({ length: h + 1 }, (_, i) => { const l = new Date(2000, 0, 1, i).toLocaleTimeString('es-PR', { hour: 'numeric' }); const v = by.get(i) ?? 0; return { label: l, value: v, tip: `${l}: ${num(v)} visitantes` }; });
+      } else {
+        const by = new Map(d.series.map((x) => [x.at, x.users]));
+        series = Array.from({ length: anRange }, (_, i) => {
+          const day = new Date(Date.now() - (anRange - 1 - i) * 864e5); const k = `${day.getFullYear()}${String(day.getMonth() + 1).padStart(2, '0')}${String(day.getDate()).padStart(2, '0')}`;
+          const l = day.toLocaleDateString('es-PR', { day: 'numeric', month: 'short' }); const v = by.get(k) ?? 0; return { label: l, value: v, tip: `${l}: ${num(v)} visitantes` };
+        });
+      }
+      $('[data-an-chart-h]').textContent = anRange === 1 ? 'Visitantes por hora (hoy)' : 'Visitantes por día';
+      barChart($('[data-an-chart]'), series, (n) => (n >= 1000 ? `${Math.round(n / 100) / 10}k` : String(n)));
+      const stories = d.pages.map((p) => ({ p, s: PUBLISHED.find((x) => p.path === new URL(x.url, location.origin).pathname) })).filter((x) => x.s).slice(0, 10);
+      $('[data-an-top]').innerHTML = stories.map(({ p, s }) => `<li><a href="${s!.url}" target="_blank" rel="noopener">${esc(s!.title)}</a><b>${num(p.views)}</b></li>`).join('') || '<li class="pnl-muted">Todavía no hay visitas a noticias en este período.</li>';
+      $('[data-an-ref]').innerHTML = pct(d.channels.map((c) => [CHANNEL[c.name] ?? c.name, c.sessions]));
+      $('[data-an-geo]').innerHTML = pct(d.countries.map((c) => [COUNTRY[c.name] ?? c.name, c.users]));
+      $('[data-an-dev]').innerHTML = pct(d.devices.map((c) => [DEVICE[c.name] ?? c.name, c.users]));
+    }
+    root.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const rg = t.closest<HTMLElement>('[data-range]');
+      if (rg) { anRange = Number(rg.dataset.range) as 1 | 7 | 28; $$('[data-range]').forEach((b) => b.setAttribute('aria-pressed', String(b === rg))); void paintAnalytics(); return; }
+      if (t.closest('[data-an-retry]')) void paintAnalytics(true);
+    });
+
+    // ---------- Salud del sitio ----------
+    const fmtDate = (d: string) => new Date(d).toLocaleString('es-PR', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    const mb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : `${Math.max(0.1, b / 1e6).toFixed(1)} MB`);
+    /** The newest story on the site; more than 6 hours without one gets a warning. */
+    function lastStoryKpi() {
+      const now = Date.now(); const live = PUBLISHED.filter((p) => Date.parse(p.date) <= now);
+      const last = live.reduce((m, p) => Math.max(m, Date.parse(p.date)), 0);
+      if (!last) return kpi('Última noticia', 'Ninguna', '', '', 'bad');
+      const today = live.filter((p) => new Date(p.date).toDateString() === new Date().toDateString()).length;
+      const h = (now - last) / 36e5;
+      return kpi('Última noticia', ago(last), `${today} publicadas hoy${h >= 6 ? ' · ⚠ más de 6 horas sin noticias nuevas' : ''}`, '', h >= 6 ? 'warn' : 'good');
+    }
+    async function ping(u: string, init: RequestInit = {}) {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+      try { const r = await fetch(u, { cache: 'no-store', ...init, signal: ctl.signal }); return r.ok; } catch { return false; } finally { clearTimeout(t); }
+    }
+    let photoRun: Array<{ id: string; title: string; src: string }> | null = null; let probAll = false;
+    function paintProblems() {
+      const list = PROBLEMS.slice().sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+      $('[data-prob-n]').textContent = list.length ? `${list.length} de ${PUBLISHED.length}` : '';
+      const show = probAll ? list : list.slice(0, 8);
+      $('[data-prob]').innerHTML = show.map((x) => `<li><span><b>${esc(x.title)}</b><small>${x.p.map(esc).join(' · ')}</small></span><button type="button" class="adp-btn ghost-dark" data-fix="${esc(x.id)}">Corregir</button></li>`).join('')
+        || '<li><span>🎉 Todas las noticias tienen foto, crédito, texto y fuentes.</span></li>';
+      $('[data-prob-more]').hidden = probAll || list.length <= 8;
+    }
+    function paintPhotos() {
+      const btn = $<HTMLButtonElement>('[data-ph-run]');
+      $('[data-ph-note]').textContent = `${PHOTOS.length} fotos de otros sitios (Wikimedia, agencias, Supabase) en las noticias publicadas.`;
+      if (!photoRun) { $('[data-sl-ph]').innerHTML = ''; return; }
+      btn.textContent = 'Revisar otra vez';
+      $('[data-sl-ph]').innerHTML = photoRun.map((x) => `<li><span><b>${esc(x.title)}</b><small><a href="${esc(x.src)}" target="_blank" rel="noopener">${esc(x.src.replace(/^https?:\/\//, '').slice(0, 60))}…</a></small></span><button type="button" class="adp-btn ghost-dark" data-fix="${esc(x.id)}">Corregir</button></li>`).join('')
+        || '<li><span>🎉 Todas las fotos cargan.</span></li>';
+    }
+    async function checkPhotos() {
+      const btn = $<HTMLButtonElement>('[data-ph-run]'); btn.disabled = true; btn.textContent = 'Revisando…';
+      const load = (src: string) => new Promise<boolean>((ok) => { const im = new Image(); const t = setTimeout(() => ok(false), 15000); im.onload = () => { clearTimeout(t); ok(true); }; im.onerror = () => { clearTimeout(t); ok(false); }; im.src = src; });
+      const bad: typeof PHOTOS = []; const queue = PHOTOS.slice();
+      await Promise.all(Array.from({ length: 6 }, async () => { for (let x = queue.shift(); x; x = queue.shift()) if (!(await load(x.src))) bad.push(x); }));
+      photoRun = bad; btn.disabled = false; paintPhotos();
+    }
+    /** The parts that need the database: online checks, scheduled stories, comments, space and errors. */
+    async function saludLive() {
+      paintProblems(); paintPhotos();
+      const sb = BACKEND.url.replace(/\/$/, '');
+      const off = Promise.resolve(false);
+      const lights: Array<[string, string, Promise<boolean>]> = [
+        ['El sitio (noticel.com)', 'abre la portada', ping(root.dataset.base!)],
+        ['Cuentas y base de datos (Supabase)', 'entrar, comentarios, este panel', sb ? ping(`${sb}/auth/v1/health`, { headers: { apikey: BACKEND.anonKey } }) : off],
+        ['Botón de publicar', 'la función “publicar” en Supabase', sb ? ping(`${sb}/functions/v1/publicar`, { method: 'OPTIONS' }) : off],
+        ['GitHub', 'donde se guardan las noticias', REPO ? ping(`https://api.github.com/repos/${REPO}`) : off],
+      ];
+      $('[data-lights]').innerHTML = lights.map(([n, why]) => `<li><i class="sl-dot"></i><span><b>${n}</b><small>${why} · revisando…</small></span></li>`).join('');
+      lights.forEach(([n, why, p], i) => void p.then((ok) => {
+        const li = $$('[data-lights] li')[i]; if (!li) return;
+        li.className = ok ? 'ok' : 'bad'; li.innerHTML = `<i class="sl-dot"></i><span><b>${n}</b><small>${ok ? 'funciona' : 'no responde ahora'} · ${why}</small></span>`;
+      }));
+      if (!hasBackend()) { if (isDemo()) saludDemo(); else saludPreview(); return; }
+      const [sc, st, er] = await Promise.all([
+        staffApi('articles?status=eq.scheduled&select=id,doc,slug&order=updated_at.desc'),
+        staffApi('rpc/panel_stats', { method: 'POST', body: '{}' }),
+        staffApi('panel_errors?select=*&order=at.desc&limit=15'),
+      ]);
+      // Scheduled: the team's (database) plus story files dated ahead (automatic news, imports)
+      const rows: Array<{ title: string; author: string; date: string }> = sc?.ok ? (await sc.json()).map((r: any) => ({ title: r.doc.title, author: r.doc.author || r.doc.owner, date: r.doc.date })) : [];
+      const all = [...rows, ...AHEAD.filter((f) => !rows.some((r) => r.title === f.title))].filter((x) => Date.parse(x.date) > Date.now()).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+      $('[data-sched-n]').textContent = all.length ? String(all.length) : '';
+      $('[data-sched]').innerHTML = all.map((x) => `<li><span><b>${esc(x.title || 'Sin titular')}</b><small>sale el ${fmtDate(x.date)} · ${esc(x.author || '')}</small></span></li>`).join('') || '<li><span>No hay noticias programadas.</span></li>';
+      const missing = '<p class="pnl-muted pnl-small">Falta correr <b>supabase/salud.sql</b> en Supabase.</p>';
+      if (st?.ok) {
+        const n = await st.json();
+        $('[data-sl-mod]').innerHTML = `<ul class="sl-nums">
+          <li><b>${n.comments_today}</b><span>comentarios hoy</span></li><li><b>${n.review_now}</b><span>esperan revisión${n.review_today ? ` (${n.review_today} de hoy)` : ''}</span></li>
+          <li><b>${n.removed_week}</b><span>quitados esta semana</span></li><li><b>${n.signups_week}</b><span>cuentas nuevas esta semana</span></li>
+          <li><b>${n.accounts}</b><span>cuentas en total</span></li><li><b>${n.banned}</b><span>bloqueadas</span></li></ul>
+          <p class="pnl-muted pnl-small">Los comentarios que el filtro bloquea al instante no se guardan, así que no se cuentan.</p>`;
+        const bar = (label: string, used: number, max: number) => { const pc = Math.min(100, Math.round((used / max) * 100)); return `<div class="sl-bar ${pc >= 80 ? 'bad' : ''}"><p><b>${label}</b><span>${mb(used)} de ${mb(max)} · ${pc}%</span></p><i><em style="width:${Math.max(1, pc)}%"></em></i></div>`; };
+        $('[data-space]').innerHTML = bar('Fotos y archivos', n.storage_bytes, 1e9) + bar('Base de datos', n.db_bytes, 5e8) + '<p class="pnl-muted pnl-small">Al pasar de 80%, toca subir al plan Pro de Supabase o mover las fotos a Cloudflare R2.</p>';
+      } else { $('[data-sl-mod]').innerHTML = missing; $('[data-space]').innerHTML = missing; }
+      if (er?.ok) {
+        const list = await er.json();
+        $('[data-errs]').innerHTML = list.map((x: any) => `<li><span><b>${esc(x.what)}</b><small>${esc(x.who)} · ${ago(Date.parse(x.at))} · ${esc(x.detail)}</small></span></li>`).join('') || '<li><span>🎉 Ningún error.</span></li>';
+        $('[data-errs-clear]').hidden = !list.length || me()?.role !== 'admin';
+      } else $('[data-errs]').innerHTML = `<li>${missing}</li>`;
+    }
+    /** Preview (no database yet): the scheduled stories on this device, and a plain note where the database's numbers go. */
+    function saludPreview() {
+      const local = get<Array<{ title: string; author: string; date: string; status: string }>>('nc-articles', []).filter((a) => a.status === 'scheduled');
+      const all = [...local, ...AHEAD].filter((x) => Date.parse(x.date) > Date.now()).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+      $('[data-sched-n]').textContent = all.length ? String(all.length) : '';
+      $('[data-sched]').innerHTML = all.map((x) => `<li><span><b>${esc(x.title || 'Sin titular')}</b><small>sale el ${fmtDate(x.date)} · ${esc(x.author || '')}</small></span></li>`).join('') || '<li><span>No hay noticias programadas.</span></li>';
+      const note = '<p class="pnl-muted pnl-small"><span class="sp-demo">VISTA PREVIA</span> Aparece cuando NotiCel tenga su propia base de datos (Supabase).</p>';
+      $('[data-sl-mod]').innerHTML = note; $('[data-space]').innerHTML = note;
+      $('[data-errs]').innerHTML = `<li>${note}</li>`;
+    }
+    /** Demo mode: the same Salud cards with sample numbers, labeled DEMO. */
+    function saludDemo() {
+      const tag = '<span class="sp-demo">DEMO</span>';
+      const local = get<Array<{ title: string; author: string; date: string; status: string }>>('nc-articles', []).filter((a) => a.status === 'scheduled');
+      const all = [...local, ...AHEAD].filter((x) => Date.parse(x.date) > Date.now()).sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+      $('[data-sched-n]').textContent = all.length ? String(all.length) : '';
+      $('[data-sched]').innerHTML = all.map((x) => `<li><span><b>${esc(x.title)}</b><small>sale el ${fmtDate(x.date)} · ${esc(x.author || '')}</small></span></li>`).join('') || '<li><span>No hay noticias programadas.</span></li>';
+      const n = { comments_today: 148, review_now: 3, review_today: 2, removed_week: 9, signups_week: 212, accounts: 3480, banned: 4 };
+      $('[data-sl-mod]').innerHTML = `<ul class="sl-nums">
+        <li><b>${n.comments_today}</b><span>comentarios hoy</span></li><li><b>${n.review_now}</b><span>esperan revisión (${n.review_today} de hoy)</span></li>
+        <li><b>${n.removed_week}</b><span>quitados esta semana</span></li><li><b>${n.signups_week}</b><span>cuentas nuevas esta semana</span></li>
+        <li><b>${num(n.accounts)}</b><span>cuentas en total</span></li><li><b>${n.banned}</b><span>bloqueadas</span></li></ul><p class="pnl-muted pnl-small">${tag} Números de ejemplo.</p>`;
+      const bar = (label: string, used: number, max: number) => { const pc = Math.round((used / max) * 100); return `<div class="sl-bar"><p><b>${label}</b><span>${mb(used)} de ${mb(max)} · ${pc}%</span></p><i><em style="width:${pc}%"></em></i></div>`; };
+      $('[data-space]').innerHTML = bar('Fotos y archivos', 214e6, 1e9) + bar('Base de datos', 61e6, 5e8) + `<p class="pnl-muted pnl-small">${tag} Números de ejemplo.</p>`;
+      $('[data-errs]').innerHTML = '<li><span>🎉 Ningún error.</span></li>';
+    }
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const fix = t.closest<HTMLElement>('[data-fix]');
+      if (fix) { dispatchEvent(new CustomEvent('nc-edit-story', { detail: { id: fix.dataset.fix } })); showTab('escribir'); scrollTo({ top: 0 }); return; }
+      if (t.closest('[data-prob-more]')) { probAll = true; paintProblems(); return; }
+      if (t.closest('[data-ph-run]')) { void checkPhotos(); return; }
+      if (t.closest('[data-errs-clear]') && (await ask('¿Borrar la lista de errores?', { ok: 'Borrar' }))) { await staffApi('panel_errors?id=gt.0', { method: 'DELETE' }); void saludLive(); }
+    });
+
+    const paint: Record<string, () => void> = {
+      inicio() {
+        const s = me()!; const c = counts(); const allowed = ROLE_TABS[s.role];
+        const h = new Date().getHours(); $$('[data-me]').forEach((e) => (e.textContent = s.name));
+        $('.pnl-h', $('[data-pane="inicio"]')).firstChild!.textContent = h < 12 ? 'Buenos días, ' : h < 19 ? 'Buenas tardes, ' : 'Buenas noches, ';
+        $('[data-today]').textContent = new Date().toLocaleDateString('es-PR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Puerto_Rico' });
+        $('[data-kpis]').innerHTML = [
+          allowed.includes('noticias') && kpi('Noticias por aprobar', String(c.pending), `${c.check} para vistazo rápido`, 'noticias', c.pending ? 'warn' : ''),
+          allowed.includes('comentarios') && kpi('Comentarios por revisar', String(c.comentarios), 'reportados por lectores', 'comentarios', c.comentarios ? 'warn' : ''),
+          allowed.includes('anuncios') && kpi('Anuncios por aprobar', String(c.anuncios), 'respuesta en 24 horas', 'anuncios', c.anuncios ? 'warn' : ''),
+          s.role === 'reporter' && kpi('Mis noticias en revisión', String(LIVE.review.filter((r) => r.doc.owner === s.name).length), 'esperan por un editor', 'escribir'),
+        ].filter(Boolean).join('');
+        const todo: string[] = [];
+        // Team tasks (Tareas, below): mine that are late or due today
+        const td = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+        const myTasks = get<Array<{ owner: string; mates: string[]; status: string; due: string }>>('nc-tasks', []).filter((t) => t.status !== 'done' && (t.owner === s.name || t.mates.includes(s.name)));
+        const lateT = myTasks.filter((t) => t.due && t.due < td).length, todayT = myTasks.filter((t) => t.due === td).length;
+        if (lateT) todo.push(`<li><span>⏰ <b>${lateT}</b> ${lateT === 1 ? 'tarea atrasada' : 'tareas atrasadas'}.</span><button type="button" data-tk-scroll>Ver</button></li>`);
+        if (todayT) todo.push(`<li><span>📌 <b>${todayT}</b> ${todayT === 1 ? 'tarea vence' : 'tareas vencen'} hoy.</span><button type="button" data-tk-scroll>Ver</button></li>`);
+        if (PIN && ['admin', 'editor'].includes(s.role)) todo.push(`<li><span>📌 <b>${esc(PIN.title)}</b> está fijada arriba en la Portada (publicada ${ago(Date.parse(PIN.date))}). Para quitarla: ábrela en Escribir y desmarca 📌.</span><a href="${PIN.url}" target="_blank" rel="noopener">Ver</a></li>`);
+        if (['admin', 'editor'].includes(s.role)) SECTION_PINS.forEach((p) => todo.push(`<li><span>📌 En <b>${esc(p.section)}</b>, “${esc(p.title)}” está fijada arriba de la sección.</span><a href="${p.url}" target="_blank" rel="noopener">Ver</a></li>`));
+        if (allowed.includes('noticias') && c.pending) todo.push(`<li><span>📰 <b>${c.pending}</b> ${c.pending === 1 ? 'noticia espera' : 'noticias esperan'} tu aprobación.</span><button type="button" data-go="noticias">Revisar</button></li>`);
+        if (allowed.includes('noticias') && c.check) todo.push(`<li><span>👀 <b>${c.check}</b> publicadas para un vistazo rápido.</span><button type="button" data-go="noticias">Ver</button></li>`);
+        if (allowed.includes('ventas') && c.ventas) todo.push(`<li><span>📞 <b>${c.ventas}</b> ${c.ventas === 1 ? 'cliente espera' : 'clientes esperan'} seguimiento hoy.</span><button type="button" data-go="ventas">Ver</button></li>`);
+        if (s.role === 'reporter') todo.push(`<li><span>✍️ Escribe una noticia nueva o sigue un borrador.</span><button type="button" data-go="escribir">Escribir</button></li>`);
+        if (allowed.includes('comentarios') && c.comentarios) todo.push(`<li><span>💬 <b>${c.comentarios}</b> ${c.comentarios === 1 ? 'comentario reportado' : 'comentarios reportados'} por revisar.</span><button type="button" data-go="comentarios">Revisar</button></li>`);
+        if (allowed.includes('anuncios') && c.anuncios) todo.push(`<li><span>📣 <b>${c.anuncios}</b> ${c.anuncios === 1 ? 'anuncio espera' : 'anuncios esperan'}. Prometimos responder en 24 horas.</span><button type="button" data-go="anuncios">Abrir</button></li>`);
+        if (s.role === 'admin' && SOURCES.length && root.dataset.aikey !== 'true' && !isDemo()) todo.push(`<li><span>🔑 Falta conectar la clave de Anthropic: el redactor automático todavía no redacta noticias.</span><button type="button" data-go="salud">Detalles</button></li>`);
+        $('[data-todo]').innerHTML = todo.join('') || '<li><span>🎉 No hay nada pendiente.</span></li>';
+      },
+
+      noticias() {
+        const c = counts();
+        $('[data-nn="pending"]').textContent = c.pending ? String(c.pending) : '';
+        $('[data-nn="check"]').textContent = c.check ? String(c.check) : '';
+        $('[data-nn="pub"]').textContent = String(PUBLISHED.length);
+        const box = $('[data-news]');
+        if (nf === 'pending') {
+          const canApprove = ['admin', 'editor'].includes(me()?.role ?? '');
+          const revs = LIVE.review.map((r) => `<article class="pnl-row" data-rev="${esc(r.id)}">
+            <div><p class="pnl-muted">✍️ Escrita por <b>${esc(r.doc.author || r.doc.owner || 'Periodista')}</b> · ${esc(SEC_NAME[r.doc.section || ''] ?? '')} · enviada ${ago(Date.parse(r.updated_at))}${r.doc.date && Date.parse(r.doc.date) > Date.now() ? ` · <b>programada para el ${new Date(r.doc.date).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</b>` : ''}</p><h2>${esc(r.doc.title || 'Sin titular')}</h2></div>
+            <div class="pnl-row-acts">${canApprove ? '<button type="button" class="adp-btn" data-rv="approve">Aprobar y publicar</button>' : ''}<button type="button" class="adp-btn ghost-dark" data-rv="open">Revisar en Escribir</button>${canApprove ? '<button type="button" class="pnl-link" data-rv="return">Devolver</button>' : ''}</div></article>`).join('');
+          const prs = LIVE.prs.map((p) => `<article class="pnl-row"><div><p class="pnl-muted">✍️ Redactada por <b>el redactor automático</b> · ${ago(Date.parse(p.created_at))}</p><h2>${esc(p.title)}</h2></div>
+            <div class="pnl-row-acts"><a class="adp-btn ghost-dark" href="${p.html_url}" target="_blank" rel="noopener">Revisar y aprobar en GitHub ↗</a></div></article>`).join('');
+          box.innerHTML = (revs ? `<h2 class="pnl-h3">De periodistas</h2>${revs}` : '') + (prs ? `<h2 class="pnl-h3">Del redactor automático</h2>${prs}` : '')
+            || '<p class="apr-empty">🎉 No hay noticias esperando aprobación.</p>';
+        } else if (nf === 'check') {
+          box.innerHTML = checkList().map((r) => `<article class="pnl-row" data-id="c-${r.id}">
+            <div><p class="pnl-muted">✍️ Escrita por <b>${esc(r.author || 'NotiCel')}</b> · ${esc(r.section)} · publicada ${ago(Date.parse(r.date))}</p><h2><a href="${r.url}" target="_blank" rel="noopener">${esc(r.title)}</a></h2></div>
+            <div class="pnl-row-acts"><button type="button" class="adp-btn ghost-dark" data-act="ok">Se ve bien</button><button type="button" class="adp-btn ghost-dark" data-act="editpub">Editar</button><button type="button" class="apr-reject" data-act="remove">Quitar del sitio</button></div></article>`).join('')
+            || '<p class="apr-empty">🎉 Ya le diste un vistazo a todo.</p>';
+        } else if (nf === 'pub') {
+          // Every story on the site: search, edit in Escribir, see it, or take it down
+          box.innerHTML = `<input type="search" class="pl-q pnl-pub-q" data-pub-q placeholder="Buscar en las ${PUBLISHED.length} noticias publicadas…" aria-label="Buscar noticias publicadas" value="${esc(pubQ)}" /><div data-pub-list></div>`;
+          paintPub();
+          $<HTMLInputElement>('[data-pub-q]', box).addEventListener('input', (e) => { pubQ = (e.target as HTMLInputElement).value; paintPub(); });
+        }
+      },
+
+      analitica() { void paintAnalytics(); },
+
+      async salud() {
+        const box = $('[data-health]');
+        box.innerHTML = kpi('Última noticia', 'Cargando…') + kpi('Actualización del sitio', 'Cargando…') + kpi('Redactor de noticias (IA)', 'Cargando…');
+        void saludLive();
+        const api = `https://api.github.com/repos/${REPO}`;
+        try {
+          if (!REPO) throw new Error('no repo');
+          const [dep, ai, prs, iss] = await Promise.all([
+            fetch(`${api}/actions/workflows/deploy.yml/runs?per_page=1`).then((r) => r.json()),
+            fetch(`${api}/actions/workflows/daily-news.yml/runs?per_page=1`).then((r) => r.json()),
+            fetch(`${api}/pulls?state=open&per_page=50`).then((r) => r.json()),
+            fetch(`${api}/issues?state=open&per_page=50`).then((r) => r.json()),
+          ]);
+          const run = (x: any) => x?.workflow_runs?.[0];
+          const d = run(dep), a = run(ai);
+          const state = (r: any) => (!r ? ['Sin datos', ''] : r.status !== 'completed' ? ['Trabajando ahora', ''] : r.conclusion === 'success' ? ['Funciona ✓', 'good'] : ['Falló ✗', 'bad']);
+          const [ds, dt] = state(d); let [as, at] = state(a);
+          if (root.dataset.aikey !== 'true' && at === 'good') [as, at] = ['Sin clave ⚠', 'bad']; // runs, but writes nothing yet
+          const openPrs = Array.isArray(prs) ? prs.length : 0; const checks = Array.isArray(iss) ? iss.filter((i: any) => !i.pull_request && /Vistazo/.test(i.title)).length : 0;
+          box.innerHTML = [
+            lastStoryKpi(),
+            kpi('Actualización del sitio', ds, d ? `cada 15 minutos · última ${ago(Date.parse(d.updated_at))}` : '', '', dt),
+            kpi('Redactor de noticias (IA)', as, root.dataset.aikey !== 'true' ? 'corre a las 7 a.m. y 5 p.m., pero no redacta hasta conectar la clave' : a ? `7 a.m. y 5 p.m. · última ${ago(Date.parse(a.updated_at))}` : '', '', at),
+            kpi('Esperan aprobación en GitHub', String(openPrs), 'noticias reales por aprobar'),
+            kpi('Vistazos rápidos abiertos', String(checks), 'avisos en GitHub'),
+          ].join('');
+        } catch { box.innerHTML = lastStoryKpi() + (REPO ? kpi('Estado', 'No se pudo consultar GitHub', 'intenta en unos minutos', '', 'bad') : kpi('Repositorio en GitHub', 'Todavía no', 'el sitio nuevo de NotiCel aún no está en GitHub')); }
+        // NotiCel's new site, 2026-10-08: built on this computer, nothing connected yet. Update as each one is set up.
+        const acc: Array<[string, boolean, string]> = [
+          ['Repositorio propio en GitHub', !!REPO, 'el código y las noticias del sitio nuevo'], ['Sitio nuevo publicado', false, 'noticel.com sigue en WordPress hasta el cambio'],
+          ['Cuentas, comentarios y este panel (Supabase)', !!BACKEND.url, 'proyecto propio de NotiCel en Supabase'], ['Entrar con Google (administradores)', false, 'con la cuenta de Google de la empresa'],
+          ['Fotos (Cloudflare R2)', false, 'biblioteca de fotos compartida; reemplaza PhotoShelter'], ['Archivo de WordPress', false, 'unas 228,800 noticias por mudar'],
+          ['Google Analytics', false, 'propiedad propia de NotiCel'], ['Google Search Console', false, 'noticel.com'], ['Google Ad Manager / AdSense', false, 'anuncios de Google'],
+          ['Mensaje de consentimiento (Funding Choices)', false, 'aviso de cookies y anuncios'], ['Notificaciones de la app', false, 'la app de NotiCel (iPhone y Android)'],
+          ['Versión en inglés', false, 'hoy la hace TranslatePress en WordPress'], ['EFE', false, 'noticias de agencia'],
+        ];
+        $('[data-accounts]').innerHTML = acc.map(([n, ok, why]) => `<li class="${ok ? 'ok' : ''}"><span>${ok ? '✓' : '○'} ${n}</span><small>${why}</small></li>`).join('');
+        const lv: Record<string, [string, string]> = { auto: ['Se publica sola', 'g'], check: ['Se publica + vistazo', 'y'], always: ['Espera aprobación', 'r'] };
+        $('[data-src-n]').textContent = `${SOURCES.length} fuentes oficiales`;
+        $('[data-sl-srcs]').innerHTML = SOURCES.map((s) => `<li><span>${esc(s.name)}</span><span class="pnl-lv ${lv[s.review]?.[1] ?? 'r'}">${lv[s.review]?.[0] ?? 'Espera aprobación'}</span></li>`).join('');
+      },
+
+      equipo() {
+        const s = me()!;
+        const team = get<Array<{ id?: string; name: string; mail: string; role: Staff['role'] }>>('nc-staff-team', [
+          { name: s.name, mail: 'tú', role: 'admin' }, { name: 'Editora (ejemplo)', mail: 'editora@ejemplo.com', role: 'editor' },
+          { name: 'Ventas (ejemplo)', mail: 'ventas@ejemplo.com', role: 'ads' }, { name: 'Periodista (ejemplo)', mail: 'periodista@ejemplo.com', role: 'reporter' },
+        ]);
+        $('[data-team]').innerHTML = team.map((m, i) => `<li><span class="pnl-av sm">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span><b>${esc(m.name)}</b><small>${esc(m.mail)}</small></span><span class="pnl-tag">${ROLE_NAME[m.role]}</span>${i ? `<button type="button" class="pnl-link" data-rm="${i}">Quitar</button>` : ''}</li>`).join('');
+        const can: Array<[string, boolean[]]> = [
+          ['Aprobar noticias', [true, true, false, false]], ['Escribir noticias', [true, true, false, true]], ['Publicar o programar', [true, true, false, false]],
+          ['Clientes y propuestas', [true, false, true, false]], ['Moderar comentarios', [true, true, true, false]],
+          ['Aprobar anuncios', [true, false, true, false]], ['Ver ingresos', [true, false, true, false]], ['Ver analítica', [true, true, false, false]],
+          ['Salud del sitio', [true, true, false, false]], ['Manejar el equipo', [true, false, false, false]],
+        ];
+        $('[data-perms]').innerHTML = `<table class="pnl-table perms"><thead><tr><th></th><th>Admin</th><th>Editor</th><th>Ventas</th><th>Periodista</th></tr></thead><tbody>${can.map(([k, v]) => `<tr><th scope="row">${k}</th>${v.map((x) => `<td>${x ? '✓' : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      },
+    };
+
+    // ---------- actions ----------
+    let nf = 'pending';
+    // ---------- Noticias → Publicadas: every story on the site ----------
+    const PUBLISHED: Array<{ id: string; title: string; section: string; author: string; date: string; url: string }> = JSON.parse(root.dataset.published || '[]');
+    let pubQ = ''; const takenDown = new Set<string>();
+    const plainTxt = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    function paintPub() {
+      const words = plainTxt(pubQ.trim()).split(/\s+/).filter(Boolean);
+      const rows = PUBLISHED.filter((p) => words.every((w) => plainTxt(`${p.title} ${p.section} ${p.author}`).includes(w))).slice(0, 60);
+      const canEdit = ['admin', 'editor'].includes(me()?.role ?? '');
+      $('[data-pub-list]').innerHTML = rows.map((p) => `<article class="pnl-row" data-pub="${esc(p.id)}">
+        <div><p class="pnl-muted">✍️ Escrita por <b>${esc(p.author || 'NotiCel')}</b> · ${esc(p.section)} · ${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}${takenDown.has(p.id) ? ' · <b class="pnl-down">Quitada: desaparece en unos minutos</b>' : ''}</p>
+          <h2><a href="${p.url}" target="_blank" rel="noopener">${esc(p.title)}</a></h2></div>
+        <div class="pnl-row-acts"><button type="button" class="adp-btn ghost-dark" data-pub-edit>Editar</button><a class="adp-btn ghost-dark" href="${p.url}" target="_blank" rel="noopener">Ver en el sitio ↗</a>${canEdit && !takenDown.has(p.id) ? '<button type="button" class="apr-reject" data-pub-down>Quitar del sitio</button>' : ''}</div></article>`).join('')
+        || `<p class="apr-empty">No encontramos noticias con “${esc(pubQ)}”.</p>`;
+    }
+    addEventListener('nc-takedown-done', (e) => { const d = (e as CustomEvent).detail as { id: string; ok: boolean }; if (d.ok) { takenDown.add(d.id); if (nf === 'pub') paintPub(); } });
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement; const row = t.closest<HTMLElement>('[data-pub]'); if (!row) return;
+      const p = PUBLISHED.find((x) => x.id === row.dataset.pub); if (!p) return;
+      if (t.closest('[data-pub-edit]')) { dispatchEvent(new CustomEvent('nc-edit-story', { detail: { id: p.id } })); showTab('escribir'); scrollTo({ top: 0 }); }
+      if (t.closest('[data-pub-down]')) {
+        if (!(await ask(`¿Quitar “${p.title}” del sitio? Desaparece en unos 2 minutos. Quedará en Escribir → Borradores para corregirla y publicarla otra vez.`, { ok: 'Quitar del sitio', danger: true }))) return;
+        (t as HTMLButtonElement).disabled = true; (t as HTMLButtonElement).textContent = 'Quitando…';
+        dispatchEvent(new CustomEvent('nc-takedown', { detail: { id: p.id } }));
+      }
+    });
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const sub = t.closest<HTMLElement>('[data-nf]');
+      if (sub) { nf = sub.dataset.nf!; $$('[data-nf]').forEach((b) => b.setAttribute('aria-selected', String(b === sub))); paint.noticias(); return; }
+      const rng = t.closest<HTMLElement>('[data-range]');
+      if (rng) { $$('[data-range]').forEach((b) => b.setAttribute('aria-pressed', String(b === rng))); paint.analitica(); return; }
+      const rm = t.closest<HTMLElement>('[data-rm]');
+      if (rm) {
+        if (hasBackend()) {
+          const m = get<Array<{ id?: string; name: string }>>('nc-staff-team', [])[Number(rm.dataset.rm)];
+          if (!m?.id || !(await ask(`¿Quitar a ${m.name} del equipo? Ya no podrá entrar al panel (su cuenta de lector sigue).`, { ok: 'Quitar', danger: true }))) return;
+          if (await removeFromTeam(m.id)) { await syncTeam(); paint.equipo(); dispatchEvent(new Event('nc-team')); toast(`${m.name} ya no está en el equipo.`); } else toast('No se pudo. Solo el administrador puede quitar personas.');
+          return;
+        }
+        const team = get<unknown[]>('nc-staff-team', []); team.splice(Number(rm.dataset.rm), 1); set('nc-staff-team', team); paint.equipo(); return;
+      }
+      const rv = t.closest<HTMLElement>('[data-rv]');
+      if (rv) {
+        const row = rv.closest<HTMLElement>('[data-rev]')!; const id = row.dataset.rev!; const r = LIVE.review.find((x) => x.id === id);
+        if (rv.dataset.rv === 'open') { dispatchEvent(new CustomEvent('nc-open-article', { detail: { id } })); showTab('escribir'); scrollTo({ top: 0 }); return; }
+        if (rv.dataset.rv === 'approve') {
+          if (!(await ask(`¿Aprobar y publicar “${r?.doc.title || 'esta noticia'}”? ${r?.doc.date && Date.parse(r.doc.date) > Date.now() ? 'Saldrá sola a la hora programada.' : 'Aparece en el sitio en unos 2 minutos.'}`, { ok: 'Aprobar y publicar' }))) return;
+          (rv as HTMLButtonElement).disabled = true; (rv as HTMLButtonElement).textContent = 'Publicando…';
+          dispatchEvent(new CustomEvent('nc-approve-article', { detail: { id } }));
+          return;
+        }
+        if (rv.dataset.rv === 'return') {
+          const n = await askText('¿Qué debe corregir el periodista?', { placeholder: 'ej. Falta la fuente oficial del dato.', ok: 'Devolver', multiline: true }); if (n === null) return;
+          dispatchEvent(new CustomEvent('nc-return-article', { detail: { id, note: n } }));
+          return;
+        }
+      }
+      const act = t.closest<HTMLElement>('[data-act]'); const card = t.closest<HTMLElement>('.pnl-draft,.pnl-row');
+      if (!act || !card || !card.closest('[data-news]')) return;
+      const id = card.dataset.id!; const a = act.dataset.act;
+      if (a === 'editpub') { // a published story (Vistazo rápido) opens in Escribir to correct and update it
+        dispatchEvent(new CustomEvent('nc-edit-story', { detail: { id: id.replace(/^c-/, '') } }));
+        showTab('escribir'); scrollTo({ top: 0 });
+        return;
+      }
+      if (a === 'ok') { setNews(id, { status: 'ok', at: Date.now() }); toast('Marcada como revisada.'); }
+      if (a === 'remove') {
+        if (!(await ask('¿Quitar esta noticia del sitio? Desaparece en unos 2 minutos. Quedará en Escribir → Borradores para corregirla y publicarla otra vez.', { ok: 'Quitar del sitio', danger: true }))) return;
+        dispatchEvent(new CustomEvent('nc-takedown', { detail: { id: id.replace(/^c-/, '') } }));
+        setNews(id, { status: 'removed', at: Date.now() });
+      }
+      card.classList.add('pnl-gone'); setTimeout(() => { paint.noticias(); paintCounts(); }, 250);
+    });
+    $<HTMLFormElement>('[data-add]').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = $<HTMLInputElement>('[data-add-name]').value.trim(), mail = $<HTMLInputElement>('[data-add-mail]').value.trim();
+      if (hasBackend()) {
+        // Real team: the person signs up on the site first; here the admin gives them a role by @username or email
+        if (name.length < 2 || mail.length < 3) { toast('Escribe el nombre y su @usuario o correo.'); return; }
+        const res = await addToTeam(mail, name, $<HTMLSelectElement>('[data-add-role]').value);
+        if (res !== 'ok') { toast(res); return; }
+        (e.target as HTMLFormElement).reset(); await syncTeam(); paint.equipo(); dispatchEvent(new Event('nc-team'));
+        toast(`Listo: ${name} ya puede entrar al panel con su cuenta.`);
+        return;
+      }
+      if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(mail)) { toast('Escribe el nombre y un correo válido.'); return; }
+      const team = get<Array<{ name: string; mail: string; role: string }>>('nc-staff-team', []);
+      if (!team.length) { paint.equipo(); }
+      set('nc-staff-team', [...get<unknown[]>('nc-staff-team', []), { name, mail, role: $<HTMLSelectElement>('[data-add-role]').value }]);
+      (e.target as HTMLFormElement).reset(); paint.equipo();
+      toast(`Vista previa: con las cuentas, ${mail} recibirá una invitación por correo.`);
+    });
+    // Keep the team list saved once it's first shown, so adding works on top of the examples
+    const ensureTeam = () => { if (hasBackend()) { void syncTeam().then((t) => { if (t) { if ((location.hash.slice(1) || 'inicio') === 'equipo') paint.equipo(); dispatchEvent(new Event('nc-team')); } }); return; }
+      if (!localStorage.getItem('nc-staff-team') || isDemo()) { const s = me(); if (s) set('nc-staff-team', [{ name: s.name, mail: 'tú', role: 'admin' }, { name: 'Editora (ejemplo)', mail: 'editora@ejemplo.com', role: 'editor' }, { name: 'Ventas (ejemplo)', mail: 'ventas@ejemplo.com', role: 'ads' }, { name: 'Periodista (ejemplo)', mail: 'periodista@ejemplo.com', role: 'reporter' }]); } };
+
+    // ---------- start ----------
+    function start() {
+      if (isDemo() && !me()) { set('nc-staff', { name: 'Invitado', role: 'admin' }); dispatchEvent(new Event('nc-staff-change')); } // demo: straight in, as the administrator
+      const s = me();
+      $('[data-login]').hidden = !!s; $('[data-pnl-app]').hidden = !s;
+      if (!s) return;
+      ensureTeam();
+      $$('[data-me]').forEach((e) => (e.textContent = s.name));
+      $('[data-av]').textContent = s.name[0].toUpperCase();
+      $('[data-role]').textContent = ROLE_NAME[s.role];
+      paintCounts(); showTab(location.hash.slice(1) || 'inicio');
+      void loadLive(true); // what's really waiting (stories in review, automatic news, reported comments)
+      if (hasBackend()) void loadRequests().then(() => { paintCounts(); if ((location.hash.slice(1) || 'inicio') === 'inicio') showTab('inicio'); }); // real ad requests for the counts and Inicio
+    }
+    // Real login (once BACKEND is set in src/lib/backend.ts): Supabase email + password, role from the `staff` table
+    if (hasBackend()) { $('[data-real]').hidden = false; $$('[data-prevlogin]').forEach((e) => (e.hidden = true)); }
+    $<HTMLFormElement>('[data-login]').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (hasBackend()) {
+        const er = $('[data-err]'); er.hidden = true;
+        const ok = await staffLogin($<HTMLInputElement>('#pnl-mail').value.trim(), $<HTMLInputElement>('#pnl-pass').value);
+        const who = ok ? await staffProfile() : null;
+        if (!who) { er.textContent = ok ? 'Tu cuenta no está en el equipo. Pídele al administrador que te añada.' : 'Correo o contraseña incorrectos.'; er.hidden = false; return; }
+        set('nc-staff', who); start(); return;
+      }
+      const name = $<HTMLInputElement>('#pnl-name').value.trim();
+      if (name.length < 2) { const er = $('[data-err]'); er.textContent = 'Escribe tu nombre.'; er.hidden = false; return; }
+      set('nc-staff', { name, role: $<HTMLSelectElement>('#pnl-role').value });
+      start();
+    });
+    $('[data-logout]').addEventListener('click', () => { staffLogout(); set('nc-staff', null); set('nc-staff-pending', null); dispatchEvent(new Event('nc-staff-change')); start(); });
+    // The comment and ad queues change counts when used
+    root.addEventListener('click', () => setTimeout(paintCounts, 50));
+    start();
+  </script>
+</Base>

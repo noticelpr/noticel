@@ -1,0 +1,108 @@
+---
+// Exact preview of an article from the staff editor (Escribir): the real story page (header, menu, story layout,
+// sidebar, "Sigue leyendo"), filled with the article being written. The editor saves the article to this
+// browser ('nc-preview') and shows this page in a frame (computer or phone width); it updates live while typing.
+// Internal: hidden from search engines.
+import Base from '../../layouts/Base.astro';
+import '../../styles/panel.css';
+import Sidebar from '../../components/Sidebar.astro';
+import Card from '../../components/Card.astro';
+import DocViewer from '../../components/DocViewer.astro';
+import { getStories, SECTIONS, CATEGORIES, parentOf, url } from '../../lib/site';
+
+const stories = await getStories();
+const more = stories.slice(0, 3);
+// Category names and their parent, for the label and the breadcrumbs
+const secs = Object.fromEntries(SECTIONS.map((s) => { const p = parentOf(s.id); return [s.id, { name: s.short, parent: p ? CATEGORIES[p] : '' }]; }));
+---
+<Base title="Vista previa" description="Vista previa interna de una noticia." noindex>
+  <div class="vp-flag" role="note"><span class="sp-demo">VISTA PREVIA</span> Así se verá la noticia en el sitio. Todavía no está publicada.</div>
+  <main class="wrap" id="main" data-vp data-secs={JSON.stringify(secs)} data-base={url()}>
+    <div class="art-grid">
+      <article class="art">
+        <div class="crumbs"><a href={url()}>Portada</a><span data-vp-parent></span> / <a href={url()} data-vp-crumb>Sección</a></div>
+        <span class="kicker live" data-vp-live style="display:none">EN VIVO</span>
+        <h1 data-vp-title>Sin titular</h1>
+        <p class="dek" data-vp-dek></p>
+        <div class="byline">
+          <div class="by-who">
+            <strong data-vp-by>Por NotiCel</strong>
+            <span><span data-vp-when></span><span data-vp-place></span> · <span data-vp-min>1</span> min de lectura</span>
+          </div>
+          <div class="by-actions" aria-hidden="true">
+            <span class="tool"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z" /></svg> Guardar</span>
+            <span class="tool-group"><span class="tool">A−</span><span class="tool">A+</span></span>
+          </div>
+        </div>
+        <figure style="margin:0" data-vp-fig>
+          <div class="ph" style="--c:#006FA6"><img alt="" data-vp-img /></div>
+          <figcaption class="caption" data-vp-cap></figcaption>
+        </figure>
+        <div class="gal-thumbs vp-gal" data-vp-gal hidden></div>
+        <div class="body" data-vp-body></div>
+        <p class="sources" data-vp-corr hidden></p>
+        <p class="sources" data-vp-src hidden></p>
+        <div class="sec-h"><h2>Sigue leyendo</h2></div>
+        <div class="grid3">{more.map((x) => <Card story={x} dek={false} />)}</div>
+      </article>
+      <Sidebar />
+    </div>
+  </main>
+  <DocViewer />
+  <script>
+    import { embedFor } from '../../lib/embeds.mjs';
+    import { docCard } from '../../lib/doccard.mjs';
+    const root = document.querySelector<HTMLElement>('[data-vp]')!;
+    const SECS: Record<string, { name: string; parent: string }> = JSON.parse(root.dataset.secs!);
+    const base = root.dataset.base!.replace(/\/$/, '');
+    const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    // Links in the preview must not leave it (the frame is inside the staff panel)
+    document.addEventListener('click', (e) => { const a = (e.target as HTMLElement).closest('a'); if (a && !a.classList.contains('doc-open')) e.preventDefault(); }, true);
+
+    function paint() {
+      let a: any = null;
+      try { a = JSON.parse(localStorage.getItem('nc-preview') || 'null'); } catch { /* storage blocked */ }
+      if (!a) { $('[data-vp-title]').textContent = 'Abre la vista previa desde el editor (Panel de la redacción → Escribir).'; return; }
+      const sec = SECS[a.section] ?? SECS.noticias;
+      document.title = `${a.title || 'Sin titular'} | Vista previa`;
+      $('[data-vp-crumb]').textContent = sec.name;
+      $('[data-vp-parent]').textContent = sec.parent ? ` / ${sec.parent}` : '';
+      $('[data-vp-live]').style.display = a.live ? '' : 'none'; // .kicker sets display, so `hidden` alone would not hide it
+      $('[data-vp-title]').textContent = a.title || 'Sin titular';
+      $('[data-vp-dek]').textContent = a.description || '';
+      $('[data-vp-by]').textContent = `Por ${a.author || 'NotiCel'}`;
+      const d = a.date ? new Date(a.date) : new Date();
+      const when = d.toLocaleString('es-PR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      $('[data-vp-when]').textContent = when.charAt(0).toUpperCase() + when.slice(1);
+      $('[data-vp-place]').textContent = a.place ? `, ${a.place}` : '';
+      // Photo: the article's own (NotiCel shows no photo block when a story has none)
+      const own = a.image || a.imageUrl || a.gallery?.[0]?.src;
+      $('[data-vp-fig]').hidden = !own;
+      if (own) (root.querySelector('[data-vp-img]') as HTMLImageElement).src = /^(https?:|data:)/.test(own) ? own : `${base}/${own}`;
+      $('[data-vp-cap]').textContent = [a.imageCaption, a.imageCredit].filter(Boolean).join(' ');
+      // Gallery: the extra photos (the site shows them as a slideshow with the main one)
+      const galBox = $('[data-vp-gal]'); const gal = (a.gallery ?? []) as Array<{ src: string }>;
+      galBox.hidden = !gal.length;
+      galBox.innerHTML = gal.length ? `<span class="vp-gal-n">+${gal.length} ${gal.length === 1 ? 'foto' : 'fotos'} en la galería</span>` + gal.map((g) => `<button type="button" aria-hidden="true"><img src="${/^(https?:|data:)/.test(g.src) ? g.src : `${base}/${g.src}`}" alt="" /></button>`).join('') : '';
+      // Body: the editor's blocks, with embeds and photos exactly as the site shows them
+      const box = document.createElement('div'); box.innerHTML = a.body || '';
+      box.querySelectorAll<HTMLElement>('figure.wr-embed').forEach((f) => { const h = embedFor(f.dataset.url || '', { size: f.dataset.size, align: f.dataset.align }); if (h) f.outerHTML = h; else f.remove(); });
+      box.querySelectorAll<HTMLElement>('figure.wr-doc').forEach((f) => { f.outerHTML = docCard({ src: f.dataset.src!, title: f.dataset.title!, pages: Number(f.dataset.pages) || 0, size: Number(f.dataset.size) || 0, source: f.dataset.source || '' }); });
+      box.querySelectorAll<HTMLElement>('figure.wr-img').forEach((f) => {
+        const lay = `${f.dataset.size ? ` sz-${f.dataset.size}` : ''}${f.dataset.align ? ` al-${f.dataset.align}` : ''}`.trim();
+        const cap = [f.dataset.cap, f.dataset.credit].filter(Boolean).join(' ') || (f.querySelector('figcaption span')?.textContent ?? '').trim();
+        f.outerHTML = `<figure class="${lay}"><img src="${esc(f.dataset.src || f.querySelector('img')?.getAttribute('src') || '')}" alt="">${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`;
+      });
+      box.querySelectorAll('[contenteditable]').forEach((x) => x.removeAttribute('contenteditable'));
+      $('[data-vp-body]').innerHTML = box.innerHTML;
+      const words = (box.textContent || '').trim().split(/\s+/).filter(Boolean).length;
+      $('[data-vp-min]').textContent = String(Math.max(1, Math.round(words / 200)));
+      const corr = $('[data-vp-corr]'); corr.hidden = !a.correction; corr.innerHTML = a.correction ? `<strong>Corrección:</strong> ${esc(a.correction)}` : '';
+      const src = $('[data-vp-src]'); src.hidden = !a.sources?.length;
+      src.innerHTML = a.sources?.length ? `Fuentes: ${a.sources.map((s: { name: string; url?: string }) => (s.url ? `<a href="${esc(s.url)}">${esc(s.name)}</a>` : esc(s.name))).join(', ')}` : '';
+    }
+    paint();
+    addEventListener('storage', (e) => { if (e.key === 'nc-preview') paint(); }); // live while the editor types
+  </script>
+</Base>

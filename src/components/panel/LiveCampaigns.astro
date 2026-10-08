@@ -1,0 +1,98 @@
+---
+// Ventas → "Campañas en el aire": every direct ad campaign (not Google) with its progress: views delivered of the views
+// paid (or days run of the days bought), clicks, and when it will finish at today's pace. Pause, resume or end one early.
+// Data: ad_campaigns + ad_stats (supabase/schema.sql). In demo mode: the sample campaigns, labeled DEMO.
+---
+<section class="pnl-card lc" data-lc>
+  <header class="lc-head">
+    <h2 class="pnl-h3">Campañas en el aire <span class="sp-demo" data-lc-demo hidden>DEMO</span></h2>
+    <div class="pnl-range" role="group" aria-label="Campañas">
+      <button type="button" data-lf="live" aria-pressed="true">En el aire <b data-lfn="live"></b></button>
+      <button type="button" data-lf="next" aria-pressed="false">Programadas <b data-lfn="next"></b></button>
+      <button type="button" data-lf="done" aria-pressed="false">Terminadas <b data-lfn="done"></b></button>
+    </div>
+  </header>
+  <div class="pnl-kpis lc-kpis" data-lc-kpis></div>
+  <div class="lc-list" data-lc-list><p class="pnl-muted">Cargando…</p></div>
+</section>
+
+<script>
+  import { allCampaigns, setCampaignStatus, hasBackend, type CampaignRow } from '../../lib/backend';
+  import { DEMO_CAMPAIGNS } from '../../lib/ads';
+  import { isDemo } from '../../lib/demo';
+  import { ask } from '../../lib/dialogs';
+  const root = document.querySelector<HTMLElement>('[data-lc]');
+  if (root) {
+    const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const num = (n: number) => Math.round(n).toLocaleString('es-PR');
+    const today = new Date().toISOString().slice(0, 10);
+    const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' });
+    const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00`) - Date.parse(`${a}T12:00:00`)) / 864e5);
+    const SIZE: Record<string, string> = { leaderboard: 'Banner superior', rectangle: 'Rectángulo', halfpage: 'Media página', infeed: 'Entre noticias' };
+    const WHERE: Record<string, string> = { all: 'Puerto Rico y la diáspora', island: 'Solo Puerto Rico', diaspora: 'Solo la diáspora' };
+    const demo = isDemo();
+    let rows: CampaignRow[] = [], filter = 'live';
+
+    const stage = (c: CampaignRow) => (c.status === 'ended' || c.end < today || (c.views != null && c.delivered >= c.views) ? 'done' : c.start > today ? 'next' : 'live');
+    function card(c: CampaignRow) {
+      const st = stage(c), byViews = c.views != null && c.views > 0;
+      const total = byViews ? c.views! : Math.max(1, daysBetween(c.start, c.end) + 1);
+      const done = byViews ? c.delivered : Math.min(total, Math.max(0, daysBetween(c.start, today) + 1));
+      const pct = Math.min(100, Math.round((done / total) * 100));
+      const ran = Math.max(1, daysBetween(c.start, today) + 1);
+      // At today's pace: views per day so far → days left
+      const pace = byViews && st === 'live' && c.delivered > 0 ? Math.ceil((c.views! - c.delivered) / (c.delivered / ran)) : 0;
+      const ctr = c.delivered ? ((c.clicks / c.delivered) * 100).toFixed(1) : '0.0';
+      const label = st === 'done' ? (byViews && c.delivered >= c.views! ? 'Vistas cumplidas' : 'Terminada') : st === 'next' ? `Empieza el ${day(c.start)}` : c.status === 'paused' ? 'En pausa' : 'En el aire';
+      return `<article class="lc-card ${st}${c.status === 'paused' ? ' paused' : ''}" data-cid="${esc(c.id)}">
+        <header><b>${esc(c.client)}</b>${c.takeover ? '<span class="lc-tag tk">Toma de portada</span>' : ''}<span class="lc-st">${label}</span></header>
+        <p class="lc-meta">${c.takeover ? 'Todos los espacios del sitio' : esc(c.sizes.map((s) => SIZE[s] ?? s).join(', '))} · ${esc(WHERE[c.regions] ?? c.regions)} · ${byViews ? `desde el ${day(c.start)}` : `${day(c.start)} al ${day(c.end)}`}</p>
+        <div class="lc-prog"><p><span>${byViews ? `${num(c.delivered)} de ${num(c.views!)} vistas` : `Día ${num(done)} de ${num(total)} · ${num(c.delivered)} vistas`}</span><b>${pct}%</b></p><i><em style="width:${pct}%"></em></i></div>
+        <p class="lc-meta">Clics: ${num(c.clicks)} (${ctr}%)${pace ? ` · al ritmo actual termina en unos ${pace} día${pace > 1 ? 's' : ''}` : ''}${!byViews && st === 'live' ? ` · termina el ${day(c.end)}` : ''}</p>
+        ${st !== 'done' && !demo ? `<div class="lc-acts">${c.status === 'paused' ? '<button type="button" class="pnl-link" data-lca="active">Reanudar</button>' : '<button type="button" class="pnl-link" data-lca="paused">Pausar</button>'}<button type="button" class="pnl-link danger" data-lca="ended">Terminar ya</button></div>` : ''}
+      </article>`;
+    }
+    function paint() {
+      const by = (k: string) => rows.filter((c) => stage(c) === k);
+      (['live', 'next', 'done'] as const).forEach((k) => ($(`[data-lfn="${k}"]`).textContent = by(k).length ? String(by(k).length) : ''));
+      root!.querySelectorAll<HTMLElement>('[data-lf]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lf === filter)));
+      const live = by('live');
+      $('[data-lc-kpis]').innerHTML = [
+        ['En el aire', num(live.filter((c) => c.status !== 'paused').length), live.some((c) => c.takeover) ? 'incluye una toma de portada' : 'anuncios directos'],
+        ['Vistas entregadas', num(live.reduce((a, c) => a + c.delivered, 0)), 'de las campañas en el aire'],
+        ['Clics', num(live.reduce((a, c) => a + c.clicks, 0)), 'de las campañas en el aire'],
+      ].map(([l, v, s]) => `<div class="pnl-kpi"><span>${l}</span><b>${v}</b><small>${demo ? 'DEMO · ' : ''}${s}</small></div>`).join('');
+      const list = by(filter);
+      $('[data-lc-list]').innerHTML = list.map(card).join('')
+        || `<p class="apr-empty">${filter === 'live' ? 'No hay campañas directas en el aire ahora. Los espacios libres muestran Google (cuando se conecte) o “Anúnciate”.' : filter === 'next' ? 'No hay campañas programadas.' : 'Todavía no hay campañas terminadas.'}</p>`;
+    }
+    async function load() {
+      $('[data-lc-demo]').hidden = !demo;
+      if (demo) {
+        // Sample numbers so the guest sees how it works; labeled DEMO above
+        const ago = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+        rows = DEMO_CAMPAIGNS.map((c, i) => ({ id: c.id, client: c.client, sizes: c.sizes, start: ago([12, 5, 20, 2][i] ?? 3), end: ago(-[18, 25, 10, 28][i]), regions: 'all', takeover: false,
+          views: [25000, 10000, null, 50000][i] ?? null, status: 'active' as const, delivered: [18240, 3120, 9800, 2050][i] ?? 0, clicks: [212, 41, 96, 30][i] ?? 0, created: '' }));
+        rows.push({ id: 'demo-toma', client: 'Mueblería Don Pepe (ejemplo)', sizes: [], start: ago(-12), end: ago(-13), regions: 'all', takeover: true, views: 50000, status: 'active', delivered: 0, clicks: 0, created: '' });
+        rows.push({ id: 'demo-fin', client: 'Gimnasio Fuerza (ejemplo)', sizes: ['rectangle'], start: ago(40), end: ago(10), regions: 'island', takeover: false, views: 10000, status: 'ended', delivered: 10000, clicks: 184, created: '' });
+      } else if (hasBackend()) {
+        const r = await allCampaigns();
+        if (!r) { $('[data-lc-list]').innerHTML = '<p class="pnl-muted">No se pudieron cargar las campañas. Revisa la conexión.</p>'; return; }
+        rows = r;
+      } else rows = [];
+      paint();
+    }
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const f = t.closest<HTMLElement>('[data-lf]'); if (f) { filter = f.dataset.lf!; paint(); return; }
+      const a = t.closest<HTMLElement>('[data-lca]'); if (!a) return;
+      const id = t.closest<HTMLElement>('[data-cid]')!.dataset.cid!, c = rows.find((x) => x.id === id)!;
+      const to = a.dataset.lca as 'active' | 'paused' | 'ended';
+      const msg = to === 'ended' ? `¿Terminar ya la campaña de ${c.client}? Deja de salir en el sitio y no se puede reanudar.` : to === 'paused' ? `¿Pausar la campaña de ${c.client}? Deja de salir hasta que la reanudes.` : `¿Reanudar la campaña de ${c.client}?`;
+      if (!(await ask(msg, { ok: to === 'ended' ? 'Terminar' : to === 'paused' ? 'Pausar' : 'Reanudar', danger: to === 'ended' }))) return;
+      if (await setCampaignStatus(id, to)) { c.status = to; paint(); } else alert('No se pudo cambiar. Solo el administrador y Ventas pueden hacerlo.');
+    });
+    void load();
+  }
+</script>

@@ -23,6 +23,21 @@ const noticias = defineCollection({
     pdfUrl: z.string().optional(),
     pdfTitle: z.string().optional(),
     draft: z.boolean().default(false),
+    // Written by the staff panel (same fields as Noticias Xtra). Imported WordPress stories leave them at the defaults.
+    place: z.string().optional(), // dateline, e.g. "San Juan"
+    imageCredit: z.string().optional(),
+    imageCreditUrl: z.string().optional(),
+    gallery: z.array(z.object({ src: z.string(), caption: z.string().default(''), credit: z.string().default(''), creditUrl: z.string().optional() })).default([]),
+    breaking: z.boolean().default(false), // Última hora: eligible for the ÚLTIMA HORA bar for 12 hours
+    live: z.boolean().default(false), // developing story, shown with an EN VIVO label
+    pinned: z.boolean().default(false), // 📌 locked in the home page's main spot until an editor unpins it
+    homeLead: z.boolean().default(false), // editor's pick for the home page's main spot
+    sectionLead: z.boolean().default(false), // editor's pick for the top of its category page
+    sectionPinned: z.boolean().default(false), // 📌 locked at the top of its category page
+    aiAssisted: z.boolean().default(false),
+    sources: z.array(z.object({ name: z.string(), url: z.string().optional() })).default([]),
+    related: z.array(z.string()).default([]), // ids of related stories
+    correction: z.string().optional(),
   }),
 });
 

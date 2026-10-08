@@ -1,0 +1,171 @@
+---
+// Reported-comments review queue (moved from src/pages/comentarios/revisar.astro, which still shows it on its own).
+// Review queue for reported comments, for the same one employee who approves ads (/publicidad/aprobar/).
+// The automatic check (src/lib/moderation.ts) already hid the clear violations and kept the clearly fine ones;
+// only doubtful cases land in "Por revisar". "Ocultos automáticamente" lets the employee undo a mistake.
+// PREVIEW: shows reports made on this device plus four examples. The real version needs Supabase (shared reports
+// from every reader), an AI moderation key, and a staff login so only the employee can open it.
+import { getStories, url } from '../lib/site';
+const stories = (await getStories()).slice(0, 3).map((s) => ({ id: s.id, title: s.data.title, url: url(s.data.path) }));
+interface Props { embedded?: boolean } // inside the staff panel (/redaccion/): no page wrapper
+const { embedded = false } = Astro.props;
+const Tag = embedded ? 'section' : 'main';
+---
+<Tag class:list={["apr", !embedded && "wrap"]} id={embedded ? undefined : "main"} data-mod data-stories={JSON.stringify(stories)}>
+  <p class="pf-demo"><span class="sp-demo">VISTA PREVIA</span> Página interna para quien modera. Muestra los reportes hechos en este dispositivo y cuatro de ejemplo. Con las cuentas, llegarán los reportes de todos los lectores.</p>
+  <header class="apr-head">
+    <h1>Revisar comentarios</h1>
+    <p class="apn-sub">El sistema oculta solo lo que claramente incumple las reglas y deja publicado lo que está bien. Aquí llega únicamente lo dudoso.</p>
+  </header>
+  <section class="mod-rules" aria-label="Cómo decidir">
+    <div class="no"><h2>Ocultar si tiene…</h2><ul><li>Insultos o ataques a una persona</li><li>Odio por raza, origen, religión, sexo u orientación</li><li>Amenazas o llamados a la violencia</li><li>Datos personales (teléfono, dirección, correo)</li><li>Spam, ventas o enlaces sospechosos</li></ul></div>
+    <div class="yes"><h2>Mantener si es…</h2><ul><li>Una crítica fuerte pero sin insultos</li><li>Una opinión distinta a la de otros</li><li>Una queja contra el gobierno o una figura pública</li><li>Una duda o corrección sobre la noticia</li></ul></div>
+  </section>
+  <nav class="apn-tabs" role="tablist" aria-label="Filtrar">
+    <button type="button" role="tab" aria-selected="true" data-f="review">Por revisar <b data-n="review"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-f="auto">Ocultos automáticamente <b data-n="auto"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-f="done">Resueltos <b data-n="done"></b></button>
+  </nav>
+  <div class="apr-list" data-list></div>
+  <div class="apn-toast" data-toast role="status" hidden></div>
+</Tag>
+<script>
+  import { getReports, saveReports, upsertReport, assess, isHidden, reasonName, myReports, saveMyReports, HIDE_AFTER_REPORTS, type Report } from '../lib/moderation';
+  import { penalize, RULES } from '../lib/reputation';
+  import { notify } from '../lib/notifications';
+  import { hasBackend, staffApi } from '../lib/backend';
+  const page = document.querySelector<HTMLElement>('[data-mod]')!;
+  const STORIES: Array<{ id: string; title: string; url: string }> = JSON.parse(page.dataset.stories!);
+  const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const toast = (m: string) => { const t = page.querySelector<HTMLElement>('[data-toast]')!; t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3500); };
+  const ago = (t: number) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
+
+  // Four example reports, added once so the queue isn't empty in the preview
+  function demo() {
+  function seed() {
+    try { if (localStorage.getItem('nc-mod-seeded')) return; localStorage.setItem('nc-mod-seeded', '1'); } catch { return; }
+    const now = Date.now();
+    const ex = (i: number, author: string, text: string, reasons: string[], count: number, status: Report['status'], mins: number): Report => {
+      const s = STORIES[i % STORIES.length]; const a = assess(text);
+      return { id: `${s.id}:ejemplo${i}`, at: now - mins * 60000, storyId: s.id, storyUrl: `${s.url}#comentarios`, title: s.title, commentId: `ejemplo${i}`, author, text,
+        mine: false, source: 'report', reasons, count, score: a.score, flags: a.reasons, status };
+    };
+    const list = [
+      ex(0, 'boricua_en_orlando', 'Eso no es verdad. El municipio ya dijo hace un mes que la obra se canceló, busquen bien antes de publicar.', ['falso'], 2, 'review', 25),
+      ex(1, 'vecino_molesto', 'Llamen al 787-555-0199, ese es el número del que hizo eso. Que todo el mundo sepa quién es.', ['personal'], HIDE_AFTER_REPORTS, 'review', 50),
+      ex(2, 'anonimo_77', 'Este alcalde es un pendejo y un cabrón, que se vaya ya.', ['insulto'], 1, 'auto', 90),
+      ex(0, 'maestra_retirada', 'Me parece que el gobierno debió avisar con más tiempo. Siempre es lo mismo.', ['insulto'], 1, 'kept', 140),
+    ];
+    saveReports([...getReports(), ...list]);
+  }
+
+  const DONE: Record<string, string> = { kept: 'Reporte rechazado por el sistema: sigue publicado', restored: 'Mantenido por la redacción', removed: 'Ocultado por la redacción', warned: 'Publicado con advertencia al autor', auto: '', review: '' };
+  let filter = 'review';
+  function render() {
+    const all = getReports().sort((a, b) => b.at - a.at);
+    const groups: Record<string, Report[]> = { review: all.filter((r) => r.status === 'review'), auto: all.filter((r) => r.status === 'auto'), done: all.filter((r) => !['review', 'auto'].includes(r.status)) };
+    Object.entries(groups).forEach(([k, l]) => (page.querySelector(`[data-n="${k}"]`)!.textContent = l.length ? String(l.length) : ''));
+    const box = page.querySelector<HTMLElement>('[data-list]')!;
+    const list = groups[filter];
+    if (!list.length) { box.innerHTML = `<p class="apr-empty">${filter === 'done' ? 'Todavía no hay decisiones.' : '🎉 Nada pendiente aquí.'}</p>`; return; }
+    box.innerHTML = list.map((r) => {
+      const who = r.source === 'post' ? '<span class="apn-st">Detectado al publicar</span>' : `<span class="apn-st">Reportado ${r.count} ${r.count === 1 ? 'vez' : 'veces'}</span>`;
+      const vis = isHidden(r) ? '<span class="apn-st">Oculto ahora</span>' : r.status === 'review' || r.status === 'warned' || r.status === 'kept' || r.status === 'restored' ? '<span class="apn-st on">Visible</span>' : '';
+      const acts = r.status === 'review'
+        ? `<button type="button" class="adp-btn" data-act="keep">Mantener</button><button type="button" class="adp-btn ghost-dark" data-act="warn">Advertir al autor</button><button type="button" class="apr-reject" data-act="remove">Ocultar (${RULES.report} al autor)</button>`
+        : r.status === 'auto'
+        ? `<button type="button" class="adp-btn ghost-dark" data-act="keep">Restaurar: fue un error</button><button type="button" class="adp-btn" data-act="remove">Confirmar que se oculta</button>`
+        : `<p class="mod-done">${DONE[r.status]}${r.decided ? ` · ${ago(r.decided)}` : ''}</p>`;
+      return `<article class="apr-card" data-id="${esc(r.id)}">
+        <header class="apr-card-h">
+          <div><h2>${r.commentId.startsWith('ejemplo') ? '<span class="sp-demo">EJEMPLO</span> ' : ''}${esc(r.author)}${r.mine ? ' <small>(tú)</small>' : ''}</h2><p class="apn-small">${ago(r.at)} · en <a href="${esc(r.storyUrl)}">${esc(r.title)}</a></p></div>
+          <div class="apr-badges">${who}${vis}</div>
+        </header>
+        <blockquote class="mod-quote">${esc(r.text) || '<i>(solo sticker o GIF)</i>'}${r.media ? `<img src="${esc(r.media)}" alt="Sticker" />` : ''}</blockquote>
+        <div class="mod-flags">
+          ${r.reasons.length ? `Motivo del reporte: ${r.reasons.map((x) => `<span class="mod-chip r">${esc(reasonName(x))}</span>`).join('')}` : ''}
+          <span class="mod-score">Revisión automática: <i><b style="width:${r.score}%"></b></i> ${r.score}/100</span>
+          ${r.flags.length ? r.flags.map((f) => `<span class="mod-chip">${esc(f)}</span>`).join('') : '<span>No encontró nada que incumpla las reglas.</span>'}
+        </div>
+        <div class="apr-acts">${acts}</div>
+      </article>`;
+    }).join('');
+  }
+
+  page.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const tab = t.closest<HTMLElement>('[data-f]');
+    if (tab) { filter = tab.dataset.f!; page.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-selected', String(x === tab))); render(); return; }
+    const btn = t.closest<HTMLElement>('[data-act]'); if (!btn) return;
+    const r = getReports().find((x) => x.id === btn.closest<HTMLElement>('[data-id]')!.dataset.id); if (!r) return;
+    const act = btn.dataset.act;
+    if (act === 'keep') {
+      upsertReport({ ...r, status: 'restored', decided: Date.now() });
+      // A report that turned out wrong lowers the weight of that reader's next reports
+      const my = myReports(); if (r.source === 'report' && my.ids.includes(r.id)) { my.wrong++; saveMyReports(my); }
+      if (r.mine && r.status === 'auto') notify({ id: `mod-${r.id}-ok`, kind: 'mod', text: 'Revisamos tu comentario y lo restauramos. Gracias por tu paciencia.', quote: r.text.slice(0, 80), url: r.storyUrl });
+      toast('Listo: el comentario queda publicado.');
+    } else if (act === 'warn') {
+      upsertReport({ ...r, status: 'warned', decided: Date.now() });
+      if (r.mine) notify({ id: `mod-${r.id}-warn`, kind: 'mod', text: 'La redacción te envió una advertencia: tu comentario sigue publicado, pero roza las reglas de la comunidad.', quote: r.text.slice(0, 80), url: r.storyUrl });
+      toast(`Se le enviará una advertencia a ${r.author} (cuando las cuentas estén conectadas).`);
+    } else if (act === 'remove') {
+      upsertReport({ ...r, status: 'removed', decided: Date.now() });
+      if (r.mine) { penalize(r.commentId); notify({ id: `mod-${r.id}-rm`, kind: 'mod', text: `Ocultamos tu comentario por incumplir las reglas de la comunidad (${RULES.report} de reputación).`, quote: r.text.slice(0, 80), url: r.storyUrl }); }
+      toast(`Ocultado. ${r.author} pierde ${Math.abs(RULES.report)} puntos de reputación y, si lo tenía, su nivel Top comentarista o Diamante.`);
+    }
+    render();
+  });
+
+  seed(); render();
+  }
+
+  // ---------- Real queue (Supabase, supabase/comments.sql) ----------
+  // Por revisar: comments the automatic check flagged when posted, or that 3 readers reported (hidden until you decide).
+  // Reportados: still public, with 1 or 2 reports. Resueltos: removed by the newsroom.
+  function liveQueue() {
+    page.querySelector('.pf-demo')?.remove();
+    const tabs = page.querySelectorAll<HTMLElement>('[data-f]');
+    const LABEL: Record<string, string> = { review: 'Por revisar', auto: 'Reportados', done: 'Quitados' };
+    tabs.forEach((b) => (b.firstChild!.textContent = `${LABEL[b.dataset.f!]} `));
+    page.querySelector('.apn-sub')!.textContent = 'Aquí llega lo que el filtro automático marcó al publicarse y lo que reportan los lectores. Con 3 reportes, un comentario se oculta solo hasta que decidas.';
+    let tab = 'review';
+    type C = { id: string; story: string; url: string; body: string; media: { src: string } | null; status: string; flags: string[]; likes: number; reports: number; created_at: string;
+      author: { username: string } | null; why: Array<{ reason: string }> };
+    let rows: C[] = [];
+    async function load() {
+      const sel = 'id,story,url,body,media,status,flags,likes,reports,created_at,author:profiles!comments_user_id_fkey(username),why:comment_reports(reason)';
+      const r = await staffApi(`comments?or=(status.eq.review,status.eq.removed,reports.gt.0)&select=${sel}&order=created_at.desc&limit=200`);
+      if (!r?.ok) { page.querySelector('[data-list]')!.innerHTML = '<p class="apr-empty">No pudimos cargar los comentarios. Revisa que entraste al panel con tu cuenta.</p>'; return; }
+      rows = await r.json(); paint();
+    }
+    const group = (c: C) => (c.status === 'review' ? 'review' : c.status === 'removed' ? 'done' : 'auto');
+    function paint() {
+      ['review', 'auto', 'done'].forEach((g) => { const n = rows.filter((c) => group(c) === g).length; page.querySelector(`[data-n="${g}"]`)!.textContent = n ? String(n) : ''; });
+      const list = rows.filter((c) => group(c) === tab);
+      page.querySelector('[data-list]')!.innerHTML = list.map((c) => {
+        const why = [...new Set(c.why.map((w) => reasonName(w.reason)))];
+        const flags = c.flags.length ? `Filtro automático: ${c.flags.join(', ')}` : '';
+        return `<article class="apr-card mod-card" data-id="${c.id}">
+          <p class="apr-meta"><b>@${esc(c.author?.username ?? 'lector')}</b> · ${ago(Date.parse(c.created_at))} · <a href="${esc(c.url)}" target="_blank" rel="noopener">Ver en la noticia ↗</a></p>
+          <blockquote class="mod-text">${esc(c.body) || '<i>(sticker o GIF)</i>'}${c.media ? `<img class="cm-media" src="${esc(c.media.src)}" alt="" />` : ''}</blockquote>
+          <p class="apr-meta">${c.reports ? `🚩 ${c.reports} ${c.reports === 1 ? 'reporte' : 'reportes'}${why.length ? `: ${esc(why.join(', '))}` : ''}` : ''}${c.reports && flags ? ' · ' : ''}${esc(flags)}</p>
+          <div class="apr-acts">${c.status === 'removed'
+            ? '<button type="button" class="adp-btn ghost-dark" data-act="keep">Restaurar: fue un error</button>'
+            : `<button type="button" class="adp-btn" data-act="keep">${c.status === 'review' ? 'Publicar: está bien' : 'Está bien, quitar los reportes'}</button><button type="button" class="apr-reject" data-act="remove">Quitar comentario</button>`}</div>
+        </article>`;
+      }).join('') || `<p class="apr-empty">${tab === 'review' ? 'No hay comentarios por revisar. 🎉' : 'Nada aquí.'}</p>`;
+    }
+    tabs.forEach((b) => b.addEventListener('click', () => { tab = b.dataset.f!; tabs.forEach((x) => x.setAttribute('aria-selected', String(x === b))); paint(); }));
+    page.addEventListener('click', async (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!btn) return;
+      const id = btn.closest<HTMLElement>('[data-id]')!.dataset.id!;
+      const patch = btn.dataset.act === 'remove' ? { status: 'removed' } : { status: 'visible', reports: 0 };
+      const r = await staffApi(`comments?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+      toast(!r?.ok ? 'No se pudo guardar. Intenta otra vez.' : btn.dataset.act === 'remove' ? 'Quitado. Su autor recibe un aviso.' : 'Listo: el comentario queda publicado.');
+      void load();
+    });
+    void load();
+  }
+  if (hasBackend()) liveQueue(); else demo();
+</script>

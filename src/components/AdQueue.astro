@@ -1,0 +1,215 @@
+---
+// Ad approval queue (moved from src/pages/publicidad/aprobar.astro, which still shows it on its own).
+// Approval page for the one employee who handles ads: a queue of client requests from the Anúnciate page.
+// For each: check the artwork (or finish the design the client asked for), tick the checklist, then approve,
+// ask for changes, or reject (refund). Approving gives the campaign entry for src/lib/ads.ts and the image files.
+// PREVIEW: until REQUESTS.url (src/lib/ads.ts) is set, it shows requests made on this device plus two examples.
+// The real version needs a login so only staff can open it.
+import { FORMATS } from '../lib/ads';
+import { url } from '../lib/site';
+import { hasBackend } from '../lib/backend';
+const fmtInfo = FORMATS.map(({ id, name, slots, art, where }) => ({ id, name, slots, art, where }));
+const home = url();
+interface Props { embedded?: boolean } // inside the staff panel (/redaccion/): no page wrapper
+const { embedded = false } = Astro.props;
+const Tag = embedded ? 'section' : 'main';
+---
+<Tag class:list={["apr", !embedded && "wrap"]} id={embedded ? undefined : "main"} data-apr data-formats={JSON.stringify(fmtInfo)} data-home={home}>
+  {!hasBackend() && <p class="pf-demo"><span class="sp-demo">VISTA PREVIA</span> Página interna para quien aprueba los anuncios. Muestra las solicitudes hechas en este dispositivo y dos de ejemplo.</p>}
+  <header class="apr-head">
+    <h1>Aprobar anuncios</h1>
+    <p class="apn-sub">Revisa cada anuncio, diséñalo si el cliente lo pidió, y apruébalo. Prometemos responder en 24 horas.</p>
+  </header>
+  <nav class="apn-tabs" role="tablist" aria-label="Filtrar">
+    <button type="button" role="tab" aria-selected="true" data-f="revisar">Por revisar <b data-n="revisar"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-f="disenar">Por diseñar <b data-n="disenar"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-f="cambios">Esperando al cliente <b data-n="cambios"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-f="hechas">Listas <b data-n="hechas"></b></button>
+  </nav>
+  <div class="apr-list" data-list></div>
+  <div class="apn-toast" data-toast role="status" hidden></div>
+</Tag>
+<script>
+  import { ask, askText } from '../lib/dialogs';
+  import { drawAd, THEMES } from '../lib/adcreative';
+  import { listRequests, loadRequests, saveRequest, updateRequest, type AdRequest } from '../lib/adrequests';
+  import { hasBackend, publishCampaign, campaignStats } from '../lib/backend';
+  import type { Campaign, AdSize } from '../lib/ads';
+  const page = document.querySelector<HTMLElement>('[data-apr]')!;
+  const FMT: Array<{ id: string; name: string; slots: string[]; art: number[][]; where: string }> = JSON.parse(page.dataset.formats!);
+  const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+  const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const toast = (m: string) => { const t = page.querySelector<HTMLElement>('[data-toast]')!; t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3500); };
+  const ago = (iso: string) => { const h = Math.round((Date.now() - new Date(iso).valueOf()) / 36e5); return h < 1 ? 'hace un momento' : h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} días`; };
+  const CHECKS = ['Tamaño y calidad de imagen bien', 'Texto claro y sin errores', 'Cumple las reglas (nada prohibido ni engañoso)', 'El enlace funciona'];
+
+  // Two example requests, added once so the queue isn't empty in the preview
+  async function seed() {
+    if (hasBackend()) return; // real requests come from the database
+    try { if (localStorage.getItem('nc-ad-seeded')) return; localStorage.setItem('nc-ad-seeded', '1'); } catch { return; }
+    const c = document.createElement('canvas');
+    drawAd(c, 300, 250, { title: 'Gomas a mitad de precio', msg: 'Alineación gratis con 4 gomas. Bayamón y Caguas.', cta: 'Llama hoy', business: 'Gomera El Pana' }, THEMES[4], null, 1);
+    const now = Date.now();
+    await saveRequest({ id: 'NC-EJEMPLO2', created: new Date(now - 5 * 36e5).toISOString(), status: 'disenar', paid: true,
+      client: { name: 'Marisol Vega', business: 'Repostería Mari', email: 'mari@ejemplo.com', phone: '787-555-0142', who: 'retail' },
+      formats: ['valla'], where: 'Metro, Este', start: new Date(now + 2 * 864e5).toISOString().slice(0, 10), duration: '3 meses', total: 0, lines: ['Valla digital'],
+      art: { mode: 'design', files: [], title: 'Bizcochos por encargo', msg: 'Cumpleaños, bodas y bautizos. Pide el tuyo.', cta: 'Escríbenos por WhatsApp', theme: 'rojo', notes: 'Que se vea bien dulce' },
+      link: 'https://wa.me/17875550142' });
+    await saveRequest({ id: 'NC-EJEMPLO1', created: new Date(now - 2 * 36e5).toISOString(), status: 'revisar', paid: true,
+      client: { name: 'José Rivera', business: 'Gomera El Pana', email: 'jose@ejemplo.com', phone: '787-555-0177', who: 'retail' },
+      formats: ['rectangle'], where: 'Puerto Rico y la diáspora', start: new Date(now + 864e5).toISOString().slice(0, 10), duration: '1 mes', total: 0, lines: ['Rectángulo'],
+      art: { mode: 'upload', files: [{ name: 'anuncio-gomas.png', w: 300, h: 250, data: c.toDataURL('image/png') }] },
+      link: 'https://example.com' });
+  }
+
+  /** Views the client paid for: the takeover's (if bought by views) or the display ads'. */
+  const paidViews = (r: AdRequest) => r.takeoverViews ?? r.views;
+  // The campaign an approved request becomes. Paid by views → it runs until they're delivered (end date a year out
+  // as a safety stop); by time → it ends on its date.
+  function campaignOf(r: AdRequest): Campaign {
+    const fmts = FMT.filter((f) => r.formats.includes(f.id));
+    const sizes = [...new Set(fmts.flatMap((f) => (f.slots.length ? f.slots : ['leaderboard', 'rectangle', 'halfpage', 'infeed'])))] as AdSize[];
+    const end = new Date(`${r.start}T12:00:00`);
+    const m = r.duration.match(/(\d+)\s*(semana|mes|día)/);
+    const paid = paidViews(r); // takeover by views counts every ad space it fills
+    if (paid) end.setFullYear(end.getFullYear() + 1);
+    else if (m && m[2] === 'semana') end.setDate(end.getDate() + 7 * Number(m[1]) - 1); else if (m && m[2] === 'día') end.setDate(end.getDate() + Number(m[1]) - 1); else if (m) { end.setMonth(end.getMonth() + Number(m[1])); end.setDate(end.getDate() - 1); }
+    const regions = r.where === 'Solo la diáspora' ? 'diaspora' : r.where === 'Puerto Rico y la diáspora' ? 'all' : 'island';
+    return { id: r.id.toLowerCase(), client: r.client.business, sizes, start: r.start, end: end.toISOString().slice(0, 10), regions, takeover: fmts.some((f) => f.id === 'takeover') || undefined,
+      views: paid, creatives: r.art.files.map((f) => ({ img: f.data, url: r.link || '#', alt: r.client.business, w: f.w, h: f.h })) };
+  }
+  // Campaign entry for src/lib/ads.ts (manual publishing, only while there's no database)
+  function campaign(r: AdRequest) {
+    const c = campaignOf(r);
+    const creatives = c.creatives.map((cr) => `{ img: 'anuncios/${r.id.toLowerCase()}-${cr.w}x${cr.h}.png', url: '${cr.url}', alt: '${c.client.replace(/'/g, "\\'")}' }`);
+    return `{ id: '${c.id}', client: '${c.client.replace(/'/g, "\\'")}', sizes: ${JSON.stringify(c.sizes).replace(/"/g, "'")}, start: '${c.start}', end: '${c.end}', regions: '${c.regions}',${c.takeover ? ' takeover: true,' : ''}${c.views ? ` views: ${c.views},` : ''}\n  creatives: [${creatives.join(', ')}] },`;
+  }
+  // Views delivered so far: for everyone with the database, on this device in the preview
+  let stats: Record<string, { views: number; clicks: number }> = {};
+  const delivered = (r: AdRequest) => (hasBackend() ? stats[r.id.toLowerCase()]?.views ?? 0 : (() => { try { return JSON.parse(localStorage.getItem('nc-ad-views') || '{}')[r.id] ?? 0; } catch { return 0; } })());
+  const progress = (r: AdRequest) => {
+    const goal = paidViews(r); if (!goal) return '';
+    const n = delivered(r), pct = Math.min(100, Math.round((n / goal) * 100)), done = n >= goal;
+    return `<div class="apr-views"><p><b>${done ? '✅ Vistas cumplidas: la campaña terminó sola.' : `Vistas: ${n.toLocaleString('es-PR')} de ${goal.toLocaleString('es-PR')}`}</b>${hasBackend() ? '' : ' <small>(contadas en este dispositivo · vista previa)</small>'}</p><span class="pnl-bar"><i style="width:${pct}%"></i></span></div>`;
+  };
+
+  let filter = 'revisar';
+  function render() {
+    const all = listRequests();
+    const groups: Record<string, AdRequest[]> = { revisar: all.filter((r) => r.status === 'revisar'), disenar: all.filter((r) => r.status === 'disenar'), cambios: all.filter((r) => r.status === 'cambios'), hechas: all.filter((r) => r.status === 'aprobada' || r.status === 'rechazada') };
+    Object.entries(groups).forEach(([k, l]) => (page.querySelector(`[data-n="${k}"]`)!.textContent = l.length ? String(l.length) : ''));
+    const list = groups[filter];
+    const box = page.querySelector<HTMLElement>('[data-list]')!;
+    if (!list.length) { box.innerHTML = `<p class="apr-empty">${filter === 'hechas' ? 'Todavía no hay anuncios aprobados.' : '🎉 Nada pendiente aquí.'}</p>`; return; }
+    box.innerHTML = list.map((r) => {
+      const design = r.art.mode === 'design';
+      const sizes = [...new Map(FMT.filter((f) => r.formats.includes(f.id)).flatMap((f) => f.art).map((s) => [s.join('x'), s])).values()];
+      const art = design && r.status !== 'aprobada'
+        ? `<div class="apr-design" data-design>
+            <div class="apr-fields">
+              <p class="apn-small">El cliente escribió lo siguiente. Ajústalo si hace falta:</p>
+              <label>Título<input data-k="title" maxlength="30" value="${esc(r.art.title)}" /></label>
+              <label>Mensaje<textarea data-k="msg" rows="2" maxlength="80">${esc(r.art.msg)}</textarea></label>
+              <label>Botón<input data-k="cta" maxlength="24" value="${esc(r.art.cta)}" /></label>
+              <label>Colores<select data-k="theme">${THEMES.map((t) => `<option value="${t.id}"${t.id === r.art.theme ? ' selected' : ''}>${t.name}</option>`).join('')}</select></label>
+              ${r.art.notes ? `<p class="apr-notes">📝 Nota del cliente: ${esc(r.art.notes)}</p>` : ''}
+              ${r.art.logo ? `<p class="apn-small">Logo del cliente:</p><img class="apr-logo" src="${r.art.logo}" alt="Logo" />` : '<p class="apn-small">Sin logo.</p>'}
+            </div>
+            <div class="apr-canvases">${sizes.map(([w, h]) => `<figure><canvas data-w="${w}" data-h="${h}" style="aspect-ratio:${w}/${h};max-width:${w}px"></canvas><figcaption>${w} × ${h} · <a href="#" data-dl="${r.id.toLowerCase()}-${w}x${h}.png">Descargar</a></figcaption></figure>`).join('')}</div>
+          </div>`
+        : `<div class="apr-files">${r.art.files.map((f) => {
+            const ok = sizes.some(([w, h]) => Math.abs(f.w / f.h - w / h) / (w / h) < 0.08);
+            return `<figure><img src="${f.data}" alt="${esc(f.name)}" /><figcaption>${f.w} × ${f.h} ${ok ? '✓' : '⚠ adaptar'} · <a href="${f.data}" download="${r.id.toLowerCase()}-${f.w}x${f.h}.png">Descargar</a></figcaption></figure>`;
+          }).join('') || '<p class="apn-small">Sin imágenes.</p>'}</div>`;
+      const done = r.status === 'aprobada' || r.status === 'rechazada';
+      return `<article class="apr-card" data-id="${r.id}">
+        <header class="apr-card-h">
+          <div><h2>${r.id.includes('EJEMPLO') ? '<span class="sp-demo">EJEMPLO</span> ' : ''}${esc(r.client.business)}</h2><p class="apn-small">${r.id} · ${ago(r.created)} · ${esc(r.client.name)} · <a href="mailto:${esc(r.client.email)}">${esc(r.client.email)}</a>${r.client.phone ? ` · ${esc(r.client.phone)}` : ''}</p></div>
+          <div class="apr-badges"><span class="apn-st ${r.paid ? 'on' : 'wait'}">${r.paid ? `Pagado ${money(r.total)}` : `Sin pagar · ${money(r.total)}`}</span><span class="apn-st ${design ? 'wait' : ''}">${design ? 'Lo diseñamos nosotros' : 'Arte del cliente'}</span>${r.status === 'aprobada' ? '<span class="apn-st on">Aprobado</span>' : r.status === 'rechazada' ? '<span class="apn-st">Rechazado · reembolsar</span>' : ''}</div>
+        </header>
+        <div class="apr-where"><b>Dónde sale:</b><ul>${FMT.filter((f) => r.formats.includes(f.id)).map((f) => `<li><b>${esc(f.name)}:</b> ${esc(f.where)}</li>`).join('')}</ul>
+          ${r.status === 'aprobada' && !(paidViews(r) && delivered(r) >= paidViews(r)!) ? `<p>✅ Ya puedes verlo en el sitio <b>en este dispositivo</b> (marcado “Vista previa”). <a href="${page.dataset.home}" target="_blank" rel="noopener">Abrir la portada ↗</a></p>` : ''}</div>
+        <p class="apr-meta"><b>${FMT.filter((f) => r.formats.includes(f.id)).map((f) => f.name).join(', ')}</b> · ${esc(r.where)} · ${esc(r.duration)} desde el ${r.start}${r.link ? ` · <a href="${esc(r.link)}" target="_blank" rel="noopener">Abrir enlace ↗</a>` : ' · sin enlace'}</p>
+        ${r.note ? `<p class="apr-notes">💬 ${esc(r.note)}</p>` : ''}
+        ${art}
+        ${r.status === 'aprobada' ? progress(r) : ''}
+        ${done ? (r.status === 'aprobada' && !hasBackend() ? `<details class="apr-code"><summary>Código para publicarlo</summary><p class="apn-small">1) Descarga las imágenes y guárdalas en <code>public/anuncios/</code>. 2) Pega esto dentro de <code>CAMPAIGNS</code> en <code>src/lib/ads.ts</code>. (Cuando conectemos la base de datos, esto será automático.)</p><textarea readonly rows="4">${esc(campaign(r))}</textarea><button type="button" class="adp-btn ghost-dark" data-copy>Copiar</button></details>` : '')
+        : `<fieldset class="apr-checks"><legend>Antes de aprobar</legend>${CHECKS.map((c) => `<label class="adb-check"><input type="checkbox" data-chk /> ${c}</label>`).join('')}</fieldset>
+        <div class="apr-acts">
+          <button type="button" class="adp-btn" data-act="approve" disabled>Aprobar y publicar</button>
+          <button type="button" class="adp-btn ghost-dark" data-act="changes">Pedir cambios</button>
+          <button type="button" class="apr-reject" data-act="reject">Rechazar y reembolsar</button>
+        </div>`}
+      </article>`;
+    }).join('');
+    box.querySelectorAll<HTMLElement>('[data-design]').forEach((d) => drawDesign(d));
+  }
+
+  function drawDesign(d: HTMLElement) {
+    const card = d.closest<HTMLElement>('[data-id]')!;
+    const r = listRequests().find((x) => x.id === card.dataset.id)!;
+    const v = (k: string) => d.querySelector<HTMLInputElement>(`[data-k="${k}"]`)!.value;
+    const theme = THEMES.find((t) => t.id === v('theme')) ?? THEMES[0];
+    const go = (logo: HTMLImageElement | null) => d.querySelectorAll<HTMLCanvasElement>('canvas').forEach((c) => drawAd(c, Number(c.dataset.w), Number(c.dataset.h), { title: v('title'), msg: v('msg'), cta: v('cta'), business: r.client.business }, theme, logo));
+    if (r.art.logo) { const img = new Image(); img.onload = () => go(img); img.src = r.art.logo; } else go(null);
+  }
+
+  page.addEventListener('input', (e) => { const d = (e.target as HTMLElement).closest<HTMLElement>('[data-design]'); if (d) drawDesign(d); });
+  page.addEventListener('change', (e) => {
+    const t = e.target as HTMLElement;
+    const d = t.closest<HTMLElement>('[data-design]'); if (d) drawDesign(d);
+    if (t.matches('[data-chk]')) { const card = t.closest<HTMLElement>('[data-id]')!; card.querySelector<HTMLButtonElement>('[data-act="approve"]')!.disabled = [...card.querySelectorAll<HTMLInputElement>('[data-chk]')].some((c) => !c.checked); }
+  });
+  page.addEventListener('click', async (e) => {
+    const t = e.target as HTMLElement;
+    const card = t.closest<HTMLElement>('[data-id]');
+    if (t.matches('[data-f]') || t.closest('[data-f]')) {
+      const b = t.closest<HTMLElement>('[data-f]')!; filter = b.dataset.f!;
+      page.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-selected', String(x === b))); render(); return;
+    }
+    if (t.matches('[data-dl]')) {
+      e.preventDefault();
+      const c = t.closest('figure')!.querySelector('canvas')!;
+      const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = t.dataset.dl!; a.click(); return;
+    }
+    if (t.matches('[data-copy]')) { const ta = t.parentElement!.querySelector('textarea')!; navigator.clipboard?.writeText(ta.value).then(() => toast('Copiado.'), () => { ta.select(); }); return; }
+    if (!card || !t.matches('[data-act]')) return;
+    const id = card.dataset.id!; const r = listRequests().find((x) => x.id === id)!;
+    const act = t.dataset.act;
+    if (act === 'approve') {
+      const d = card.querySelector<HTMLElement>('[data-design]');
+      const patch: Partial<AdRequest> = { status: 'aprobada' };
+      if (d) { // keep the final design as the ad files
+        const v = (k: string) => d.querySelector<HTMLInputElement>(`[data-k="${k}"]`)!.value;
+        patch.art = { ...r.art, title: v('title'), msg: v('msg'), cta: v('cta'), theme: v('theme'), files: [...d.querySelectorAll('canvas')].map((c) => ({ name: `${c.dataset.w}x${c.dataset.h}.png`, w: Number(c.dataset.w), h: Number(c.dataset.h), data: c.toDataURL('image/png') })) };
+      }
+      updateRequest(id, patch);
+      if (hasBackend()) {
+        // Automatic publishing: live for every reader right away
+        publishCampaign(campaignOf({ ...r, ...patch } as AdRequest)).then((ok) => toast(ok ? `Aprobado y publicado: ya sale para todos los lectores.` : 'Se aprobó, pero no se pudo publicar. Revisa tu sesión e intenta otra vez.'));
+      } else toast(`Aprobado. Ya lo ves en el sitio en este dispositivo (vista previa). Con la base de datos conectada, sale para todos al instante.`);
+    } else if (act === 'changes') {
+      const msg = await askText('¿Qué cambios necesita el cliente? Se le enviará por correo.', { value: 'Hola, ¿nos puedes enviar el anuncio en 300 × 250 píxeles?', ok: 'Escribir el correo', multiline: true });
+      if (!msg) return;
+      updateRequest(id, { status: 'cambios', note: msg });
+      location.href = `mailto:${r.client.email}?subject=${encodeURIComponent(`Tu anuncio en NotiCel (${r.id})`)}&body=${encodeURIComponent(msg)}`;
+    } else if (act === 'reject') {
+      if (!(await ask(`¿Rechazar el anuncio de ${r.client.business}? Habrá que devolverle ${money(r.total)}.`, { ok: 'Rechazar', danger: true }))) return;
+      updateRequest(id, { status: 'rechazada' });
+      toast('Rechazado. Recuerda hacer el reembolso.');
+    }
+    render();
+  });
+
+  seed().then(async () => {
+    if (hasBackend()) { await loadRequests(); stats = await campaignStats(listRequests().filter((x) => x.status === 'aprobada').map((x) => x.id.toLowerCase())); }
+    render();
+  });
+  // Staff login changes: fetch the requests again (the panel's counters send nc-staff-change too, often, so at most
+  // once every 30 seconds unless the person changed)
+  let who = localStorage.getItem('nc-staff'), last = Date.now();
+  addEventListener('nc-staff-change', () => {
+    const now = localStorage.getItem('nc-staff'); if (now === who && Date.now() - last < 30000) return;
+    who = now; last = Date.now(); void loadRequests().then(render);
+  });
+</script>

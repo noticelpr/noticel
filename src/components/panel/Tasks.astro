@@ -1,0 +1,202 @@
+---
+// Team tasks (staff panel → Inicio): anyone creates a task, assigns it, adds teammates, sets a due date and priority,
+// moves it Pendiente → En progreso → Hecha and comments on it. Everyone sees "Mis tareas" (assigned to them or
+// helping); the admin and editors also see "Equipo": what each person is working on, what's pending or late,
+// what they finished this week, and their articles in progress (Escribir).
+// PREVIEW: kept on this device ('nc-tasks'); with accounts (Supabase) the whole team shares it live.
+---
+<section class="tk" data-tk aria-labelledby="tk-h">
+  <header class="sd-head">
+    <div><h2 class="pnl-h2" id="tk-h">Tareas</h2><p class="pnl-muted pnl-small">Lo pendiente, quién lo hace y quién ayuda.</p></div>
+    <button type="button" class="adp-btn" data-tk-new>+ Nueva tarea</button>
+  </header>
+  <nav class="apn-tabs pnl-sub" role="tablist" aria-label="Tareas">
+    <button type="button" role="tab" aria-selected="true" data-tv="mine">Mis tareas <b data-tn="mine"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-tv="team" data-lead-only>Equipo</button>
+    <button type="button" role="tab" aria-selected="false" data-tv="all" data-lead-only>Todas <b data-tn="all"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-tv="done">Hechas <b data-tn="done"></b></button>
+  </nav>
+  <div class="tk-list" data-tk-list></div>
+
+  <dialog class="sd-dlg tk-dlg" data-tk-dlg aria-labelledby="tk-dlg-h">
+    <form class="sd-form" data-tk-form novalidate>
+      <header class="sd-dlg-h"><h2 id="tk-dlg-h" data-tk-title>Nueva tarea</h2><button type="button" class="sd-x" data-tk-close aria-label="Cerrar">✕</button></header>
+      <label>Qué hay que hacer<input name="title" maxlength="120" required placeholder="ej. Entrevistar al alcalde de Ponce sobre el carnaval" /></label>
+      <label>Detalles<textarea name="notes" rows="3" maxlength="800" placeholder="Lo que la persona necesita saber"></textarea></label>
+      <div class="sd-2">
+        <label>Asignada a<select name="owner" data-tk-people></select></label>
+        <label>Para cuándo<input name="due" type="date" /></label>
+        <label>Prioridad<select name="prio"><option value="normal">Normal</option><option value="alta">Alta</option><option value="urgente">Urgente</option></select></label>
+        <label>Estado<select name="status"><option value="todo">Pendiente</option><option value="doing">En progreso</option><option value="done">Hecha</option></select></label>
+      </div>
+      <fieldset class="tk-mates"><legend>Compañeros que ayudan</legend><div data-tk-mates></div></fieldset>
+      <p class="cm-err" data-tk-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="apr-reject" data-tk-del hidden>Borrar tarea</button><button type="button" class="adp-btn ghost-dark" data-tk-close>Cancelar</button><button type="submit" class="adp-btn">Guardar</button></footer>
+    </form>
+  </dialog>
+</section>
+
+<script>
+  import { ask } from '../../lib/dialogs';
+  import { sharedList } from '../../lib/shared';
+  const root = document.querySelector<HTMLElement>('[data-tk]');
+  if (root) {
+    type Status = 'todo' | 'doing' | 'done';
+    type Task = { id: string; title: string; notes: string; owner: string; mates: string[]; due: string; prio: 'normal' | 'alta' | 'urgente'; status: Status;
+      by: string; created: number; doneAt?: number; comments: Array<{ who: string; at: number; text: string }>; demo?: boolean };
+    type Member = { name: string; mail: string; role: string };
+    const $ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => el.querySelector<T>(s)!;
+    const $$ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => [...el.querySelectorAll<T>(s)];
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const get = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+    const set = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } dispatchEvent(new Event('nc-tasks')); };
+    const me = () => get<{ name: string; role: string } | null>('nc-staff', null);
+    const isLead = () => ['admin', 'editor'].includes(me()?.role ?? '');
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+    const addDays = (n: number) => { const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
+    const fmtDate = (s: string) => (s ? new Date(`${s}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'short', day: 'numeric', month: 'short' }) : '');
+    const ago = (t: number) => { const m = Math.round((Date.now() - t) / 60000); return m < 60 ? `hace ${Math.max(1, m)} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`; };
+    const ROLE: Record<string, string> = { admin: 'Administrador', editor: 'Editor', ads: 'Ventas', reporter: 'Periodista' };
+    const STATUS: Record<Status, string> = { todo: 'Pendiente', doing: 'En progreso', done: 'Hecha' };
+    // Shared by the whole team through Supabase (staff_tasks), mirrored on this device
+    const board = sharedList<Task>('staff_tasks', 'nc-tasks', 'nc-tasks');
+    const tasks = board.load, save = board.save;
+    // With Supabase, the preview's example tasks left on this device are never sent to the team
+    if (board.shared()) { try { localStorage.setItem('nc-tasks', JSON.stringify(tasks().filter((t) => !t.demo && !t.id.startsWith('T-EJ')))); } catch { /* storage blocked */ } }
+    // The team comes from Equipo; the person logged in is always on it
+    const EXAMPLE_TEAM: Member[] = [{ name: 'Editora (ejemplo)', mail: '', role: 'editor' }, { name: 'Ventas (ejemplo)', mail: '', role: 'ads' }, { name: 'Periodista (ejemplo)', mail: '', role: 'reporter' }];
+    const team = (): Member[] => {
+      const saved = get<Member[]>('nc-staff-team', []); const t = saved.length || board.shared() ? saved : EXAMPLE_TEAM; const m = me();
+      return m && !t.some((x) => x.name === m.name) ? [{ name: m.name, mail: 'tú', role: m.role }, ...t] : t;
+    };
+    const av = (name: string, cls = '') => `<span class="tk-av ${cls}" title="${esc(name)}">${esc((name || '?')[0].toUpperCase())}</span>`;
+    const late = (t: Task) => t.status !== 'done' && t.due && t.due < today;
+
+    // A few example tasks, once, so the board isn't empty in the preview
+    function seed() {
+      if (board.shared() || localStorage.getItem('nc-tasks-seeded') || !me()) return; // examples only in the preview
+      try { localStorage.setItem('nc-tasks-seeded', '1'); } catch { return; }
+      const t = team(); const n = (i: number) => t[i % Math.max(1, t.length)]?.name ?? me()!.name; // 0 = me, 1 editor, 2 sales, 3 reporter
+      const base = { notes: '', mates: [] as string[], by: me()!.name, created: Date.now() - 864e5, comments: [] as Task['comments'], demo: true };
+      save([
+        { ...base, id: 'T-EJ1', title: 'Cubrir la conferencia de prensa de LUMA sobre la factura', owner: n(3), mates: [n(1)], due: today, prio: 'urgente', status: 'doing',
+          notes: 'A las 2:00 p.m. en San Juan. Fotos y 300 palabras para la tarde.', comments: [{ who: n(1), at: Date.now() - 36e5, text: 'Yo reviso el texto en cuanto llegue.' }] },
+        { ...base, id: 'T-EJ2', title: 'Llamar a Mueblería Don Pepe para cerrar la toma de portada', owner: n(2), due: addDays(1), prio: 'alta', status: 'todo' },
+        { ...base, id: 'T-EJ3', title: 'Revisar las noticias de la IA de esta tarde', owner: n(1), due: addDays(-1), prio: 'normal', status: 'todo' },
+        { ...base, id: 'T-EJ4', title: 'Preparar la sección especial del Día del Veterano', owner: me()!.name, mates: [n(1), n(3)], due: addDays(9), prio: 'normal', status: 'todo' },
+        { ...base, id: 'T-EJ5', title: 'Subir las fotos del juego del BSN', owner: n(3), due: addDays(-1), prio: 'normal', status: 'done', doneAt: Date.now() - 5 * 36e5 },
+      ].map((x) => ({ ...x, mates: x.mates.filter((m) => m !== x.owner) })));
+    }
+
+    let view = 'mine', openId = '';
+    function card(t: Task) {
+      const mine = t.owner === me()?.name || t.mates.includes(me()?.name ?? '');
+      return `<article class="tk-card ${t.status} ${late(t) ? 'late' : ''} ${t.prio}" data-tid="${t.id}">
+        <button type="button" class="tk-check" data-tk-done aria-pressed="${t.status === 'done'}" aria-label="${t.status === 'done' ? 'Marcar como pendiente' : 'Marcar como hecha'}">✓</button>
+        <div class="tk-main">
+          <p class="tk-meta">${t.prio !== 'normal' ? `<span class="tk-prio ${t.prio}">${t.prio === 'urgente' ? 'Urgente' : 'Alta'}</span>` : ''}<span class="tk-st ${t.status}">${STATUS[t.status]}</span>${t.due ? `<span class="${late(t) ? 'tk-late' : ''}">${late(t) ? 'Atrasada · ' : ''}${t.due === today ? 'Hoy' : fmtDate(t.due)}</span>` : ''}${t.demo ? '<span class="sp-demo">EJEMPLO</span>' : ''}</p>
+          <h3>${esc(t.title)}</h3>
+          ${t.notes ? `<p class="tk-notes">${esc(t.notes)}</p>` : ''}
+          <div class="tk-people">${av(t.owner, 'owner')}<span class="tk-who"><b>${esc(t.owner)}</b>${t.mates.length ? ` con ${t.mates.map(esc).join(', ')}` : ''}</span><span class="tk-mav">${t.mates.map((m) => av(m)).join('')}</span></div>
+          ${openId === t.id ? `<div class="tk-thread">${t.comments.map((c) => `<p>${av(c.who)}<span><b>${esc(c.who)}</b> <small>${ago(c.at)}</small><br>${esc(c.text)}</span></p>`).join('') || '<p class="pnl-muted pnl-small">Sin comentarios todavía.</p>'}
+            <form class="tk-say" data-tk-say><input name="c" maxlength="300" placeholder="Escribe un comentario o una actualización" aria-label="Comentario" /><button type="submit" class="adp-btn">Enviar</button></form></div>` : ''}
+          <div class="tk-acts">
+            ${t.status !== 'done' ? `<select data-tk-status aria-label="Estado">${(['todo', 'doing', 'done'] as Status[]).map((s) => `<option value="${s}" ${s === t.status ? 'selected' : ''}>${STATUS[s]}</option>`).join('')}</select>` : ''}
+            <select data-tk-mate aria-label="Añadir compañero"><option value="">+ Compañero</option>${team().filter((m) => m.name !== t.owner && !t.mates.includes(m.name)).map((m) => `<option>${esc(m.name)}</option>`).join('')}</select>
+            ${t.status !== 'done' && !mine ? '<button type="button" class="pnl-link" data-tk-join>Ayudar</button>' : ''}
+            <button type="button" class="pnl-link" data-tk-thread>${openId === t.id ? 'Cerrar' : `Comentarios${t.comments.length ? ` (${t.comments.length})` : ''}`}</button>
+            <button type="button" class="pnl-link" data-tk-edit>Editar</button>
+          </div>
+        </div></article>`;
+    }
+    // Admin and editors: one card per person with what they're on
+    function teamView(all: Task[]) {
+      const weekAgo = Date.now() - 7 * 864e5;
+      const arts = get<Array<{ owner: string; title: string; status: string }>>('nc-articles', []);
+      return `<div class="tk-team">${team().map((m) => {
+        const on = all.filter((t) => t.owner === m.name || t.mates.includes(m.name));
+        const doing = on.filter((t) => t.status === 'doing'), todo = on.filter((t) => t.status === 'todo'), lateN = on.filter(late).length;
+        const doneWeek = on.filter((t) => t.status === 'done' && (t.doneAt ?? 0) > weekAgo).length;
+        const writing = arts.filter((a) => a.owner === m.name && (a.status === 'draft' || a.status === 'review'));
+        return `<article class="tk-person">
+          <header>${av(m.name, 'big')}<div><b>${esc(m.name)}</b><small>${ROLE[m.role] ?? m.role}</small></div></header>
+          <p class="tk-nums"><span><b>${doing.length}</b> en progreso</span><span><b>${todo.length}</b> pendientes</span><span class="${lateN ? 'tk-late' : ''}"><b>${lateN}</b> atrasadas</span><span><b>${doneWeek}</b> hechas esta semana</span></p>
+          <p class="tk-lbl">Trabajando en</p>
+          <ul>${doing.map((t) => `<li><button type="button" class="pnl-link" data-tk-goto="${t.id}">${esc(t.title)}</button></li>`).join('') || '<li class="pnl-muted">Nada en progreso.</li>'}</ul>
+          ${writing.length ? `<p class="tk-lbl">Escribiendo</p><ul>${writing.map((a) => `<li>${esc(a.title || 'Sin titular')} <small>(${a.status === 'review' ? 'en revisión' : 'borrador'})</small></li>`).join('')}</ul>` : ''}
+        </article>`;
+      }).join('')}</div>`;
+    }
+    function render() {
+      seed();
+      const all = tasks(); const name = me()?.name ?? '';
+      $$('[data-lead-only]').forEach((b) => (b.hidden = !isLead()));
+      if (!isLead() && (view === 'team' || view === 'all')) view = 'mine';
+      const mine = all.filter((t) => t.status !== 'done' && (t.owner === name || t.mates.includes(name)));
+      const open = all.filter((t) => t.status !== 'done'), done = all.filter((t) => t.status === 'done');
+      const n = (k: string, v: number) => { const el = root.querySelector(`[data-tn="${k}"]`); if (el) el.textContent = v ? String(v) : ''; };
+      n('mine', mine.length); n('all', open.length); n('done', done.length);
+      const order = (a: Task, b: Task) => Number(late(b)) - Number(late(a)) || ({ urgente: 0, alta: 1, normal: 2 }[a.prio] - { urgente: 0, alta: 1, normal: 2 }[b.prio]) || (a.due || '9').localeCompare(b.due || '9');
+      const box = $('[data-tk-list]');
+      if (view === 'team') { box.innerHTML = teamView(all); return; }
+      const list = (view === 'mine' ? mine : view === 'all' ? open : done.filter((t) => isLead() || t.owner === name || t.mates.includes(name))).sort(view === 'done' ? (a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0) : order);
+      box.innerHTML = list.map(card).join('') || `<p class="apr-empty">${view === 'mine' ? '🎉 No tienes tareas pendientes.' : 'Nada aquí.'}</p>`;
+    }
+
+    // ---- form ----
+    const dlg = $<HTMLDialogElement>('[data-tk-dlg]'); const form = $<HTMLFormElement>('[data-tk-form]'); let editing: Task | null = null;
+    function openForm(t: Task | null) {
+      editing = t; form.reset(); $('[data-tk-err]').hidden = true; $('[data-tk-del]').hidden = !t;
+      $('[data-tk-title]').textContent = t ? 'Editar tarea' : 'Nueva tarea';
+      const people = team();
+      $('[data-tk-people]').innerHTML = people.map((m) => `<option value="${esc(m.name)}">${esc(m.name)}${m.name === me()?.name ? ' (yo)' : ''}</option>`).join('');
+      $('[data-tk-mates]').innerHTML = people.map((m) => `<label class="sd-chk sm"><input type="checkbox" name="mates" value="${esc(m.name)}" ${t?.mates.includes(m.name) ? 'checked' : ''} /><span>${esc(m.name)}</span></label>`).join('');
+      const f = (k: string, v: string) => ((form.elements.namedItem(k) as HTMLInputElement).value = v);
+      if (t) { f('title', t.title); f('notes', t.notes); f('owner', t.owner); f('due', t.due); f('prio', t.prio); f('status', t.status); }
+      else { f('owner', me()?.name ?? ''); f('due', addDays(1)); }
+      dlg.showModal();
+    }
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const d = new FormData(form); const s = (k: string) => String(d.get(k) ?? '').trim();
+      if (s('title').length < 4) { const er = $('[data-tk-err]'); er.textContent = 'Escribe qué hay que hacer.'; er.hidden = false; return; }
+      const v = { title: s('title'), notes: s('notes'), owner: s('owner'), due: s('due'), prio: s('prio') as Task['prio'], status: s('status') as Status, mates: d.getAll('mates').map(String).filter((m) => m !== s('owner')) };
+      const all = tasks();
+      if (editing) { const i = all.findIndex((x) => x.id === editing!.id); all[i] = { ...all[i], ...v, doneAt: v.status === 'done' ? all[i].doneAt ?? Date.now() : undefined }; }
+      else all.unshift({ ...v, id: `T-${Date.now().toString(36)}`, by: me()?.name ?? '', created: Date.now(), comments: [], doneAt: v.status === 'done' ? Date.now() : undefined });
+      save(all); dlg.close(); render();
+    });
+    $$('[data-tk-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
+    $('[data-tk-del]').addEventListener('click', async () => { if (editing && await ask('¿Borrar esta tarea?', { ok: 'Borrar', danger: true })) { save(tasks().filter((x) => x.id !== editing!.id)); dlg.close(); render(); } });
+    $('[data-tk-new]').addEventListener('click', () => openForm(null));
+
+    // ---- actions on a task ----
+    const update = (id: string, fn: (t: Task) => void) => { const all = tasks(); const t = all.find((x) => x.id === id); if (!t) return; fn(t); save(all); render(); };
+    root.addEventListener('click', (e) => {
+      const el = e.target as HTMLElement;
+      const tab = el.closest<HTMLElement>('[data-tv]');
+      if (tab) { view = tab.dataset.tv!; $$('[data-tv]').forEach((b) => b.setAttribute('aria-selected', String(b === tab))); render(); return; }
+      const go = el.closest<HTMLElement>('[data-tk-goto]');
+      if (go) { view = 'all'; openId = go.dataset.tkGoto!; $$('[data-tv]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tv === 'all'))); render(); root.querySelector(`[data-tid="${openId}"]`)?.scrollIntoView({ block: 'center' }); return; }
+      const c = el.closest<HTMLElement>('[data-tid]'); if (!c) return; const id = c.dataset.tid!;
+      if (el.closest('[data-tk-done]')) update(id, (t) => { t.status = t.status === 'done' ? 'todo' : 'done'; t.doneAt = t.status === 'done' ? Date.now() : undefined; });
+      if (el.closest('[data-tk-join]')) update(id, (t) => { const n = me()?.name; if (n && !t.mates.includes(n)) t.mates.push(n); });
+      if (el.closest('[data-tk-thread]')) { openId = openId === id ? '' : id; render(); }
+      if (el.closest('[data-tk-edit]')) openForm(tasks().find((x) => x.id === id) ?? null);
+    });
+    root.addEventListener('change', (e) => {
+      const el = e.target as HTMLSelectElement; const c = el.closest<HTMLElement>('[data-tid]'); if (!c) return;
+      if (el.matches('[data-tk-status]')) update(c.dataset.tid!, (t) => { t.status = el.value as Status; t.doneAt = t.status === 'done' ? Date.now() : undefined; });
+      if (el.matches('[data-tk-mate]') && el.value) update(c.dataset.tid!, (t) => { if (!t.mates.includes(el.value)) t.mates.push(el.value); });
+    });
+    root.addEventListener('submit', (e) => {
+      const f = (e.target as HTMLElement).closest<HTMLFormElement>('[data-tk-say]'); if (!f) return; e.preventDefault();
+      const text = String(new FormData(f).get('c') ?? '').trim(); const id = f.closest<HTMLElement>('[data-tid]')!.dataset.tid!;
+      if (text) update(id, (t) => t.comments.push({ who: me()?.name ?? '', at: Date.now(), text }));
+    });
+    addEventListener('nc-staff-change', render);
+    addEventListener('nc-team', render);
+    render();
+    void board.refresh().then((ok) => ok && render()); // the team's latest tasks
+  }
+</script>

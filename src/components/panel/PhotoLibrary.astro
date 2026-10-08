@@ -1,0 +1,218 @@
+---
+// Photo library (src/lib/photos.ts): search and scroll through the team's photos and the ones already published,
+// upload new ones with their caption and credit, edit or delete them.
+//   mode="pane"   → the panel's Fotos tab
+//   mode="picker" → a window inside Escribir: opened with the event nc-photo-open {target}, and "Usar esta foto"
+//                   sends nc-photo-pick {photo, target} back to the editor
+interface Props { mode?: 'pane' | 'picker' }
+const { mode = 'pane' } = Astro.props;
+const picker = mode === 'picker';
+---
+{picker ? (
+  <dialog class="sd-dlg pl-dlg" data-pl-dlg aria-label="Biblioteca de fotos">
+    <div class="pl" data-pl data-mode="picker">
+      <header class="pl-head"><h2 class="pnl-h3">Elegir de la biblioteca</h2><button type="button" class="sd-x" data-pl-close aria-label="Cerrar">✕</button></header>
+      <div class="pl-tools">
+        <input type="search" class="pl-q" data-pl-q placeholder="Buscar: persona, lugar, tema, fotógrafo…" aria-label="Buscar fotos" />
+        <div class="pnl-range pl-src" role="group" aria-label="Fuente"><button type="button" data-pl-src="all" aria-pressed="true">Todas</button><button type="button" data-pl-src="lib" aria-pressed="false">Biblioteca</button><button type="button" data-pl-src="pub" aria-pressed="false">Publicadas</button></div>
+        <button type="button" class="adp-btn ghost-dark" data-pl-upopen>+ Subir fotos</button>
+      </div>
+      <p class="pnl-muted pnl-small" data-pl-count></p>
+      <p class="sd-warn" data-pl-warn hidden></p>
+      <div class="pl-grid" data-pl-grid></div>
+      <div class="pl-more" data-pl-more aria-hidden="true"></div>
+    </div>
+  </dialog>
+) : (
+  <div class="pl" data-pl data-mode="pane">
+    <header class="sd-head"><div><h1 class="pnl-h">Fotos</h1><p class="pnl-muted">La biblioteca de fotos del equipo y las que ya salieron en noticias. Busca, sube y reutiliza sin salir del panel.</p></div>
+      <button type="button" class="adp-btn" data-pl-upopen>+ Subir fotos</button></header>
+    <div class="pl-tools">
+      <input type="search" class="pl-q" data-pl-q placeholder="Buscar: persona, lugar, tema, fotógrafo…" aria-label="Buscar fotos" />
+      <div class="pnl-range pl-src" role="group" aria-label="Fuente"><button type="button" data-pl-src="all" aria-pressed="true">Todas</button><button type="button" data-pl-src="lib" aria-pressed="false">Biblioteca</button><button type="button" data-pl-src="pub" aria-pressed="false">Publicadas</button></div>
+    </div>
+    <p class="pnl-muted pnl-small" data-pl-count></p>
+    <p class="sd-warn" data-pl-warn hidden></p>
+    <div class="pl-grid" data-pl-grid></div>
+    <div class="pl-more" data-pl-more aria-hidden="true"></div>
+  </div>
+)}
+
+<script>
+  import { searchLibrary, searchPublished, addPhoto, updatePhoto, deletePhoto, type Photo, type Meta } from '../../lib/photos';
+  import { ask } from '../../lib/dialogs';
+  import { isDemo } from '../../lib/demo';
+  const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
+  const toast = (t: string) => dispatchEvent(new CustomEvent('nc-toast', { detail: t }));
+
+  // One shared window for photo details and one for uploading (used by every library on the page)
+  const shell = document.createElement('div');
+  shell.innerHTML = `
+    <dialog class="sd-dlg pl-view" data-plv aria-label="Foto"><div class="pl-view-in">
+      <div class="pl-view-img"><img data-plv-img alt="" /></div>
+      <form class="sd-form pl-view-f" data-plv-f novalidate>
+        <header class="sd-dlg-h"><h2 data-plv-h>Foto</h2><button type="button" class="sd-x" data-plv-close aria-label="Cerrar">✕</button></header>
+        <p class="pnl-muted pnl-small" data-plv-info></p>
+        <label>Qué se ve (pie de foto)<textarea name="caption" rows="2" maxlength="300"></textarea></label>
+        <label>Crédito<input name="credit" maxlength="160" placeholder="Foto: Nombre / NotiCel" /></label>
+        <div class="wr-2"><label>Lugar<input name="place" maxlength="120" /></label><label>Fecha de la foto<input name="taken_on" type="date" /></label></div>
+        <label>Personas<input name="people" maxlength="200" placeholder="Quién aparece" /></label>
+        <label>Etiquetas<input name="tags" maxlength="300" placeholder="Palabras para encontrarla, separadas por comas" /></label>
+        <label>Enlace de la licencia (opcional)<input name="credit_url" type="url" maxlength="500" /></label>
+        <p class="cm-err" data-plv-err hidden></p>
+        <div class="sd-dlg-f"><button type="button" class="apr-reject" data-plv-del hidden>Borrar</button><button type="button" class="pnl-link" data-plv-copy>Copiar enlace</button>
+          <button type="submit" class="adp-btn ghost-dark" data-plv-save>Guardar cambios</button><button type="button" class="adp-btn" data-plv-use hidden>Usar esta foto</button></div>
+      </form></div></dialog>
+    <dialog class="sd-dlg pl-up" data-plu aria-label="Subir fotos"><form class="sd-form" data-plu-f novalidate>
+      <header class="sd-dlg-h"><h2>Subir fotos a la biblioteca</h2><button type="button" class="sd-x" data-plu-close aria-label="Cerrar">✕</button></header>
+      <label class="pl-drop" data-plu-drop><input type="file" name="files" accept="image/*" multiple class="sr" /><b>Arrastra las fotos aquí</b><span>o toca para escogerlas (puedes escoger varias)</span></label>
+      <ul class="pl-up-list" data-plu-list></ul>
+      <p class="pnl-muted pnl-small">Estos datos se aplican a todas las fotos de esta tanda. Luego puedes cambiar cada una.</p>
+      <label>Qué se ve (pie de foto)<textarea name="caption" rows="2" maxlength="300" placeholder="ej. Conferencia de prensa sobre la reforma energética en La Fortaleza"></textarea></label>
+      <label>Crédito (obligatorio)<input name="credit" maxlength="160" required placeholder="Foto: Nombre / NotiCel" /></label>
+      <div class="wr-2"><label>Lugar<input name="place" maxlength="120" placeholder="San Juan" /></label><label>Fecha de la foto<input name="taken_on" type="date" /></label></div>
+      <label>Personas<input name="people" maxlength="200" placeholder="Quién aparece" /></label>
+      <label>Etiquetas<input name="tags" maxlength="300" placeholder="ej. gobierno, energía, LUMA" /></label>
+      <label class="adb-check"><input type="checkbox" name="rights" required /> Estas fotos son nuestras o tenemos permiso para usarlas.</label>
+      <p class="cm-err" data-plu-err hidden></p>
+      <div class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-plu-close>Cancelar</button><button type="submit" class="adp-btn" data-plu-go>Subir</button></div>
+    </form></dialog>`;
+  document.body.append(shell);
+  const view = shell.querySelector<HTMLDialogElement>('[data-plv]')!, vf = shell.querySelector<HTMLFormElement>('[data-plv-f]')!;
+  const up = shell.querySelector<HTMLDialogElement>('[data-plu]')!, uf = shell.querySelector<HTMLFormElement>('[data-plu-f]')!;
+  const metaOf = (f: HTMLFormElement): Meta => Object.fromEntries(['caption', 'credit', 'credit_url', 'place', 'people', 'tags', 'taken_on'].filter((k) => f.elements.namedItem(k)).map((k) => [k, String(new FormData(f).get(k) ?? '')])) as Meta;
+
+  const libs: Array<{ reload: () => void; add: (p: Photo) => void }> = [];
+  let viewing: { photo: Photo; lib: boolean; onPick?: (p: Photo) => void; done: () => void } | null = null;
+
+  document.querySelectorAll<HTMLElement>('[data-pl]').forEach((root) => {
+    const pickerMode = root.dataset.mode === 'picker';
+    const dlg = root.closest<HTMLDialogElement>('[data-pl-dlg]');
+    const grid = root.querySelector<HTMLElement>('[data-pl-grid]')!, more = root.querySelector<HTMLElement>('[data-pl-more]')!;
+    const count = root.querySelector<HTMLElement>('[data-pl-count]')!, warn = root.querySelector<HTMLElement>('[data-pl-warn]')!;
+    const qIn = root.querySelector<HTMLInputElement>('[data-pl-q]')!;
+    let q = '', src: 'all' | 'lib' | 'pub' = 'all', page = 0, done = false, busy = false, run = 0, items: Array<{ p: Photo; lib: boolean }> = [], libTotal = 0, pubLeft: Photo[] = [];
+    let target = '';
+
+    const card = (p: Photo, lib: boolean, i: number) => `<button type="button" class="pl-item" data-i="${i}" title="${esc(p.caption || p.story || '')}">
+      <img src="${esc(p.thumb || p.src)}" alt="${esc(p.caption || '')}" loading="lazy" decoding="async" />
+      <span class="pl-cap">${esc(p.caption || p.story || 'Sin descripción')}</span>${lib ? '' : '<span class="pl-tag">Publicada</span>'}</button>`;
+    async function next() {
+      if (busy || done) return; busy = true; const mine = run;
+      const add: Array<{ p: Photo; lib: boolean }> = [];
+      if (src !== 'pub' && page >= 0) {
+        const r = await searchLibrary(q, page);
+        if (mine !== run) return;
+        if (!r) { warn.textContent = isDemo() ? 'Modo demo: aquí también sale la biblioteca de fotos del equipo. Ahora ves las fotos que ya salieron en noticias.' : 'La biblioteca del equipo todavía no está conectada (falta correr supabase/fotos.sql). Por ahora ves las fotos ya publicadas.'; warn.hidden = false; page = -1; }
+        else { warn.hidden = true; libTotal = r.total; add.push(...r.rows.map((p) => ({ p, lib: true }))); page = r.rows.length < 48 ? -1 : page + 1; }
+      }
+      if (page < 0 || src === 'pub') { // the team's library is done: then the published ones, a page at a time
+        if (!pubLeft.length && !items.some((x) => !x.lib) && src !== 'lib') pubLeft = await searchPublished(q);
+        if (mine !== run) return;
+        if (src !== 'lib') add.push(...pubLeft.splice(0, 48).map((p) => ({ p, lib: false })));
+        if (!pubLeft.length) done = true;
+      }
+      const start = items.length; items.push(...add);
+      grid.insertAdjacentHTML('beforeend', add.map((x, k) => card(x.p, x.lib, start + k)).join(''));
+      const pubCount = items.filter((x) => !x.lib).length + pubLeft.length;
+      count.textContent = items.length ? `${src === 'pub' ? '' : `${libTotal.toLocaleString('es-PR')} en la biblioteca`}${src === 'all' ? ' · ' : ''}${src === 'lib' ? '' : `${pubCount} publicadas`}${q ? ` con “${q}”` : ''}` : (q ? `No encontramos fotos con “${q}”.` : 'Todavía no hay fotos. Toca “Subir fotos” para empezar.');
+      busy = false;
+      if (!done && more.getBoundingClientRect().top < innerHeight + 600) void next(); // keep filling while the end is in view
+    }
+    function reload() { run++; items = []; page = 0; done = false; busy = false; pubLeft = []; grid.innerHTML = ''; count.textContent = 'Buscando…'; void next(); }
+    new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) void next(); }, { root: pickerMode ? dlg : null, rootMargin: '600px' }).observe(more);
+    let t = 0; qIn.addEventListener('input', () => { clearTimeout(t); t = window.setTimeout(() => { q = qIn.value.trim(); reload(); }, 300); });
+    root.querySelectorAll<HTMLButtonElement>('[data-pl-src]').forEach((b) => b.addEventListener('click', () => {
+      src = b.dataset.plSrc as typeof src; root.querySelectorAll('[data-pl-src]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); reload();
+    }));
+    grid.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-i]'); if (!b) return;
+      const x = items[Number(b.dataset.i)];
+      open(x.p, x.lib, pickerMode ? (p) => { dispatchEvent(new CustomEvent('nc-photo-pick', { detail: { photo: p, target } })); dlg?.close(); } : undefined, () => reload());
+    });
+    root.querySelector('[data-pl-upopen]')?.addEventListener('click', () => openUpload());
+    libs.push({ reload, add: () => reload() });
+    if (pickerMode && dlg) {
+      addEventListener('nc-photo-open', (e) => { target = (e as CustomEvent).detail?.target ?? ''; dlg.showModal(); if (!items.length) reload(); qIn.focus(); });
+      root.querySelector('[data-pl-close]')!.addEventListener('click', () => dlg.close());
+      dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    } else {
+      // The pane loads when its tab opens
+      const pane = root.closest<HTMLElement>('[data-pane]');
+      if (pane) new MutationObserver(() => { if (!pane.hidden && !items.length) reload(); }).observe(pane, { attributes: true, attributeFilter: ['hidden'] });
+      if (!pane || !pane.hidden) reload();
+    }
+  });
+
+  // ---------- one photo: details, edit, delete, use ----------
+  function open(p: Photo, lib: boolean, onPick: ((p: Photo) => void) | undefined, refresh: () => void) {
+    viewing = { photo: p, lib, onPick, done: refresh };
+    view.querySelector<HTMLImageElement>('[data-plv-img]')!.src = p.src;
+    view.querySelector('[data-plv-h]')!.textContent = lib ? 'Foto de la biblioteca' : 'Foto publicada';
+    view.querySelector('[data-plv-info]')!.innerHTML = lib
+      ? `Subida por ${esc(p.uploaded_by_name || '—')}${p.created_at ? ` el ${new Date(p.created_at).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}${p.width ? ` · ${p.width}×${p.height}` : ''}`
+      : `${p.storyUrl ? `Salió en <a href="${esc(p.storyUrl)}" target="_blank" rel="noopener">${esc(p.story || 'una noticia')}</a>` : esc(p.section || '')}`;
+    (['caption', 'credit', 'credit_url', 'place', 'people', 'tags', 'taken_on'] as const).forEach((k) => {
+      const el = vf.elements.namedItem(k) as HTMLInputElement; el.value = String((p as Record<string, unknown>)[k === 'credit_url' ? (lib ? 'credit_url' : 'creditUrl') : k] ?? ''); el.disabled = !lib;
+    });
+    const role = me()?.role ?? '';
+    view.querySelector<HTMLElement>('[data-plv-save]')!.hidden = !lib;
+    view.querySelector<HTMLElement>('[data-plv-del]')!.hidden = !(lib && ['admin', 'editor'].includes(role));
+    view.querySelector<HTMLElement>('[data-plv-use]')!.hidden = !onPick;
+    view.querySelector<HTMLElement>('[data-plv-err]')!.hidden = true;
+    view.showModal();
+  }
+  const verr = (t: string) => { const e = view.querySelector<HTMLElement>('[data-plv-err]')!; e.textContent = t; e.hidden = false; };
+  vf.addEventListener('submit', async (e) => {
+    e.preventDefault(); if (!viewing?.lib || !viewing.photo.id) return;
+    const m = metaOf(vf); if (!m.credit.trim()) return verr('El crédito es obligatorio.');
+    if (!(await updatePhoto(viewing.photo.id, m))) return verr('No se pudo guardar. Solo quien la subió o un editor puede cambiarla.');
+    Object.assign(viewing.photo, m); toast('Cambios guardados.'); view.close(); viewing.done();
+  });
+  view.querySelector('[data-plv-use]')!.addEventListener('click', () => {
+    if (!viewing?.onPick) return;
+    const p = viewing.lib ? { ...viewing.photo, ...metaOf(vf) } : viewing.photo; // what the reporter sees (and maybe edited) goes into the story
+    view.close(); viewing.onPick(p);
+  });
+  view.querySelector('[data-plv-copy]')!.addEventListener('click', async () => { try { await navigator.clipboard.writeText(viewing!.photo.src); toast('Enlace copiado.'); } catch { toast(viewing!.photo.src); } });
+  view.querySelector('[data-plv-del]')!.addEventListener('click', async () => {
+    if (!viewing?.photo.id || !(await ask('¿Borrar esta foto de la biblioteca? Las noticias que ya la usan seguirán mostrándola solo si está publicada en otro lugar.', { ok: 'Borrar', danger: true }))) return;
+    if (await deletePhoto(viewing.photo)) { toast('Foto borrada.'); view.close(); viewing.done(); } else verr('No se pudo borrar. Solo los editores y el administrador pueden borrar fotos.');
+  });
+  view.querySelector('[data-plv-close]')!.addEventListener('click', () => view.close());
+  view.addEventListener('click', (e) => { if (e.target === view) view.close(); });
+
+  // ---------- upload: several photos at once, the same details for the whole batch ----------
+  let files: File[] = [];
+  const list = up.querySelector<HTMLElement>('[data-plu-list]')!;
+  const paintFiles = () => { list.innerHTML = files.map((f, i) => `<li data-fi="${i}"><span>${esc(f.name)}</span><small>${(f.size / 1048576).toFixed(1)} MB</small></li>`).join(''); };
+  function openUpload() { uf.reset(); files = []; paintFiles(); up.querySelector<HTMLElement>('[data-plu-err]')!.hidden = true; up.showModal(); }
+  const pickFiles = (l: FileList | null) => { if (!l) return; files = [...files, ...[...l].filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|heic)$/i.test(f.name))].slice(0, 50); paintFiles(); };
+  uf.files.addEventListener('change', () => pickFiles(uf.files.files));
+  const drop = up.querySelector<HTMLElement>('[data-plu-drop]')!;
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('on'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('on'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('on'); pickFiles(e.dataTransfer?.files ?? null); });
+  up.querySelectorAll('[data-plu-close]').forEach((b) => b.addEventListener('click', () => up.close()));
+  uf.addEventListener('submit', async (e) => {
+    e.preventDefault(); const err = up.querySelector<HTMLElement>('[data-plu-err]')!; err.hidden = true;
+    const say = (t: string) => { err.textContent = t; err.hidden = false; };
+    if (!files.length) return say('Escoge al menos una foto.');
+    const m = metaOf(uf); if (!m.credit.trim()) return say('Escribe el crédito de las fotos.');
+    if (!(uf.elements.namedItem('rights') as HTMLInputElement).checked) return say('Confirma que las fotos son nuestras o que tenemos permiso.');
+    const go = up.querySelector<HTMLButtonElement>('[data-plu-go]')!; go.disabled = true;
+    let ok = 0; const bad: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const li = list.querySelector<HTMLElement>(`[data-fi="${i}"]`); li?.classList.add('on'); go.textContent = `Subiendo ${i + 1} de ${files.length}…`;
+      const r = await addPhoto(files[i], m, me()?.name ?? '');
+      li?.classList.remove('on'); li?.classList.add(r.photo ? 'ok' : 'bad');
+      if (r.photo) ok++; else bad.push(r.error!);
+      if (r.error?.includes('supabase/fotos.sql')) break;
+    }
+    go.disabled = false; go.textContent = 'Subir';
+    libs.forEach((l) => l.reload());
+    if (bad.length) return say(`${ok ? `Se subieron ${ok}. ` : ''}${bad.slice(0, 3).join(' ')}`);
+    up.close(); toast(ok === 1 ? 'Foto subida a la biblioteca.' : `${ok} fotos subidas a la biblioteca.`);
+  });
+</script>

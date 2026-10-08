@@ -1,0 +1,388 @@
+---
+// Sales desk (staff panel → Ventas): client inquiries from calls, WhatsApp, email or in person.
+// For each: what the client wants (formats, takeover days, months, audience, special requests), an instant quote with the
+// same rules as the Anúnciate page (quote() in src/lib/ads.ts), a takeover calendar that warns about taken days,
+// follow-up dates and notes, a printable proposal, and "convert to ad" once the client says yes.
+// Shared by the sales team through Supabase (sales_leads, supabase/connect-all.sql); preview on this device without it.
+import LiveCampaigns from './LiveCampaigns.astro';
+import { FORMATS, REGIONS, CAMPAIGNS, SPECIALS, SALES_DISCOUNT_LIMIT, VIEW_PACKS, TAKEOVER_VIEW_PACKS } from '../../lib/ads';
+const fmts = FORMATS.map(({ id, name, price, per }) => ({ id, name, price, per }));
+const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start, end: c.end, client: c.client }));
+---
+<section class="sd" data-sd data-fmts={JSON.stringify(fmts)} data-booked={JSON.stringify(booked)} data-regions={JSON.stringify(REGIONS.map((r) => ({ id: r.id, name: r.name })))}>
+  <header class="sd-head">
+    <div><h1 class="pnl-h">Ventas</h1><p class="pnl-muted">Consultas de clientes, cotizaciones y propuestas. Lo que el cliente pide, a cuánto sale y cuándo darle seguimiento.</p></div>
+    <button type="button" class="adp-btn" data-sd-new>+ Nueva consulta</button>
+  </header>
+  <LiveCampaigns />
+  <h2 class="pnl-h3 sd-leads-h">Consultas de clientes</h2>
+  <div class="pnl-kpis" data-sd-kpis></div>
+  <nav class="apn-tabs pnl-sub" role="tablist" aria-label="Etapas">
+    <button type="button" role="tab" aria-selected="true" data-st="open">Abiertas <b data-sn="open"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-st="won">Ganadas <b data-sn="won"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-st="lost">Perdidas <b data-sn="lost"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-st="cal">Calendario de tomas</button>
+  </nav>
+  <div class="sd-list" data-sd-list></div>
+
+  <!-- New / edit inquiry -->
+  <dialog class="sd-dlg" data-sd-dlg aria-labelledby="sd-dlg-h">
+    <form method="dialog" class="sd-form" data-sd-form novalidate>
+      <header class="sd-dlg-h"><h2 id="sd-dlg-h" data-sd-title>Nueva consulta</h2><button type="button" class="sd-x" data-sd-close aria-label="Cerrar">✕</button></header>
+      <div class="sd-cols">
+        <div class="sd-fields">
+          <fieldset><legend>Cliente</legend>
+            <div class="sd-2">
+              <label>Negocio<input name="business" required maxlength="60" /></label>
+              <label>Persona de contacto<input name="contact" maxlength="60" /></label>
+              <label>Teléfono<input name="phone" type="tel" maxlength="20" placeholder="787-555-0100" /></label>
+              <label>Correo<input name="email" type="email" maxlength="80" /></label>
+              <label>Tipo de cliente<select name="who"><option value="retail">Negocio local</option><option value="agency">Agencia o marca grande</option><option value="nonprofit">Sin fines de lucro</option></select></label>
+              <label>Cómo llegó<select name="channel"><option>Llamada</option><option>WhatsApp</option><option>Correo</option><option>Formulario del sitio</option><option>En persona</option><option>Referido</option><option>Redes sociales</option></select></label>
+            </div>
+          </fieldset>
+          <fieldset><legend>Qué quiere</legend>
+            <div class="sd-fmts">{fmts.map((f) => <label class="sd-chk"><input type="checkbox" name="fmt" value={f.id} /><span>{f.name}<small>${f.price}/{f.per}</small></span></label>)}</div>
+            <div class="sd-2">
+              <label>Vistas (anuncios normales)<input name="views" type="number" min="1000" step="1000" list="sd-views" value="10000" /></label>
+              <datalist id="sd-views">{VIEW_PACKS.map((v) => <option value={v} />)}</datalist>
+              <label>Empieza<input name="start" type="date" /></label>
+              <label>Termina <small>(patrocinio)</small><input name="end" type="date" /></label>
+              <div class="sd-quick" role="group" aria-label="Duración rápida">{[[7, '1 sem'], [14, '2 sem'], [30, '1 mes'], [90, '3 meses'], [180, '6 meses'], [365, '12 meses']].map(([d, l]) => <button type="button" data-len={d}>{l}</button>)}</div>
+              <label data-days-wrap hidden>Toma de portada<select name="tkmode"><option value="dias">Por días</option><option value="vistas">Por vistas</option></select></label>
+              <label data-tk-days hidden>Días de toma de portada<input name="days" type="number" min="1" max="14" value="1" /></label>
+              <label data-tk-views hidden>Vistas de la toma<input name="tkViews" type="number" min="5000" step="5000" list="sd-tkviews" value="50000" /></label>
+              <datalist id="sd-tkviews">{TAKEOVER_VIEW_PACKS.map((v) => <option value={v} />)}</datalist>
+              <label>Dónde<select name="aud"><option value="all">Puerto Rico y la diáspora</option><option value="island">Solo Puerto Rico</option><option value="diaspora">Solo la diáspora</option><option value="regions">Regiones de Puerto Rico</option></select></label>
+            </div>
+            <div class="sd-regs" data-regs hidden>{REGIONS.map((r) => <label class="sd-chk sm"><input type="checkbox" name="reg" value={r.id} /><span>{r.name}</span></label>)}</div>
+            <div class="sd-flags">
+              <label class="adb-check"><input type="checkbox" name="design" /> Lo diseñamos nosotros</label>
+              <label class="adb-check"><input type="checkbox" name="prepay" /> Paga todo por adelantado</label>
+              <label class="adb-check"><input type="checkbox" name="founder" checked /> Anunciante fundador (primera vez)</label>
+            </div>
+ <label>Notas del cliente<textarea name="requests" rows="3" maxlength="600" placeholder="ej. Solo en Deportes los días de juego del BSN; usar los colores de su marca; que salga el día de su gran apertura…"></textarea></label>
+          </fieldset>
+          <fieldset><legend>Pedidos especiales</legend>
+            <p class="pnl-muted pnl-small">Lo que el cliente o la agencia pida fuera de los anuncios normales. Escoge de la lista o escribe lo que sea; el precio y el descuento de cada línea los decides tú.</p>
+            <datalist id="sd-specials">{SPECIALS.map((x) => <option value={x.name} data-price={x.price} />)}</datalist>
+            <div class="sd-custom" data-custom></div>
+            <button type="button" class="pnl-link" data-custom-add>+ Añadir pedido</button>
+          </fieldset>
+          <fieldset><legend>Descuento negociado</legend>
+            <div class="sd-2">
+              <label>Porcentaje sobre el total (%)<input name="extra" type="number" min="0" max="100" step="1" value="0" /></label>
+              <label>O una cantidad fija ($)<input name="extraAmt" type="number" min="0" step="1" value="0" /></label>
+            </div>
+            <p class="pnl-muted pnl-small">Puedes dar hasta {SALES_DISCOUNT_LIMIT}% por tu cuenta, además de los descuentos normales. Más que eso lo aprueba el administrador.</p>
+          </fieldset>
+          <fieldset><legend>Seguimiento</legend>
+            <div class="sd-2">
+              <label>Presupuesto que mencionó<input name="budget" inputmode="decimal" placeholder="$" maxlength="12" /></label>
+              <label>Próximo seguimiento<input name="follow" type="date" /></label>
+              <label>Etapa<select name="stage"><option value="new">Nueva</option><option value="talking">En conversación</option><option value="proposal">Propuesta enviada</option><option value="won">Ganada</option><option value="lost">Perdida</option></select></label>
+            </div>
+          </fieldset>
+        </div>
+        <aside class="sd-quote">
+          <h3>Cotización</h3>
+          <ul class="adb-lines" data-q-lines></ul>
+          <p class="sd-total"><span>Total</span><b data-q-total>$0</b></p>
+          <p class="pnl-muted pnl-small" data-q-month></p>
+          <p class="sd-warn" data-q-warn hidden></p>
+          <p class="sd-warn" data-q-approve hidden></p>
+          <p class="pnl-muted pnl-small">Mismas reglas y descuentos de la página Anúnciate, más los pedidos especiales y tu descuento negociado.</p>
+        </aside>
+      </div>
+      <p class="cm-err" data-sd-err hidden></p>
+      <footer class="sd-dlg-f">
+        <button type="button" class="apr-reject" data-sd-del hidden>Borrar consulta</button>
+        <button type="button" class="adp-btn ghost-dark" data-sd-close>Cancelar</button>
+        <button type="submit" class="adp-btn">Guardar</button>
+      </footer>
+    </form>
+  </dialog>
+  <div class="apn-toast" data-sd-toast role="status" hidden></div>
+</section>
+
+<script>
+  import { ask, askText } from '../../lib/dialogs';
+  import { quote, lengthLabel, SPECIALS, SALES_DISCOUNT_LIMIT, type QuoteInput, type CustomLine } from '../../lib/ads';
+  import { saveRequest } from '../../lib/adrequests';
+  import { sharedList } from '../../lib/shared';
+  const root = document.querySelector<HTMLElement>('[data-sd]');
+  if (root) {
+    type Fmt = { id: string; name: string; price: number; per: string };
+    type Lead = {
+      id: string; created: number; business: string; contact: string; phone: string; email: string; who: QuoteInput['who']; channel: string;
+      fmt: string[]; start: string; end: string; months?: number; days: number; aud: QuoteInput['aud']; reg: string[]; design: boolean; prepay: boolean; founder: boolean;
+      requests: string; budget: string; follow: string; stage: 'new' | 'talking' | 'proposal' | 'won' | 'lost'; extra: number; extraAmt: number; views?: number; tkViews?: number; // tkViews: takeover bought by views (empty: by days)
+      custom: CustomLine[]; approved?: boolean;
+      notes: Array<{ at: number; text: string }>; total: number; demo?: boolean; converted?: string;
+    };
+    const FMTS: Fmt[] = JSON.parse(root.dataset.fmts!);
+    const BOOKED: Array<{ start: string; end: string; client: string }> = JSON.parse(root.dataset.booked!);
+    const REGIONS: Array<{ id: string; name: string }> = JSON.parse(root.dataset.regions!);
+    const $ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => el.querySelector<T>(s)!;
+    const $$ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => [...el.querySelectorAll<T>(s)];
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+    const iso = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+    const today = iso(new Date());
+    const addDays = (s: string, n: number) => { const d = new Date(`${s}T12:00:00`); d.setDate(d.getDate() + n); return iso(d); };
+    const fmtDate = (s: string) => (s ? new Date(`${s}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' }) : '—');
+    const toast = (m: string) => { const t = $('[data-sd-toast]'); t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3800); };
+    // Clients and proposals: shared by the whole sales team (Supabase), mirrored on this device
+    const leads = sharedList<Lead>('sales_leads', 'nc-leads', 'nc-leads');
+    const load = leads.load, save = leads.save;
+    const STAGES = { new: 'Nueva', talking: 'En conversación', proposal: 'Propuesta enviada', won: 'Ganada', lost: 'Perdida' };
+
+    // Campaign length in days, from the start and end dates (older inquiries kept a number of months)
+    const lenOf = (l: Pick<Lead, 'start' | 'end' | 'months'>) => (l.start && l.end && l.end >= l.start ? Math.round((Date.parse(`${l.end}T12:00:00`) - Date.parse(`${l.start}T12:00:00`)) / 864e5) + 1 : (l.months || 1) * 30);
+    const priceOf = (l: Pick<Lead, 'fmt' | 'start' | 'end' | 'months' | 'days' | 'aud' | 'reg' | 'who' | 'prepay' | 'founder' | 'design' | 'extra' | 'extraAmt' | 'custom' | 'views' | 'tkViews'>) => {
+      const q = quote({ formats: l.fmt, days: lenOf(l), takeoverDays: l.days, takeoverViews: l.tkViews ?? 0, views: l.views ?? 10000, aud: l.aud, regions: l.reg.length, who: l.who, prepay: l.prepay, founder: l.founder, design: l.design,
+        custom: l.custom ?? [], extraPct: l.extra, extraAmt: l.extraAmt });
+      return { q, extra: q.extra, total: q.total };
+    };
+    // Takeover days a lead would use (start … start + days − 1)
+    const takeoverDays = (l: Lead) => (l.fmt.includes('takeover') && l.start ? Array.from({ length: l.tkViews ? 1 : Math.max(1, l.days) }, (_, i) => addDays(l.start, i)) : []); // by views: from its start day until delivered
+    const tkText = (l: Lead) => (l.tkViews ? `toma hasta ${l.tkViews.toLocaleString('es-PR')} vistas` : `toma ${l.days} día${l.days > 1 ? 's' : ''}`);
+    const bookedDays = (exceptId?: string) => {
+      const m = new Map<string, string>();
+      BOOKED.forEach((b) => { for (let d = b.start; d <= b.end; d = addDays(d, 1)) m.set(d, `${b.client} (campaña activa)`); });
+      load().filter((l) => l.id !== exceptId && (l.stage === 'won' || l.stage === 'proposal')).forEach((l) => takeoverDays(l).forEach((d) => m.set(d, `${l.business} (${l.stage === 'won' ? 'confirmada' : 'propuesta'})`)));
+      return m;
+    };
+
+    // With Supabase, the preview's example clients left on this device are never sent to the team's list
+    if (leads.shared()) { try { localStorage.setItem('nc-leads', JSON.stringify(load().filter((l) => !l.id.startsWith('L-EJ') && !l.demo))); } catch { /* storage blocked */ } }
+    // Three example inquiries, added once (preview only: with Supabase the list is the team's real clients)
+    if (!leads.shared() && !localStorage.getItem('nc-leads-seeded')) {
+      try { localStorage.setItem('nc-leads-seeded', '1'); } catch { /* storage blocked */ }
+      const base = { contact: '', email: '', phone: '', who: 'retail' as const, end: '', days: 1, extraAmt: 0, custom: [] as CustomLine[], aud: 'all' as const, reg: [] as string[], design: false, prepay: false, founder: true, extra: 0, notes: [] as Lead['notes'], demo: true };
+      const ex: Lead[] = [
+        { ...base, id: 'L-EJ1', created: Date.now() - 2 * 864e5, business: 'Mueblería Don Pepe', contact: 'Luis Rivera', phone: '787-555-0131', channel: 'Llamada', fmt: ['takeover'], start: addDays(today, 12), end: addDays(today, 13), days: 2,
+          requests: 'Quiere la portada completa el fin de semana de su venta de aniversario, con sus colores (rojo y amarillo).', budget: '', follow: today, stage: 'proposal', total: 0,
+          notes: [{ at: Date.now() - 2 * 864e5, text: 'Llamó preguntando por la toma de portada. Le envié la propuesta.' }] },
+        { ...base, id: 'L-EJ2', created: Date.now() - 864e5, business: 'Gimnasio Fuerza Bayamón', contact: 'Carla Méndez', phone: '787-555-0177', email: 'carla@ejemplo.com', channel: 'WhatsApp', fmt: ['rectangle', 'patrocinio'], start: addDays(today, 7), end: addDays(today, 96), aud: 'regions', reg: ['metro'], design: true,
+          requests: 'Patrocinar la sección de Deportes. No tiene arte: hay que diseñarle el anuncio con su logo.', budget: '', follow: addDays(today, 1), stage: 'talking', total: 0 },
+        { ...base, id: 'L-EJ3', created: Date.now() - 4 * 36e5, business: 'Agencia Caribe Creativo', contact: 'Ana Torres', email: 'ana@ejemplo.com', who: 'agency', channel: 'Correo', fmt: ['halfpage', 'infeed'], start: addDays(today, 20), end: addDays(today, 199), prepay: true, founder: false,
+          custom: [{ name: 'Artículo patrocinado (escrito por la redacción, identificado como patrocinado)', qty: 2, price: 0, pct: 0 }, { name: 'Mención en el boletín', qty: 8, price: 0, pct: 0 }], extra: 0,
+          requests: 'Campaña para un banco cliente: solo en Economía y Puerto Rico, de lunes a viernes. Piden informe mensual de clics.', budget: '', follow: addDays(today, 2), stage: 'new', total: 0 },
+      ];
+      ex.forEach((l) => (l.total = priceOf(l).total));
+      save([...ex, ...load()]);
+    }
+
+    const isAdmin = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || '{}').role === 'admin'; } catch { return false; } };
+    // Special requests: one row per item (what, how many, price each, % off)
+    function renderCustom(list: CustomLine[]) {
+      $('[data-custom]').innerHTML = list.map(crow).join('');
+    }
+    const crow = (c: Partial<CustomLine> = {}) => `<div class="sd-crow" data-crow>
+      <input data-c="name" list="sd-specials" placeholder="Qué piden (ej. Artículo patrocinado)" value="${esc(c.name ?? '')}" aria-label="Pedido" />
+      <input data-c="qty" type="number" min="1" value="${c.qty ?? 1}" aria-label="Cantidad" title="Cantidad" />
+      <input data-c="price" type="number" min="0" step="1" value="${c.price ?? ''}" placeholder="$" aria-label="Precio de cada uno" title="Precio de cada uno" />
+      <input data-c="pct" type="number" min="0" max="100" value="${c.pct ?? 0}" aria-label="Descuento %" title="Descuento %" />
+      <button type="button" class="sd-x sm" data-crow-rm aria-label="Quitar">✕</button></div>`;
+    root.querySelector('[data-custom-add]')!.addEventListener('click', () => { $('[data-custom]').insertAdjacentHTML('beforeend', crow()); updateQuote(); });
+    root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest('[data-crow-rm]'); if (b) { b.closest('[data-crow]')!.remove(); updateQuote(); } });
+    root.addEventListener('change', (e) => { // picking a suggested item fills in its usual price
+      const n = (e.target as HTMLElement).closest<HTMLInputElement>('[data-c="name"]'); if (!n) return;
+      const sp = SPECIALS.find((x) => x.name === n.value); const pr = n.closest('[data-crow]')!.querySelector<HTMLInputElement>('[data-c="price"]')!;
+      if (sp && !pr.value) { pr.value = String(sp.price); updateQuote(); }
+    });
+    root.addEventListener('click', (e) => { // quick lengths set the end date from the start date
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-len]'); if (!b) return;
+      const st = form.elements.namedItem('start') as HTMLInputElement; if (!st.value) st.value = addDays(today, 7);
+      (form.elements.namedItem('end') as HTMLInputElement).value = addDays(st.value, Number(b.dataset.len) - 1); updateQuote();
+    });
+
+    let view = 'open', editing: Lead | null = null;
+    function render() {
+      const all = load();
+      const open = all.filter((l) => !['won', 'lost'].includes(l.stage)), won = all.filter((l) => l.stage === 'won'), lost = all.filter((l) => l.stage === 'lost');
+      const due = open.filter((l) => l.follow && l.follow <= today).length;
+      const pipe = open.reduce((a, l) => a + l.total, 0), wonSum = won.reduce((a, l) => a + l.total, 0);
+      $('[data-sd-kpis]').innerHTML = [
+        `<div class="pnl-kpi ${due ? 'warn' : ''}"><span>Seguimientos para hoy</span><b>${due}</b><small>llamar o escribir</small></div>`,
+        `<div class="pnl-kpi"><span>Consultas abiertas</span><b>${open.length}</b><small>${money(pipe)} en cotizaciones</small></div>`,
+        `<div class="pnl-kpi good"><span>Ganadas</span><b>${money(wonSum)}</b><small>${won.length} ${won.length === 1 ? 'cliente' : 'clientes'}</small></div>`,
+        `<div class="pnl-kpi"><span>Cierre</span><b>${won.length + lost.length ? Math.round((won.length / (won.length + lost.length)) * 100) : 0}%</b><small>de las consultas decididas</small></div>`,
+      ].join('');
+      const n = (k: string, v: number) => ($(`[data-sn="${k}"]`).textContent = v ? String(v) : '');
+      n('open', open.length); n('won', won.length); n('lost', lost.length);
+      const box = $('[data-sd-list]');
+      if (view === 'cal') { box.innerHTML = calendar(); return; }
+      const list = (view === 'open' ? open : view === 'won' ? won : lost).sort((a, b) => (a.follow || '9') .localeCompare(b.follow || '9') || b.created - a.created);
+      box.innerHTML = list.map(card).join('') || `<p class="apr-empty">${view === 'open' ? 'No hay consultas abiertas. Toca “Nueva consulta” cuando llame un cliente.' : 'Nada aquí todavía.'}</p>`;
+    }
+    function card(l: Lead) {
+      const fm = l.fmt.map((id) => FMTS.find((f) => f.id === id)?.name).filter(Boolean).join(', ') || 'Sin formato todavía';
+      const late = l.follow && l.follow < today && !['won', 'lost'].includes(l.stage), now = l.follow === today;
+      const tk = takeoverDays(l); const taken = bookedDays(l.id); const clash = tk.filter((d) => taken.has(d));
+      const tel = (l.phone || '').replace(/\D/g, '');
+      return `<article class="sd-card" data-id="${l.id}">
+        <header><div><h2>${esc(l.business)} ${l.demo ? '<span class="sp-demo">EJEMPLO</span>' : ''}</h2>
+          <p class="pnl-muted">${esc(l.contact || 'Sin contacto')} · ${esc(l.channel)} · ${STAGES[l.stage]}</p></div>
+          <b class="sd-amt">${money(l.total)}</b></header>
+        <p class="sd-what"><b>${esc(fm)}</b>${l.fmt.some((id) => ['valla', 'rectangle', 'infeed', 'leaderboard', 'halfpage'].includes(id)) ? ` · ${(l.views ?? 10000).toLocaleString('es-PR')} vistas` : ''} · desde el ${fmtDate(l.start)}${l.fmt.includes('patrocinio') ? ` al ${fmtDate(l.end || addDays(l.start, lenOf(l) - 1))} (${lengthLabel(lenOf(l))})` : ''}${l.fmt.includes('takeover') ? ` · ${tkText(l)}` : ''}${l.aud === 'regions' ? ` · ${l.reg.map((r) => REGIONS.find((x) => x.id === r)?.name).join(', ')}` : ''}${l.design ? ' · lo diseñamos' : ''}</p>
+        ${l.custom?.length ? `<p class="sd-what">Pedidos especiales: ${l.custom.map((c) => esc(c.name.split(' (')[0]) + (c.qty > 1 ? ` × ${c.qty}` : '')).join(', ')}</p>` : ''}
+        ${l.requests ? `<p class="sd-req">“${esc(l.requests)}”</p>` : ''}
+        ${priceOf(l).q.needsApproval ? (l.approved ? `<p class="sd-ok">✓ Descuento aprobado por el administrador</p>` : `<p class="sd-warn">Necesita aprobación: el descuento negociado pasa de ${SALES_DISCOUNT_LIMIT}%. ${isAdmin() ? '<button type="button" class="pnl-link" data-a="approve">Aprobar descuento</button>' : 'El administrador lo verá aquí.'}</p>`) : ''}
+        ${clash.length ? `<p class="sd-warn">⚠ Ya hay toma de portada el ${clash.map(fmtDate).join(', ')}: ${esc(taken.get(clash[0])!)}.</p>` : ''}
+        <p class="sd-follow ${late ? 'late' : now ? 'now' : ''}">${l.follow ? `Seguimiento: ${late ? 'atrasado, ' : now ? 'hoy, ' : ''}${fmtDate(l.follow)}` : 'Sin fecha de seguimiento'}${l.budget ? ` · presupuesto ${esc(l.budget)}` : ''}</p>
+        ${l.notes.length ? `<details class="sd-notes"><summary>Notas (${l.notes.length})</summary><ul>${l.notes.map((x) => `<li><small>${new Date(x.at).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}</small> ${esc(x.text)}</li>`).join('')}</ul></details>` : ''}
+        <div class="sd-acts">
+          ${tel ? `<a class="sd-btn" href="tel:${tel}">Llamar</a><a class="sd-btn" href="https://wa.me/1${tel.slice(-10)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+          ${l.email ? `<a class="sd-btn" href="mailto:${esc(l.email)}">Correo</a>` : ''}
+          <button type="button" class="sd-btn" data-a="note">Añadir nota</button>
+          <button type="button" class="sd-btn" data-a="edit">Editar</button>
+          <button type="button" class="sd-btn strong" data-a="proposal" ${priceOf(l).q.needsApproval && !l.approved ? 'disabled title="Primero el administrador aprueba el descuento"' : ''}>Propuesta</button>
+          ${l.stage === 'won' ? (l.converted ? `<span class="sd-done">Convertida en anuncio ✓</span>` : `<button type="button" class="sd-btn strong" data-a="convert">Convertir en anuncio</button>`) : ''}
+        </div></article>`;
+    }
+    function calendar() {
+      const taken = bookedDays(); const first = new Date(`${today}T12:00:00`); first.setDate(1);
+      const months = [0, 1, 2].map((k) => { const d = new Date(first); d.setMonth(d.getMonth() + k); return d; });
+      return `<div class="sd-cal-wrap">${months.map((m) => {
+        const y = m.getFullYear(), mo = m.getMonth(); const days = new Date(y, mo + 1, 0).getDate(); const lead = (new Date(y, mo, 1).getDay() + 6) % 7;
+        const cells = [...Array(lead).fill('<span></span>'), ...Array.from({ length: days }, (_, i) => {
+          const d = iso(new Date(y, mo, i + 1, 12)); const who = taken.get(d);
+          return `<span class="${who ? (who.includes('propuesta') ? 'tent' : 'busy') : ''}${d === today ? ' today' : ''}" title="${who ? esc(who) : 'Libre'}">${i + 1}</span>`;
+        })];
+        return `<div class="sd-cal"><h3>${m.toLocaleDateString('es-PR', { month: 'long', year: 'numeric' })}</h3><div class="sd-cal-g"><b>L</b><b>M</b><b>M</b><b>J</b><b>V</b><b>S</b><b>D</b>${cells.join('')}</div></div>`;
+      }).join('')}</div><p class="sd-legend"><span class="busy"></span> Toma confirmada <span class="tent"></span> En propuesta <span></span> Libre. Solo un cliente puede tener la portada cada día.</p>`;
+    }
+
+    // ---- form ----
+    const dlg = $<HTMLDialogElement>('[data-sd-dlg]'); const form = $<HTMLFormElement>('[data-sd-form]');
+    const readForm = (): Omit<Lead, 'id' | 'created' | 'notes' | 'total'> => {
+      const d = new FormData(form); const s = (k: string) => String(d.get(k) ?? '').trim();
+      return { business: s('business'), contact: s('contact'), phone: s('phone'), email: s('email'), who: s('who') as Lead['who'], channel: s('channel'),
+        fmt: d.getAll('fmt').map(String), start: s('start'), end: s('end'), days: Math.max(1, Math.min(14, Number(s('days')) || 1)), views: Math.max(1000, Number(s('views')) || 10000),
+        tkViews: s('tkmode') === 'vistas' ? Math.max(5000, Number(s('tkViews')) || 50000) : undefined,
+        aud: s('aud') as Lead['aud'], reg: d.getAll('reg').map(String), design: !!d.get('design'), prepay: !!d.get('prepay'), founder: !!d.get('founder'),
+        requests: s('requests'), budget: s('budget'), follow: s('follow'), stage: s('stage') as Lead['stage'], extra: Number(s('extra')) || 0, extraAmt: Number(s('extraAmt')) || 0,
+        custom: $$<HTMLElement>('[data-crow]', form).map((r) => ({ name: (r.querySelector('[data-c="name"]') as HTMLInputElement).value.trim(), qty: Number((r.querySelector('[data-c="qty"]') as HTMLInputElement).value) || 1,
+          price: Number((r.querySelector('[data-c="price"]') as HTMLInputElement).value) || 0, pct: Number((r.querySelector('[data-c="pct"]') as HTMLInputElement).value) || 0 })).filter((c) => c.name) };
+    };
+    function updateQuote() {
+      const v = readForm();
+      const tk = v.fmt.includes('takeover');
+      $('[data-days-wrap]', form).hidden = !tk; $('[data-tk-days]', form).hidden = !tk || !!v.tkViews; $('[data-tk-views]', form).hidden = !tk || !v.tkViews;
+      $('[data-regs]', form).hidden = v.aud !== 'regions';
+      const { q, extra, total } = priceOf(v);
+      const rows = q.lines.map(([n, c]) => `<li><span>${esc(n)}</span><b>${money(c)}</b></li>`);
+      if (!q.lines.length && !q.custom.length) rows.push('<li class="adb-empty">Escoge un formato o añade un pedido especial.</li>');
+      q.discounts.forEach(([n, a]) => rows.push(`<li class="adb-off"><span>${esc(n)}</span><b>−${money(a)}</b></li>`));
+      if (q.capped > 0.5) rows.push(`<li class="adb-off"><span>Tope de descuento</span><b>+${money(q.capped)}</b></li>`);
+      if (q.design !== null) rows.push(`<li><span>Diseño</span><b>${q.design ? money(q.design) : 'Gratis'}</b></li>`);
+      q.custom.forEach(([n, c]) => rows.push(`<li><span>${esc(n)}</span><b>${money(c)}</b></li>`));
+      if (extra) rows.push(`<li class="adb-off"><span>Descuento negociado${v.extra ? ` (${v.extra}%)` : ''}${v.extraAmt ? ` ${v.extra ? '+ ' : ''}${money(v.extraAmt)}` : ''}</span><b>−${money(extra)}</b></li>`);
+      const ap = $('[data-q-approve]', form); ap.hidden = !q.needsApproval;
+      if (q.needsApproval) ap.textContent = isAdmin() ? `Este descuento pasa de ${SALES_DISCOUNT_LIMIT}%: como administrador, se aprueba al guardar.` : `Este descuento pasa de ${SALES_DISCOUNT_LIMIT}%: necesita aprobación del administrador antes de enviar la propuesta.`;
+      $('[data-q-lines]', form).innerHTML = rows.join('');
+      $('[data-q-total]', form).textContent = money(total);
+      // Only sponsorship (and a takeover by days) are bought by time; everything else ends when its views are delivered
+      const len = lenOf(v as Lead), byTime = v.fmt.includes('patrocinio') || (v.fmt.includes('takeover') && !v.tkViews);
+      $('[data-q-month]', form).textContent = !v.fmt.length ? '' : byTime ? `${lengthLabel(len)}${len >= 60 && total ? ` · unos ${money(total / (len / 30))} al mes` : ''}` : 'Termina sola al cumplir las vistas';
+      const lead = { ...v, id: editing?.id ?? '', created: 0, notes: [], total } as Lead;
+      const taken = bookedDays(editing?.id); const clash = takeoverDays(lead).filter((d) => taken.has(d));
+      const w = $('[data-q-warn]', form); w.hidden = !clash.length;
+      if (clash.length) w.textContent = `⚠ La portada ya está tomada el ${clash.map(fmtDate).join(', ')} (${taken.get(clash[0])}). Ofrece otro día.`;
+      const budget = Number(v.budget.replace(/[^\d.]/g, ''));
+      if (!clash.length && budget && total > budget * 1.1) { w.hidden = false; w.textContent = `El total pasa el presupuesto que mencionó (${v.budget}). Prueba con menos meses, una región o la Valla digital.`; }
+    }
+    function open(l: Lead | null) {
+      editing = l; form.reset(); $('[data-sd-err]', form).hidden = true;
+      $('[data-sd-title]', form).textContent = l ? `Editar: ${l.business}` : 'Nueva consulta';
+      $('[data-sd-del]', form).hidden = !l;
+      if (l) {
+        const set = (k: string, v: string) => { const el = form.elements.namedItem(k) as HTMLInputElement | null; if (el) el.value = v; };
+        (['business', 'contact', 'phone', 'email', 'who', 'channel', 'start', 'aud', 'requests', 'budget', 'follow', 'stage'] as const).forEach((k) => set(k, String(l[k] ?? '')));
+        set('views', String(l.views ?? 10000)); set('end', l.end || addDays(l.start, lenOf(l) - 1)); set('days', String(l.days)); set('tkmode', l.tkViews ? 'vistas' : 'dias'); set('tkViews', String(l.tkViews ?? 50000)); set('extra', String(l.extra || 0)); set('extraAmt', String(l.extraAmt || 0));
+        renderCustom(l.custom ?? []);
+        $$<HTMLInputElement>('[name="fmt"]', form).forEach((c) => (c.checked = l.fmt.includes(c.value)));
+        $$<HTMLInputElement>('[name="reg"]', form).forEach((c) => (c.checked = l.reg.includes(c.value)));
+        (['design', 'prepay', 'founder'] as const).forEach((k) => ((form.elements.namedItem(k) as HTMLInputElement).checked = l[k]));
+      } else {
+        (form.elements.namedItem('start') as HTMLInputElement).value = addDays(today, 7);
+        (form.elements.namedItem('end') as HTMLInputElement).value = addDays(today, 36);
+        renderCustom([]);
+        (form.elements.namedItem('follow') as HTMLInputElement).value = addDays(today, 1);
+      }
+      updateQuote(); dlg.showModal();
+    }
+    form.addEventListener('input', updateQuote); form.addEventListener('change', updateQuote);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = readForm(); const err = $('[data-sd-err]', form);
+      if (v.business.length < 2) { err.textContent = 'Escribe el nombre del negocio.'; err.hidden = false; return; }
+      if (!v.phone && !v.email) { err.textContent = 'Añade un teléfono o un correo para darle seguimiento.'; err.hidden = false; return; }
+      const all = load(); const total = priceOf(v).total;
+      const approved = priceOf(v).q.needsApproval ? isAdmin() || (editing?.approved && editing.extra === v.extra && editing.extraAmt === v.extraAmt) : undefined;
+      if (editing) { const i = all.findIndex((x) => x.id === editing!.id); all[i] = { ...all[i], ...v, total, approved }; }
+      else all.unshift({ ...v, id: `L-${Date.now().toString(36).toUpperCase()}`, created: Date.now(), notes: [], total, approved });
+      save(all); dlg.close(); render(); toast(editing ? 'Consulta actualizada.' : 'Consulta guardada.');
+    });
+    $$('[data-sd-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
+    $('[data-sd-del]').addEventListener('click', async () => { if (!editing || !(await ask(`¿Borrar la consulta de ${editing.business}?`, { ok: 'Borrar', danger: true }))) return; save(load().filter((x) => x.id !== editing!.id)); dlg.close(); render(); });
+    $('[data-sd-new]').addEventListener('click', () => open(null));
+
+    // ---- proposal (printable page in a new window; "Guardar como PDF" from the print dialog) ----
+    function proposal(l: Lead) {
+      const { q, extra, total } = priceOf(l);
+      const w = window.open('', '_blank'); if (!w) { toast('Permite las ventanas emergentes para ver la propuesta.'); return; }
+      const rows = [...q.lines.map(([n, c]) => `<tr><td>${esc(n)}</td><td>${money(c)}</td></tr>`),
+        ...(q.off ? [`<tr class="off"><td>Descuentos</td><td>−${money(q.off)}</td></tr>`] : []),
+        ...(q.design !== null ? [`<tr><td>Diseño del anuncio</td><td>${q.design ? money(q.design) : 'Gratis'}</td></tr>`] : []),
+        ...q.custom.map(([n, c]) => `<tr><td>${esc(n)}</td><td>${money(c)}</td></tr>`),
+        ...(extra ? [`<tr class="off"><td>Descuento especial</td><td>−${money(extra)}</td></tr>`] : [])].join('');
+      w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Propuesta para ${esc(l.business)} · NotiCel</title>
+        <style>body{font-family:system-ui,sans-serif;color:#16161D;max-width:720px;margin:40px auto;padding:0 24px;line-height:1.5}h1{color:#007BB6;margin:0}.k{color:#007BB6;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+        table{width:100%;border-collapse:collapse;margin:16px 0}td{padding:8px 4px;border-bottom:1px solid #E2E3EA}td:last-child{text-align:right;font-weight:700}.off td{color:#14663F}.tot td{font-size:20px;border-bottom:0;color:#000}
+        .box{background:#F3F3F8;border-radius:12px;padding:12px 16px}small{color:#5C5F6E}@media print{button{display:none}}</style></head><body>
+        <p class="k">NotiCel · Propuesta de publicidad</p><h1>${esc(l.business)}</h1>
+        <p>${esc(l.contact)}${l.contact ? ' · ' : ''}${new Date().toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        <div class="box"><b>Lo que pediste:</b> ${esc(l.fmt.map((id) => FMTS.find((f) => f.id === id)?.name).filter(Boolean).join(', '))}${l.fmt.length ? `, del ${fmtDate(l.start)} al ${fmtDate(l.end || addDays(l.start, lenOf(l) - 1))} (${lengthLabel(lenOf(l))})` : ''}${l.fmt.includes('takeover') ? `, ${l.tkViews ? `toma de portada hasta ${l.tkViews.toLocaleString('es-PR')} vistas` : `toma de portada ${l.days} día(s)`}` : ''}.${l.requests ? `<br>${esc(l.requests)}` : ''}</div>
+        <table>${rows}<tr class="tot"><td>Total</td><td>${money(total)}</td></tr></table>
+        <p>Pago con tarjeta o ATH Móvil. Los anuncios directos siempre salen antes que los de Google. Respondemos en menos de 24 horas.</p>
+        <p><small>Precios válidos por 15 días. Propuesta ${esc(l.id)}.</small></p><button onclick="print()">Imprimir o guardar como PDF</button></body></html>`);
+      w.document.close();
+    }
+
+    // ---- actions ----
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const st = t.closest<HTMLElement>('[data-st]');
+      if (st) { view = st.dataset.st!; $$('[data-st]').forEach((b) => b.setAttribute('aria-selected', String(b === st))); render(); return; }
+      const a = t.closest<HTMLElement>('[data-a]'); if (!a) return;
+      const id = t.closest<HTMLElement>('[data-id]')!.dataset.id!; const all = load(); const l = all.find((x) => x.id === id)!;
+      if (a.dataset.a === 'edit') open(l);
+      if (a.dataset.a === 'approve') { l.approved = true; l.notes.unshift({ at: Date.now(), text: 'Descuento aprobado por el administrador.' }); save(all); render(); toast('Descuento aprobado.'); }
+      if (a.dataset.a === 'note') { const text = await askText(`Nota sobre ${l.business}:`, { placeholder: 'ej. Llamar el lunes para confirmar fechas.', ok: 'Guardar nota', multiline: true }); if (text?.trim()) { l.notes.unshift({ at: Date.now(), text: text.trim() }); save(all); render(); } }
+      if (a.dataset.a === 'proposal') { proposal(l); if (l.stage === 'new' || l.stage === 'talking') { l.stage = 'proposal'; save(all); render(); } }
+      if (a.dataset.a === 'convert') {
+        // A won deal becomes a request in the ad approval queue (Anuncios), waiting for the client's art and payment
+        const fm = FMTS.filter((f) => l.fmt.includes(f.id));
+        await saveRequest({ id: `NC-${l.id.slice(2)}`, created: new Date().toISOString(), status: l.design ? 'disenar' : 'revisar', paid: false,
+          client: { name: l.contact || l.business, business: l.business, email: l.email, phone: l.phone, who: l.who },
+          formats: l.fmt, where: l.aud === 'regions' ? l.reg.map((r) => REGIONS.find((x) => x.id === r)?.name).join(', ') : l.aud === 'island' ? 'Solo Puerto Rico' : l.aud === 'diaspora' ? 'Solo la diáspora' : 'Puerto Rico y la diáspora',
+          start: l.start || today, duration: l.fmt.includes('takeover') && fm.length === 1 ? (l.tkViews ? `${l.tkViews.toLocaleString('en-US')} vistas` : `${l.days} día(s)`) : lengthLabel(lenOf(l)),
+          total: l.total, lines: [`Venta directa (${l.id})`], note: l.requests, views: FMTS.some((f) => l.fmt.includes(f.id) && f.per === 'mes' && f.id !== 'patrocinio') ? l.views ?? 10000 : undefined, takeoverViews: l.fmt.includes('takeover') ? l.tkViews : undefined,
+          art: l.design ? { mode: 'design', files: [], title: l.business, msg: '', cta: '', theme: 'morado', notes: l.requests } : { mode: 'upload', files: [] }, link: '' });
+        l.converted = new Date().toISOString(); save(all); render();
+        toast('Listo: el anuncio está en la cola de Anuncios esperando el arte y el pago.');
+      }
+    });
+    addEventListener('nc-leads', () => {}); // other tabs listen for this
+    render();
+    // The team's latest clients (and again when this person logs in)
+    void leads.refresh().then((ok) => ok && render());
+    // Only when someone else logs in: the panel's counters also send nc-staff-change, and refreshing on every one of
+    // them made an endless loop (refresh → nc-leads → counters → nc-staff-change → refresh…)
+    let who = localStorage.getItem('nc-staff');
+    addEventListener('nc-staff-change', () => { const now = localStorage.getItem('nc-staff'); if (now === who) return; who = now; void leads.refresh().then((ok) => ok && render()); });
+  }
+</script>

@@ -2,8 +2,9 @@
 import '../styles/global.css';
 import { SITE, MENU, CATEGORIES, CATEGORY_INFO, url, categoryUrl, longDate, type Story } from '../lib/site';
 // `current`: the menu button to highlight (a category slug; its top-level menu entry lights up)
-interface Props { title?: string; description?: string; breaking?: Story | null; current?: string; image?: string; article?: { published: Date; section?: string } }
-const { title, description = SITE.description, breaking = null, current, image, article } = Astro.props;
+// `staff`: staff panel pages (compact header: no section menu, breaking bar or footer). `noindex`: keep out of search engines.
+interface Props { title?: string; description?: string; breaking?: Story | null; current?: string; image?: string; article?: { published: Date; section?: string }; staff?: boolean; noindex?: boolean }
+const { title, description = SITE.description, breaking = null, current, image, article, staff = false, noindex = false } = Astro.props;
 const active = current ? (CATEGORY_INFO[current]?.path.split('/')[0] ?? current) : undefined;
 const pageTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
 const today = longDate(new Date());
@@ -16,6 +17,7 @@ const today = longDate(new Date());
   <meta name="theme-color" content="#000000" />
   <title>{pageTitle}</title>
   <meta name="description" content={description} />
+  {noindex && <meta name="robots" content="noindex, nofollow" />}
   <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
   <link rel="icon" href={url('logo.png')} />
   <meta property="og:site_name" content={SITE.name} />
@@ -31,38 +33,38 @@ const today = longDate(new Date());
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Merriweather:wght@400;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet" />
 </head>
-<body>
+<body data-base={url()} class:list={{ staff }}>
   <a class="skip" href="#main">Saltar al contenido</a>
 
   <div class="topbar"><div class="wrap">
     <span>{today.charAt(0).toUpperCase() + today.slice(1)}</span>
-    <div class="r"><a href={url('en')} lang="en">English</a></div>
+    <div class="r">{staff ? <a href={url()}>Ver el sitio ↗</a> : <a href={url('en')} lang="en">English</a>}</div>
   </div></div>
 
   <header class="mast"><div class="wrap">
-    <div class="l"><b>{SITE.tagline}</b>{SITE.subtitle}</div>
+    <div class="l">{staff ? <b>Panel de la redacción</b> : <><b>{SITE.tagline}</b>{SITE.subtitle}</>}</div>
     <a href={url()} aria-label={SITE.name}><img class="logo-img" src={url('logo.png')} alt="NotiCel. La verdad como es" width="210" height="88" /></a>
-    <div class="rt">
+    {staff ? <div class="rt"></div> : <div class="rt">
       <button class="icon-btn" id="searchToggle" aria-label="Buscar" aria-expanded="false" aria-controls="searchbar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
       <a href={categoryUrl('ultima-hora')} class="live-btn"><span class="dot"></span>Última Hora</a>
-    </div>
+    </div>}
   </div>
   <div class="searchbar" id="searchbar"><div class="wrap">
     <form role="search" action={url('buscar')}><label class="sr" for="q">Buscar</label><input id="q" name="q" type="search" placeholder="Buscar en NotiCel" /><button class="btn" type="submit">Buscar</button></form>
   </div></div>
   </header>
 
-  <nav class="nav" aria-label="Secciones"><div class="wrap">
+  {!staff && <nav class="nav" aria-label="Secciones"><div class="wrap">
     {MENU.map((slug) => <a href={categoryUrl(slug)} aria-current={active === slug ? 'page' : undefined}>{CATEGORIES[slug]}</a>)}
-  </div></nav>
+  </div></nav>}
 
-  {breaking && (
+  {breaking && !staff && (
     <div class="breaking"><div class="wrap"><b>ÚLTIMA HORA</b><a href={url(breaking.data.path)}>{breaking.data.title}</a></div></div>
   )}
 
   <slot />
 
-  <footer>
+  <footer hidden={staff}>
     <div class="wrap">
       <div>
         <a href={url()} aria-label={SITE.name}><img class="logo-img logo-sm" src={url('logo.png')} alt="NotiCel" width="105" height="44" /></a>
