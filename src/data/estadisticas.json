@@ -1,0 +1,233 @@
+{
+  "mlb": {
+    "columns": [
+      "CA",
+      "CP",
+      "DIF",
+      "LOCAL",
+      "VISITA"
+    ],
+    "rows": [
+      {
+        "team": "Milwaukee Brewers",
+        "values": [
+          "832",
+          "618",
+          "+214",
+          "55-26",
+          "48-33"
+        ]
+      },
+      {
+        "team": "Los Angeles Dodgers",
+        "values": [
+          "801",
+          "600",
+          "+201",
+          "51-30",
+          "49-32"
+        ]
+      },
+      {
+        "team": "Chicago Cubs",
+        "values": [
+          "850",
+          "703",
+          "+147",
+          "46-35",
+          "43-38"
+        ]
+      },
+      {
+        "team": "New York Yankees",
+        "values": [
+          "739",
+          "601",
+          "+138",
+          "46-34",
+          "47-34"
+        ]
+      },
+      {
+        "team": "Atlanta Braves",
+        "values": [
+          "742",
+          "626",
+          "+116",
+          "52-29",
+          "42-39"
+        ]
+      },
+      {
+        "team": "Tampa Bay Rays",
+        "values": [
+          "736",
+          "650",
+          "+86",
+          "55-26",
+          "43-38"
+        ]
+      },
+      {
+        "team": "Boston Red Sox",
+        "values": [
+          "689",
+          "611",
+          "+78",
+          "41-40",
+          "46-35"
+        ]
+      },
+      {
+        "team": "Detroit Tigers",
+        "values": [
+          "723",
+          "652",
+          "+71",
+          "42-39",
+          "34-47"
+        ]
+      },
+      {
+        "team": "Chicago White Sox",
+        "values": [
+          "776",
+          "720",
+          "+56",
+          "48-33",
+          "36-45"
+        ]
+      },
+      {
+        "team": "San Diego Padres",
+        "values": [
+          "722",
+          "681",
+          "+41",
+          "51-30",
+          "40-41"
+        ]
+      },
+      {
+        "team": "Pittsburgh Pirates",
+        "values": [
+          "767",
+          "739",
+          "+28",
+          "44-37",
+          "38-43"
+        ]
+      },
+      {
+        "team": "Philadelphia Phillies",
+        "values": [
+          "713",
+          "698",
+          "+15",
+          "43-38",
+          "45-36"
+        ]
+      }
+    ]
+  },
+  "nfl": {
+    "columns": [
+      "PTS/J",
+      "PC/J",
+      "DIF",
+      "J"
+    ],
+    "rows": [
+      {
+        "team": "Buffalo Bills",
+        "values": [
+          "33.7",
+          "26.0",
+          "+23",
+          "3"
+        ]
+      },
+      {
+        "team": "San Francisco 49ers",
+        "values": [
+          "32.7",
+          "16.7",
+          "+48",
+          "3"
+        ]
+      },
+      {
+        "team": "Detroit Lions",
+        "values": [
+          "31.0",
+          "31.7",
+          "-2",
+          "3"
+        ]
+      },
+      {
+        "team": "Baltimore Ravens",
+        "values": [
+          "30.7",
+          "26.0",
+          "+14",
+          "3"
+        ]
+      },
+      {
+        "team": "Chicago Bears",
+        "values": [
+          "29.7",
+          "17.7",
+          "+36",
+          "3"
+        ]
+      },
+      {
+        "team": "Carolina Panthers",
+        "values": [
+          "29.7",
+          "27.7",
+          "+6",
+          "3"
+        ]
+      },
+      {
+        "team": "Kansas City Chiefs",
+        "values": [
+          "29.3",
+          "16.7",
+          "+38",
+          "3"
+        ]
+      },
+      {
+        "team": "Las Vegas Raiders",
+        "values": [
+          "29.3",
+          "18.0",
+          "+34",
+          "3"
+        ]
+      },
+      {
+        "team": "Dallas Cowboys",
+        "values": [
+          "29.3",
+          "27.3",
+          "+6",
+          "3"
+        ]
+      },
+      {
+        "team": "Jacksonville Jaguars",
+        "values": [
+          "27.3",
+          "12.0",
+          "+46",
+          "3"
+        ]
+      }
+    ]
+  }
+}

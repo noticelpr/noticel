@@ -1,0 +1,19 @@
+---
+// League page: team statistics (offense/defense averages)
+import { teamStats, isDemoTable } from '../../lib/scores';
+import TeamLogo from './TeamLogo.astro';
+interface Props { league: string }
+const st = teamStats(Astro.props.league);
+const demo = !!st && isDemoTable('stats', Astro.props.league);
+---
+{st && (
+  <section class="sp-panel">
+    <h2>Estadísticas de equipos{demo && <span class="sp-demo">DEMO</span>}</h2>
+    <div class="sp-table-wrap">
+      <table class="sp-table">
+        <thead><tr><th scope="col">Equipo</th>{st.columns.map((c) => <th scope="col">{c}</th>)}</tr></thead>
+        <tbody>{st.rows.map((r) => <tr><th scope="row" class="notranslate" translate="no"><TeamLogo league={Astro.props.league} name={r.team} size={24} />{r.team}</th>{r.values.map((v) => <td>{v}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  </section>
+)}

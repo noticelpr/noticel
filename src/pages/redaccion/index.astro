@@ -14,21 +14,21 @@ import SalesDesk from '../../components/panel/SalesDesk.astro';
 import Writer from '../../components/panel/Writer.astro';
 import Tasks from '../../components/panel/Tasks.astro';
 import PhotoLibrary from '../../components/panel/PhotoLibrary.astro';
-import { getStories, url, SECTIONS, SITE, mainCategory, inCategory } from '../../lib/site';
+import { getStories, url, CATEGORY_OPTIONS, SITE, mainCategory, inCategory } from '../../lib/site';
 import { hasBackend } from '../../lib/backend';
 import { getCollection } from 'astro:content';
 import fs from 'node:fs';
 
 const stories = await getStories();
 const hasBackendBuild = hasBackend(); // Supabase connected: real accounts and team
-const secName = (id: string) => SECTIONS.find((x) => x.id === id)?.short ?? '';
+const secName = (id: string) => CATEGORY_OPTIONS.find((x) => x.id === id)?.short ?? '';
 // Everything on the site, for Escribir → Publicadas (with views once analytics is connected)
 const published = stories.map((s) => ({ id: s.id, title: s.data.title, section: secName(mainCategory(s)), author: s.data.author, date: s.data.date.toISOString(), url: url(s.data.path), ai: s.data.aiAssisted }));
 // The story pinned (📌) in the home page's main spot, for the reminder on Inicio
 const pinnedStory = stories.filter((s) => s.data.pinned).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())[0];
 const pin = pinnedStory ? { title: pinnedStory.data.title, date: pinnedStory.data.date.toISOString(), url: url(pinnedStory.data.path) } : null;
 // Stories pinned at the top of each category (newest pin per category), for the same reminder
-const sectionPins = SECTIONS.map((sec) => {
+const sectionPins = CATEGORY_OPTIONS.map((sec) => {
   const p = stories.filter((s) => mainCategory(s) === sec.id && s.data.sectionPinned).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())[0];
   return p ? { section: sec.short, title: p.data.title, url: url(p.data.path) } : null;
 }).filter(Boolean);
@@ -66,7 +66,7 @@ const TABS = [
 ];
 ---
 <Base title="Panel de la redacción" description="Panel interno de NotiCel (uso del personal)." noindex staff>
-  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(SECTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url }) => ({ id, title, section, author, date, url })))} data-sources={JSON.stringify(srcs)} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()} data-aikey={String(SITE.aiKeyConnected)}>
+  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(CATEGORY_OPTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url }) => ({ id, title, section, author, date, url })))} data-sources={JSON.stringify(srcs)} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()} data-aikey={String(SITE.aiKeyConnected)}>
     <form class="pnl-login" data-login hidden>
       <p class="pnl-kicker">NotiCel</p>
       <h1>Panel de la redacción</h1>

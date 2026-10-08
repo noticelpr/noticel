@@ -1,0 +1,66 @@
+---
+// Terms of use for readers: accounts, community rules (comments, photos, Foro NotiCel), moderation and liability.
+// Moderation matches src/lib/moderation.ts and supabase/comments.sql (filter before posting, 3 reports → review).
+import Base from '../layouts/Base.astro';
+import { SITE, url } from '../lib/site';
+const updated = '4 de octubre de 2026';
+---
+<Base title="Términos de uso" description="Las reglas para usar NotiCel: cuentas, comentarios, fotos, Foro NotiCel y moderación.">
+  <main class="wrap" id="main">
+    <div class="page">
+      <h1>Términos de uso</h1>
+      <p class="pg-draft"><span class="sp-demo">BORRADOR</span> Texto tomado de Noticias Xtra para el sitio de prueba. NotiCel debe revisarlo y aprobarlo antes del lanzamiento.</p>
+      <p><em>Última actualización: {updated}</em></p>
+      <p>Al usar NotiCel aceptas estos términos. Si creas una cuenta o publicas algo, también aceptas las reglas de la comunidad de abajo. Lee también nuestra <a href={url('privacidad')}>política de privacidad</a>.</p>
+
+      <h2>Tu cuenta</h2>
+      <ul>
+        <li>Debes tener al menos <strong>13 años</strong> para crear una cuenta.</li>
+        <li>Usa un correo tuyo y una contraseña segura. Eres responsable de lo que se publique desde tu cuenta.</li>
+        <li>Tu <strong>nombre de usuario</strong> es público. No puede hacerse pasar por otra persona, por la redacción ni por una institución, ni ser ofensivo.</li>
+        <li>Una cuenta por persona. Puedes borrarla cuando quieras desde <a href={url('perfil')}>Mi perfil</a>.</li>
+      </ul>
+
+      <h2>Reglas de la comunidad</h2>
+      <p>Los comentarios y el Foro NotiCel son para conversar sobre las noticias con respeto. Se vale criticar, discrepar y quejarse de figuras públicas. <strong>No se permite</strong>:</p>
+      <ul>
+        <li>Insultos, acoso o ataques personales a otros lectores o a cualquier persona.</li>
+        <li>Odio o discriminación por raza, origen, nacionalidad, religión, sexo, orientación sexual, identidad de género o discapacidad.</li>
+        <li>Amenazas o llamados a la violencia.</li>
+        <li>Publicar datos personales de otras personas (teléfonos, direcciones, correos, seguro social, fotos privadas).</li>
+        <li>Spam, publicidad, estafas o enlaces engañosos.</li>
+        <li>Información falsa presentada como hecho, sobre todo si puede causar daño (salud, emergencias, elecciones).</li>
+        <li>Contenido sexual, violento o ilegal.</li>
+      </ul>
+
+      <h2>Fotos que subes</h2>
+      <ul>
+        <li>Solo sube fotos tuyas o que tengas permiso de usar.</li>
+        <li>No subas fotos de otras personas sin su permiso, ni de menores de edad, ni contenido sexual, violento u ofensivo.</li>
+        <li>Al subir una foto nos das permiso para mostrarla en el sitio junto a tu comentario o perfil. Sigue siendo tuya.</li>
+      </ul>
+
+      <h2>Cómo moderamos</h2>
+      <ul>
+        <li>Un filtro automático revisa cada comentario antes de publicarlo: bloquea lo que claramente incumple las reglas y manda lo dudoso a revisión.</li>
+        <li>Cualquier lector puede <strong>reportar</strong> un comentario. Si varios lectores lo reportan, se oculta hasta que la redacción decida.</li>
+        <li>La redacción puede quitar contenido que incumpla estas reglas y, si se repite, suspender o cerrar la cuenta. Te avisaremos cuando quitemos algo tuyo.</li>
+        <li>Los puntos, insignias y niveles de comentarista y de Juegos NotiCel son reconocimientos dentro del sitio, sin valor monetario. Podemos ajustarlos si detectamos trampa o abuso.</li>
+      </ul>
+
+      <h2>Lo que publicas</h2>
+      <p>Lo que escribes es tuyo y eres responsable de ello. Al publicarlo en NotiCel nos das permiso para mostrarlo en el sitio. Las opiniones de los lectores no representan a NotiCel.</p>
+
+      <h2>Nuestro contenido</h2>
+      <p>Las noticias, fotos, diseños y juegos de NotiCel están protegidos por derechos de autor. Puedes compartir los enlaces y citar fragmentos breves con crédito y enlace a la noticia; no copies noticias completas sin permiso. Las fotos de terceros indican su autor y licencia.</p>
+      <p>Trabajamos para que la información sea exacta y corregimos los errores (lee nuestras <a href={url('normas-editoriales')}>normas editoriales y correcciones</a>). Aun así, el sitio se ofrece tal como está: no respondemos por decisiones tomadas solo a base de lo publicado, ni por el contenido de sitios externos enlazados.</p>
+
+      <h2>Cambios</h2>
+      <p>Podemos actualizar estos términos. Lo indicaremos aquí con una nueva fecha; seguir usando el sitio después del cambio significa que lo aceptas.</p>
+
+      <h2>Contacto</h2>
+      {SITE.email ? <p>Preguntas: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p> : <p>Muy pronto publicaremos un correo para preguntas sobre estos términos.</p>}
+      <p>Si te anuncias con nosotros, lee también los <a href={url('terminos-anunciantes')}>términos para anunciantes</a>.</p>
+    </div>
+  </main>
+</Base>

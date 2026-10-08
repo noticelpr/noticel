@@ -1,0 +1,52 @@
+---
+// Photo slideshow for stories with several photos (frontmatter `gallery`): the main photo first, then the rest.
+// Phones swipe; computers use the arrows or the thumbnails. Each photo keeps its own caption and credit.
+import { url } from '../lib/site';
+type Slide = { src: string; caption: string; credit?: string; creditUrl?: string };
+interface Props { slides: Slide[] }
+const { slides } = Astro.props;
+const abs = (s: string) => (/^https?:/.test(s) ? s : url(s.replace(/^\//, '')));
+---
+<div class="gal" data-gal aria-roledescription="galería" aria-label={`Galería de ${slides.length} fotos`}>
+  <div class="gal-stage">
+    <div class="gal-track" data-gal-track tabindex="0">
+      {slides.map((s, i) => (
+        <figure class="gal-slide" aria-roledescription="foto" aria-label={`${i + 1} de ${slides.length}`}>
+          <img src={abs(s.src)} alt={s.caption} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" />
+        </figure>
+      ))}
+    </div>
+    <button type="button" class="gal-nav prev" data-gal-prev aria-label="Foto anterior">‹</button>
+    <button type="button" class="gal-nav next" data-gal-next aria-label="Foto siguiente">›</button>
+    <span class="gal-count" data-gal-count>1 / {slides.length}</span>
+  </div>
+  <div class="gal-caps">
+    {slides.map((s, i) => (
+      <p class="caption gal-cap" data-gal-cap hidden={i !== 0}>{s.caption}{s.credit && <> {s.creditUrl ? <a href={s.creditUrl} rel="noopener" target="_blank">{s.credit}</a> : s.credit}</>}</p>
+    ))}
+  </div>
+  <div class="gal-thumbs" role="tablist" aria-label="Escoger foto">
+    {slides.map((s, i) => <button type="button" role="tab" aria-selected={i === 0 ? 'true' : 'false'} data-gal-go={i} aria-label={`Foto ${i + 1}`}><img src={abs(s.src)} alt="" loading="lazy" /></button>)}
+  </div>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-gal]').forEach((g) => {
+    const track = g.querySelector<HTMLElement>('[data-gal-track]')!;
+    const n = track.children.length; let cur = 0;
+    const show = (i: number) => {
+      cur = Math.max(0, Math.min(n - 1, i));
+      g.querySelector('[data-gal-count]')!.textContent = `${cur + 1} / ${n}`;
+      g.querySelectorAll<HTMLElement>('[data-gal-cap]').forEach((c, k) => (c.hidden = k !== cur));
+      g.querySelectorAll<HTMLElement>('[data-gal-go]').forEach((b, k) => b.setAttribute('aria-selected', String(k === cur)));
+      g.querySelector<HTMLButtonElement>('[data-gal-prev]')!.disabled = cur === 0;
+      g.querySelector<HTMLButtonElement>('[data-gal-next]')!.disabled = cur === n - 1;
+    };
+    const go = (i: number) => { show(i); track.scrollTo({ left: track.clientWidth * cur, behavior: 'smooth' }); }; // the counter updates right away
+    let t = 0; track.addEventListener('scroll', () => { clearTimeout(t); t = window.setTimeout(() => show(Math.round(track.scrollLeft / track.clientWidth)), 60); }, { passive: true });
+    g.querySelector('[data-gal-prev]')!.addEventListener('click', () => go(cur - 1));
+    g.querySelector('[data-gal-next]')!.addEventListener('click', () => go(cur + 1));
+    g.querySelectorAll<HTMLElement>('[data-gal-go]').forEach((b) => b.addEventListener('click', () => go(Number(b.dataset.galGo))));
+    track.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') { e.preventDefault(); go(cur + 1); } if (e.key === 'ArrowLeft') { e.preventDefault(); go(cur - 1); } });
+    show(0);
+  });
+</script>

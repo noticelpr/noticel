@@ -1,0 +1,18 @@
+---
+import Base from '../layouts/Base.astro';
+import { SIGNS, horoscope, todayLong } from '../lib/daily';
+---
+<Base title="Horóscopo de hoy" description="El horóscopo del día para los doce signos.">
+  <main class="wrap" id="main">
+    <div class="sec-h" style="margin-top:0"><h1 style="font-size:32px;margin:0;color:var(--purple)">Horóscopo de hoy</h1><span class="time">{todayLong()}</span></div>
+    <p class="sp-note" style="margin-bottom:18px">Sección de entretenimiento. Se actualiza cada día.</p>
+    <div class="hz-grid">
+      {SIGNS.map((s, i) => (
+        <article class="hz" id={s.id}>
+          <span class="hz-sym" aria-hidden="true">{s.symbol}{'\uFE0E'}</span>
+          <div><h2>{s.name}</h2><span class="hz-dates">{s.dates}</span><p>{horoscope(i)}</p></div>
+        </article>
+      ))}
+    </div>
+  </main>
+</Base>

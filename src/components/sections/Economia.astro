@@ -1,0 +1,47 @@
+---
+// Economía: its own look (navy and teal, green/red for markets) inside the NotiCel style.
+// A markets strip under the header, the stories, and the full "Mercados" board (src/components/economia/Markets.astro).
+import Base from '../../layouts/Base.astro';
+import StoryCard from '../../components/StoryCard.astro';
+import Sidebar from '../../components/Sidebar.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import GamesTeaser from '../../components/GamesTeaser.astro';
+import Markets from '../../components/economia/Markets.astro';
+import { getStories, topOrder, sectionTop, SITE, url } from '../../lib/site';
+
+const list = sectionTop(topOrder((await getStories()).filter((s) => s.data.section === 'economia')));
+---
+<Base title="Economía" active="economia" description={`Economía de Puerto Rico en ${SITE.name}: negocios, empleos, tu bolsillo y los mercados (Popular, FirstBank, petróleo, oro y cripto).`}>
+  <main class="wrap eco" id="main">
+    <header class="eco-hero">
+      <div class="eco-hero-t">
+        <h1>Economía</h1>
+        <p>Negocios, empleos, tu bolsillo y los mercados</p>
+      </div>
+      <Markets tape />
+    </header>
+    <div class="art-grid">
+      <div>
+        {list.length > 0 ? (
+          <div class="block">
+            <h2 class="sr">Últimas noticias</h2>
+            <StoryCard story={list[0]} variant="big" priority />
+            <div class="list">{list.slice(1, 5).map((s) => <StoryCard story={s} variant="item" />)}</div>
+          </div>
+        ) : (
+          <div class="empty"><p>Todavía no hay noticias de economía hoy.</p><a class="btn" href={url()}>Ir a la portada</a></div>
+        )}
+        <Markets />
+        {list.length > 5 && (
+          <section>
+            <div class="sec-h"><h2>Más de Economía</h2></div>
+            <div class="grid3">{list.slice(5).map((s) => <StoryCard story={s} />)}</div>
+          </section>
+        )}
+        <AdSlot size="infeed" />
+        <GamesTeaser />
+      </div>
+      <Sidebar />
+    </div>
+  </main>
+</Base>

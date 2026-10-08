@@ -1,0 +1,47 @@
+---
+// Juegos NotiCel: games page. A compact banner featuring the daily crossword, then every game together.
+import Base from '../../layouts/Base.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import GameBoard from '../../components/GameBoard.astro';
+import { url } from '../../lib/site';
+import { GAMES, FEATURED_GAME } from '../../lib/games';
+const featured = FEATURED_GAME;
+const rest = GAMES.filter((g) => g.id !== featured.id);
+---
+<Base title="Juegos NotiCel" description="Crucigrama, sudoku, dominó, Cuatro Colores, Cuatro en Línea, trivia y más: juegos gratis sobre Puerto Rico.">
+  <main class="wrap jh" id="main">
+    <section class="jh-hero" style={`--gc:${featured.color}`}>
+      <div class="jh-hero-text">
+        <p class="jh-kicker">Juegos NotiCel · Gratis, sin registrarte</p>
+        <h1>¿A qué jugamos hoy?</h1>
+        <p class="jh-lead">{GAMES.length} juegos: palabras, números, dominó y cartas.</p>
+      </div>
+      <a class="jh-feat" href={url(`juegos/${featured.id}`)}>
+        <img class="jh-feat-img" src={url(`images/juegos/${featured.id}.svg`)} alt="" />
+        <span class="jh-feat-body">
+          <span class="jh-feat-tag">Juego principal</span>
+          <strong>{featured.name}</strong>
+          <span>{featured.about}</span>
+          <span class="jh-feat-btn">Jugar ahora ›</span>
+        </span>
+      </a>
+    </section>
+
+
+    <div class="jh-grid jh-all">
+      {rest.map((g) => (
+        <a class="jh-card" href={url(`juegos/${g.id}`)} style={`--gc:${g.color}`}>
+          <span class="jh-card-art" aria-hidden="true"><img src={url(`images/juegos/${g.id}.svg`)} alt="" loading="lazy" /></span>
+          <span class="jh-card-body">
+            <strong>{g.name}</strong>
+            <span>{g.about}</span>
+          </span>
+          <span class="jh-card-play">Jugar</span>
+        </a>
+      ))}
+    </div>
+
+    <GameBoard title="Líderes de Juegos NotiCel" />
+    <AdSlot size="infeed" />
+  </main>
+</Base>

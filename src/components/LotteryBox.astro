@@ -1,0 +1,82 @@
+---
+// "Lotería" box (right column, under Clima): the latest Powerball draw; hovering (or tapping) opens Loto Cash,
+// Revancha, Double Play and Mega Millions. Puerto Rico's games come from the official Loterías de Puerto Rico data
+// feed (the same one loteriasdepuertorico.pr.gov uses); Mega Millions from the New York Lottery's open data
+// (data.ny.gov). Read when the site is built (every 15 minutes) and again in the reader's browser.
+
+const PR = 'https://wordpresswebapi.azurewebsites.net/api/ElectronicDrawing/';
+const MEGA = 'https://data.ny.gov/resource/5xaw-6ayf.json?$order=draw_date%20DESC&$limit=1';
+type Draw = { gameID: number; drawingDate: string; formattedResults: string | null; formattedPlus: string | null; formattedMultiplier: string | null; extraBall: number | null; multiplier: number | null; nextJackpot: number | null };
+const get = async <T,>(u: string): Promise<T | null> => { try { const r = await fetch(u, { signal: AbortSignal.timeout(8000) }); return r.ok ? ((await r.json()) as T) : null; } catch { return null; } };
+const [loto, revancha, power, double, megaRows] = await Promise.all([get<Draw>(`${PR}8`), get<Draw>(`${PR}9`), get<Draw>(`${PR}10`), get<Draw>(`${PR}14`), get<Array<{ draw_date: string; winning_numbers: string; mega_ball: string }>>(MEGA)]);
+const mega = megaRows?.[0];
+const balls = (s?: string | null) => (s ? s.split(/[-\s]+/).filter(Boolean).map((n) => n.padStart(2, '0')) : []);
+const day = (d?: string) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'short', day: 'numeric', month: 'short' }) : '');
+const money = (n?: number | null) => (n ? `$${n >= 1e6 ? `${(n / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })} millones` : n.toLocaleString('en-US')}` : '');
+---
+<section class="lt-box" data-lottery={PR} data-mega={MEGA}>
+  <button type="button" class="lt-head" aria-expanded="false" aria-controls="lt-more" data-lt-toggle>
+    <span class="lt-title">Lotería</span>
+    <span class="lt-game">Powerball <small data-lt="10-date">{day(power?.drawingDate)}</small></span>
+    <span class="lt-balls" data-lt="10-balls">
+      {balls(power?.formattedResults).map((b) => <i>{b}</i>)}{power?.extraBall != null && <i class="pb">{String(power.extraBall).padStart(2, '0')}</i>}
+    </span>
+    <span class="lt-extra" data-lt="10-x">{power?.multiplier ? `Power Play ×${power.multiplier}` : ''}</span>
+    <svg class="lt-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+  </button>
+  <div class="lt-more" id="lt-more">
+    <div class="lt-row">
+      <span class="lt-game">Loto Cash <small data-lt="8-date">{day(loto?.drawingDate)}</small></span>
+      <span class="lt-balls" data-lt="8-balls">{balls(loto?.formattedResults).map((b) => <i>{b}</i>)}{loto?.formattedPlus && <i class="plus">{loto.formattedPlus}</i>}</span>
+      <span class="lt-extra" data-lt="8-x">{[loto?.formattedMultiplier && `Multiplicador ×${loto.formattedMultiplier}`, loto?.nextJackpot && `Próximo: ${money(loto.nextJackpot)}`].filter(Boolean).join(' · ')}</span>
+    </div>
+    <div class="lt-row">
+      <span class="lt-game">Revancha <small data-lt="9-date">{day(revancha?.drawingDate)}</small></span>
+      <span class="lt-balls" data-lt="9-balls">{balls(revancha?.formattedResults).map((b) => <i>{b}</i>)}{revancha?.formattedPlus && <i class="plus">{revancha.formattedPlus}</i>}</span>
+      <span class="lt-extra" data-lt="9-x">{revancha?.nextJackpot ? `Próximo: ${money(revancha.nextJackpot)}` : ''}</span>
+    </div>
+    <div class="lt-row">
+      <span class="lt-game">Double Play <small data-lt="14-date">{day(double?.drawingDate)}</small></span>
+      <span class="lt-balls" data-lt="14-balls">{balls(double?.formattedResults).map((b) => <i>{b}</i>)}{double?.extraBall != null && <i class="pb">{String(double.extraBall).padStart(2, '0')}</i>}</span>
+      <span class="lt-extra" data-lt="14-x"></span>
+    </div>
+    <div class="lt-row">
+      <span class="lt-game">Mega Millions <small data-lt="mm-date">{day(mega?.draw_date)}</small></span>
+      <span class="lt-balls" data-lt="mm-balls">{balls(mega?.winning_numbers).map((b) => <i>{b}</i>)}{mega?.mega_ball && <i class="mb">{mega.mega_ball.padStart(2, '0')}</i>}</span>
+      <span class="lt-extra">Sorteo nacional</span>
+    </div>
+    <p class="lt-src">Fuentes: <a href="https://loteriasdepuertorico.pr.gov/loteria-electronica/#e-numeros-ganadores" target="_blank" rel="noopener">Loterías de Puerto Rico</a> · Mega Millions: <a href="https://data.ny.gov/" target="_blank" rel="noopener">Lotería de Nueva York</a>. Los números oficiales son los certificados por el auditor de los sorteos.</p>
+    <p class="lt-src">¿El juego te causa problemas? Llama a ASSMCA: <a href="tel:18009810023">1-800-981-0023</a>.</p>
+  </div>
+</section>
+
+<script>
+  // Fresh numbers in the reader's browser (the box already shows what was current when the site was built)
+  type Draw = { drawingDate: string; formattedResults: string | null; formattedPlus: string | null; formattedMultiplier: string | null; extraBall: number | null; multiplier: number | null; nextJackpot: number | null };
+  const pad = (n: string | number) => String(n).padStart(2, '0');
+  const ball = (n: string | number, cls = '') => `<i${cls ? ` class="${cls}"` : ''}>${pad(n)}</i>`;
+  const list = (s?: string | null) => (s ? s.split(/[-\s]+/).filter(Boolean).map((n) => ball(n)).join('') : '');
+  const day = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'short', day: 'numeric', month: 'short' });
+  const money = (n: number) => `$${n >= 1e6 ? `${(n / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 })} millones` : n.toLocaleString('en-US')}`;
+  document.querySelectorAll<HTMLElement>('[data-lottery]').forEach((box) => {
+    const set = (k: string, html: string) => { const el = box.querySelector(`[data-lt="${k}"]`); if (el) el.innerHTML = html; };
+    const toggle = box.querySelector<HTMLButtonElement>('[data-lt-toggle]')!;
+    // Phones (no hover): tap to open and close; computers also open it on hover (CSS)
+    toggle.addEventListener('click', () => { const open = box.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(open)); });
+    const get = (u: string) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const base = box.dataset.lottery!;
+    void Promise.all([8, 9, 10, 14].map((g) => get(`${base}${g}`))).then(([loto, rev, pb, dp]: Array<Draw | null>) => {
+      if (pb?.formattedResults) { set('10-date', day(pb.drawingDate)); set('10-balls', list(pb.formattedResults) + (pb.extraBall != null ? ball(pb.extraBall, 'pb') : '')); set('10-x', pb.multiplier ? `Power Play ×${pb.multiplier}` : ''); }
+      if (loto?.formattedResults) {
+        set('8-date', day(loto.drawingDate)); set('8-balls', list(loto.formattedResults) + (loto.formattedPlus ? ball(loto.formattedPlus, 'plus') : ''));
+        set('8-x', [loto.formattedMultiplier && `Multiplicador ×${loto.formattedMultiplier}`, loto.nextJackpot && `Próximo: ${money(loto.nextJackpot)}`].filter(Boolean).join(' · '));
+      }
+      if (rev?.formattedResults) { set('9-date', day(rev.drawingDate)); set('9-balls', list(rev.formattedResults) + (rev.formattedPlus ? ball(rev.formattedPlus, 'plus') : '')); set('9-x', rev.nextJackpot ? `Próximo: ${money(rev.nextJackpot)}` : ''); }
+      if (dp?.formattedResults) { set('14-date', day(dp.drawingDate)); set('14-balls', list(dp.formattedResults) + (dp.extraBall != null ? ball(dp.extraBall, 'pb') : '')); }
+    });
+    void get(box.dataset.mega!).then((rows: Array<{ draw_date: string; winning_numbers: string; mega_ball: string }> | null) => {
+      const m = rows?.[0]; if (!m) return;
+      set('mm-date', day(m.draw_date)); set('mm-balls', list(m.winning_numbers) + ball(m.mega_ball, 'mb'));
+    });
+  });
+</script>

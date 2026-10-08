@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <!-- Noticias Xtra illustration: American football on the field (default photo for NFL stories) -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B1C3D"/><stop offset="1" stop-color="#1F3A70"/></linearGradient>
+    <linearGradient id="turf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E7D32"/><stop offset="1" stop-color="#1B5E20"/></linearGradient>
+    <linearGradient id="ball" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A0522D"/><stop offset="1" stop-color="#5D2E12"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy="0" r=".8"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <rect width="1600" height="420" fill="url(#glow)"/>
+  <!-- stadium lights -->
+  <g fill="#FFF8D6"><circle cx="210" cy="90" r="9"/><circle cx="240" cy="90" r="9"/><circle cx="270" cy="90" r="9"/><circle cx="1330" cy="90" r="9"/><circle cx="1360" cy="90" r="9"/><circle cx="1390" cy="90" r="9"/></g>
+  <g stroke="#3A4A6B" stroke-width="6"><path d="M240 100v230M1360 100v230"/></g>
+  <!-- stands -->
+  <path d="M0 330 L1600 330 L1600 400 L0 400 Z" fill="#14254A"/>
+  <path d="M0 330q800-60 1600 0" fill="none" stroke="#2C4A86" stroke-width="4"/>
+  <!-- field in perspective -->
+  <path d="M-200 900 L380 400 L1220 400 L1800 900 Z" fill="url(#turf)"/>
+  <g stroke="#FFFFFF" stroke-opacity=".85" stroke-width="5">
+    <path d="M380 400 L-200 900"/><path d="M1220 400 L1800 900"/>
+    <path d="M330 443 L1270 443"/><path d="M270 495 L1330 495"/><path d="M200 555 L1400 555"/><path d="M115 628 L1485 628"/><path d="M10 718 L1590 718"/><path d="M-120 830 L1720 830"/>
+  </g>
+  <g fill="#FFFFFF" fill-opacity=".8" font-family="Arial, sans-serif" font-weight="700">
+    <text x="215" y="545" font-size="34">4 0</text><text x="1320" y="545" font-size="34">4 0</text>
+    <text x="110" y="700" font-size="44">5 0</text><text x="1420" y="700" font-size="44">5 0</text>
+  </g>
+  <!-- goal post -->
+  <g stroke="#F2C230" stroke-width="10" fill="none" stroke-linecap="round"><path d="M800 400V300M720 300H880M720 300V170M880 300V170"/></g>
+  <!-- ball -->
+  <g transform="translate(800 690) rotate(-28)">
+    <ellipse cx="0" cy="0" rx="250" ry="140" fill="url(#ball)" stroke="#3E1F0A" stroke-width="6"/>
+    <path d="M-235 -10 Q0 -40 235 -10" fill="none" stroke="#FFFFFF" stroke-opacity=".9" stroke-width="10"/>
+    <path d="M-235 10 Q0 40 235 10" fill="none" stroke="#FFFFFF" stroke-opacity=".0" stroke-width="10"/>
+    <path d="M-150 -95 Q-140 0 -150 95M150 -95 Q140 0 150 95" fill="none" stroke="#FFFFFF" stroke-width="12"/>
+    <path d="M-80 -6H80" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+    <g stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"><path d="M-60 -26V14M-30 -26V14M0 -26V14M30 -26V14M60 -26V14"/></g>
+    <ellipse cx="-80" cy="-70" rx="110" ry="28" fill="#FFFFFF" fill-opacity=".12"/>
+  </g>
+</svg>

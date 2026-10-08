@@ -1,0 +1,192 @@
+---
+// Dominó (double six), two ways:
+// · 2 jugadores: you vs. the computer, 7 tiles each, the rest go to the pile (draw when you can't play).
+// · 4 jugadores en parejas: you and your partner (across the table) vs. two rivals, all controlled
+//   by the computer. All 28 tiles are dealt, there is no pile: if you can't play, you pass.
+// Whoever holds the highest double starts. The team that dominoes scores the points left in the rivals'
+// hands; if the game is blocked (tranque), the team with fewer points wins. First to 100 wins the match.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+---
+<Base title="Dominó" description="Juega dominó contra la computadora: mano a mano o en parejas de cuatro jugadores.">
+  <main class="wrap" id="main">
+    <GameLayout id="domino">
+    <div class="jg-game dm" data-domino>
+      <div class="sd-levels" role="group" aria-label="Modo de juego">
+        <button type="button" data-mode="2" aria-pressed="false">2 jugadores</button>
+        <button type="button" data-mode="4" aria-pressed="true">4 jugadores (parejas)</button>
+      </div>
+      <p class="jg-stats"><span data-team0>Nosotros: <b data-score0>0</b></span><span data-team1>Ellos: <b data-score1>0</b></span><span>Partida a 100</span></p>
+      <div class="dm-players" data-players></div>
+      <div class="dm-table" data-table aria-label="Mesa"></div>
+      <p class="jg-msg" aria-live="polite" data-msg></p>
+      <div class="dm-ends" data-ends hidden>
+        <button type="button" class="jg-btn" data-end="L">◀ Poner a la izquierda</button>
+        <button type="button" class="jg-btn" data-end="R">Poner a la derecha ▶</button>
+      </div>
+      <div class="dm-hand" data-hand aria-label="Tus fichas"></div>
+      <div class="dm-actions">
+        <button type="button" class="tool" data-draw>Robar (<span data-pile>0</span>)</button>
+        <button type="button" class="tool" data-pass>Pasar</button>
+        <button type="button" class="jg-btn" data-next hidden>Siguiente mano</button>
+      </div>
+      <p class="jg-help" data-help></p>
+    </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    type Tile = [number, number];
+    const box = document.querySelector<HTMLElement>('[data-domino]')!;
+    const $ = (s: string) => box.querySelector<HTMLElement>(s)!;
+    const PIPS: Record<number, number[]> = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+    const half = (n: number) => `<span class="dm-half">${[...Array(9)].map((_, i) => `<i${PIPS[n].includes(i) ? ' class="on"' : ''}></i>`).join('')}</span>`;
+    const tileHTML = (t: Tile, vertical = false) => `<span class="dm-tile${vertical ? ' v' : ''}${t[0] === t[1] ? ' dbl' : ''}" aria-label="Ficha ${t[0]} y ${t[1]}">${half(t[0])}${half(t[1])}</span>`;
+    const pips = (h: Tile[]) => h.reduce((s, t) => s + t[0] + t[1], 0);
+
+    // Seats: 0 = you. In 4-player mode, 2 is your partner (across), 1 and 3 are the rivals.
+    let mode: 2 | 4 = 4;
+    const NAMES: Record<number, string[]> = { 2: ['Tú', 'Computadora'], 4: ['Tú', 'Rival A', 'Compañero', 'Rival B'] };
+    const team = (p: number) => p % 2; // 0 = you (and partner), 1 = them
+    let hands: Tile[][] = [], pile: Tile[] = [], line: Tile[] = [], turn = 0, passes = 0, over = false, pick = -1;
+    let score = [0, 0];
+    let gen = 0; // bumps on every new deal so a pending computer move from an old hand is ignored
+    const later = (ms: number) => { const g = gen; setTimeout(() => { if (g === gen) botTurn(); }, ms); };
+    try { const m = Number(localStorage.getItem('nc-domino-mode')); if (m === 2 || m === 4) mode = m; } catch { /* storage blocked */ }
+
+    const ends = () => (line.length ? [line[0][0], line[line.length - 1][1]] : [-1, -1]);
+    const fits = (t: Tile) => { if (!line.length) return ['L']; const [l, r] = ends(); const o: string[] = []; if (t[0] === l || t[1] === l) o.push('L'); if (t[0] === r || t[1] === r) o.push('R'); return o; };
+    function place(t: Tile, side: string) {
+      if (!line.length) { line.push(t); return; }
+      const [l, r] = ends();
+      if (side === 'L') line.unshift(t[1] === l ? t : [t[1], t[0]]);
+      else line.push(t[0] === r ? t : [t[1], t[0]]);
+    }
+    const say = (t: string) => { $('[data-msg]').textContent = t; };
+    const name = (p: number) => NAMES[mode][p];
+
+    function deal() {
+      const all: Tile[] = []; for (let a = 0; a <= 6; a++) for (let b = a; b <= 6; b++) all.push([a, b]);
+      for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
+      hands = [...Array(mode)].map((_, p) => all.slice(p * 7, p * 7 + 7));
+      pile = mode === 2 ? all.slice(14) : [];
+      line = []; passes = 0; over = false; pick = -1; gen++;
+      // Whoever holds the highest double starts
+      const best = hands.map((h) => Math.max(-1, ...h.filter((t) => t[0] === t[1]).map((t) => t[0])));
+      turn = best.indexOf(Math.max(...best));
+      $('[data-next]').hidden = true;
+      say(turn === 0 ? 'Sales tú: tienes el doble más alto. Juega cualquier ficha.' : `Sale ${name(turn)} con el doble más alto…`);
+      render();
+      if (turn !== 0) later(1000);
+    }
+
+    function render() {
+      // Other players: name, tiles left, whose turn
+      $('[data-players]').innerHTML = hands.map((h, p) => p === 0 ? '' :
+        `<div class="dm-seat${turn === p && !over ? ' on' : ''}${mode === 4 && team(p) === 0 ? ' mate' : ''}"><span>${name(p)}${mode === 4 && team(p) === 0 ? ' 🤝' : ''}</span><span class="dm-backs">${h.map(() => '<i></i>').join('')}</span><b>${h.length}</b></div>`).join('');
+      $('[data-table]').innerHTML = line.length ? line.map((t) => tileHTML(t, t[0] === t[1])).join('') : '<span class="dm-empty">La mesa está vacía</span>';
+      $('[data-pile]').textContent = String(pile.length);
+      const hand = $('[data-hand]'); hand.innerHTML = '';
+      hands[0].forEach((t, i) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'dm-pick'; b.innerHTML = tileHTML(t);
+        b.disabled = !(turn === 0 && !over && fits(t).length > 0);
+        if (i === pick) b.classList.add('sel');
+        b.addEventListener('click', () => choose(i));
+        hand.append(b);
+      });
+      const canPlay = hands[0].some((t) => fits(t).length);
+      const draw = box.querySelector<HTMLButtonElement>('[data-draw]')!;
+      draw.hidden = mode === 4;
+      draw.disabled = turn !== 0 || over || canPlay || !pile.length;
+      box.querySelector<HTMLButtonElement>('[data-pass]')!.disabled = turn !== 0 || over || canPlay || pile.length > 0;
+      $('[data-ends]').hidden = pick < 0;
+      $('[data-team0]').firstChild!.textContent = mode === 4 ? 'Nosotros: ' : 'Tú: ';
+      $('[data-team1]').firstChild!.textContent = mode === 4 ? 'Ellos: ' : 'Computadora: ';
+      $('[data-score0]').textContent = String(score[0]); $('[data-score1]').textContent = String(score[1]);
+      $('[data-help]').textContent = mode === 4
+        ? 'Juegas en pareja con tu Compañero (enfrente). Juega una ficha con el mismo número que una punta de la mesa; si no tienes jugada, pasa.'
+        : 'Juega una ficha con el mismo número que una punta de la mesa. Si no tienes jugada, roba del montón; si se acaba, pasa.';
+    }
+
+    function next() {
+      if (over) return;
+      turn = (turn + 1) % mode;
+      render();
+      if (turn !== 0) later(850);
+      else if (!hands[0].some((t) => fits(t).length) && !pile.length) say(`${$('[data-msg]').textContent} No tienes jugada: pasa.`);
+    }
+    function played(p: number) {
+      passes = 0;
+      if (!hands[p].length) return endRound(p);
+      next();
+    }
+    function passed(p: number) {
+      passes++;
+      if (passes >= mode) return endRound(null); // nobody can play: tranque
+      next();
+    }
+
+    function choose(i: number) {
+      const opts = fits(hands[0][i]);
+      if (opts.length === 2 && ends()[0] !== ends()[1]) { pick = i; say('¿De qué lado la pones?'); render(); return; }
+      playMine(i, opts[0]);
+    }
+    function playMine(i: number, side: string) {
+      const t = hands[0][i];
+      place(t, side); hands[0].splice(i, 1); pick = -1;
+      say(`Jugaste el ${t[0]}-${t[1]}.`);
+      played(0);
+    }
+    function botTurn() {
+      if (over || turn === 0) return;
+      const p = turn, h = hands[p];
+      let opts = h.map((t, i) => ({ t, i, sides: fits(t) })).filter((x) => x.sides.length);
+      while (!opts.length && pile.length) { h.push(pile.pop()!); opts = h.map((t, i) => ({ t, i, sides: fits(t) })).filter((x) => x.sides.length); }
+      if (!opts.length) { say(`${name(p)} pasa.`); return passed(p); }
+      // Heaviest tile first (gets rid of points), doubles first when tied
+      opts.sort((a, b) => (b.t[0] + b.t[1]) - (a.t[0] + a.t[1]) || Number(b.t[0] === b.t[1]) - Number(a.t[0] === a.t[1]));
+      const { t, i, sides } = opts[0];
+      place(t, sides[0]); h.splice(i, 1);
+      say(`${name(p)} jugó el ${t[0]}-${t[1]}.`);
+      played(p);
+    }
+
+    function endRound(winner: number | null) {
+      over = true;
+      const teamPips = [0, 1].map((tm) => hands.reduce((s, h, p) => s + (team(p) === tm ? pips(h) : 0), 0));
+      let wTeam: number;
+      let why: string;
+      if (winner !== null) { wTeam = team(winner); why = winner === 0 ? '¡Dominaste!' : `¡${name(winner)} dominó!`; }
+      else if (teamPips[0] === teamPips[1]) { why = '¡Tranque! Empate en puntos: nadie anota.'; render(); return showNext(false); }
+      else { wTeam = teamPips[0] < teamPips[1] ? 0 : 1; why = `¡Tranque! Gana ${mode === 4 ? (wTeam === 0 ? 'nuestra pareja' : 'la otra pareja') : wTeam === 0 ? 'quien tiene menos puntos: tú' : 'la computadora, con menos puntos'}.`; }
+      const pts = teamPips[1 - wTeam!];
+      score[wTeam!] += pts;
+      const matchOver = score[wTeam!] >= 100;
+      const ours = wTeam! === 0;
+      say(`${why} ${ours ? (mode === 4 ? 'Nosotros' : 'Tú') : (mode === 4 ? 'Ellos' : 'La computadora')} +${pts} puntos.${matchOver ? (ours ? ' ¡Ganamos la partida! 🎉' : ' Perdimos la partida.') : ''}`);
+      if (matchOver && ours) award('domino', 60, 'Partida de dominó ganada');
+      if (matchOver && ours) { try { localStorage.setItem('nc-domino-wins', String(Number(localStorage.getItem('nc-domino-wins') || 0) + 1)); } catch { /* storage blocked */ } }
+      render();
+      showNext(matchOver);
+    }
+    function showNext(matchOver: boolean) {
+      const btn = $('[data-next]'); btn.hidden = false; btn.textContent = matchOver ? 'Nueva partida' : 'Siguiente mano';
+      btn.onclick = () => { if (matchOver) score = [0, 0]; deal(); };
+    }
+
+    box.querySelectorAll<HTMLButtonElement>('[data-end]').forEach((b) => b.addEventListener('click', () => { if (pick >= 0) playMine(pick, b.dataset.end!); }));
+    $('[data-draw]').addEventListener('click', () => { if (pile.length) { hands[0].push(pile.pop()!); say(hands[0].some((t) => fits(t).length) ? 'Ahora sí tienes jugada.' : 'Sigue robando.'); render(); } });
+    $('[data-pass]').addEventListener('click', () => { say('Pasaste.'); passed(0); });
+    box.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.mode) === mode));
+      b.addEventListener('click', () => {
+        mode = Number(b.dataset.mode) as 2 | 4;
+        try { localStorage.setItem('nc-domino-mode', String(mode)); } catch { /* storage blocked */ }
+        box.querySelectorAll('[data-mode]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        score = [0, 0]; over = true; deal();
+      });
+    });
+    deal();
+  </script>
+</Base>

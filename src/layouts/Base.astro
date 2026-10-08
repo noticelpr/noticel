@@ -1,97 +1,619 @@
 ---
 import '../styles/global.css';
-import { SITE, MENU, CATEGORIES, CATEGORY_INFO, url, categoryUrl, longDate, type Story } from '../lib/site';
-// `current`: the menu button to highlight (a category slug; its top-level menu entry lights up)
-// `staff`: staff panel pages (compact header: no section menu, breaking bar or footer). `noindex`: keep out of search engines.
-interface Props { title?: string; description?: string; breaking?: Story | null; current?: string; image?: string; article?: { published: Date; section?: string }; staff?: boolean; noindex?: boolean }
-const { title, description = SITE.description, breaking = null, current, image, article, staff = false, noindex = false } = Astro.props;
-const active = current ? (CATEGORY_INFO[current]?.path.split('/')[0] ?? current) : undefined;
-const pageTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
-const today = longDate(new Date());
+import { SITE, SECTIONS, url, sectionUrl } from '../lib/site';
+import { getBreaking } from '../lib/breaking';
+import AdSlot from '../components/AdSlot.astro';
+import Logo from '../components/Logo.astro';
+import AuthDialog from '../components/AuthDialog.astro';
+import { holidayOn, todayPR } from '../lib/holidays';
+
+interface Props {
+  title?: string;
+  description?: string;
+  active?: string; // nav item to highlight: 'home', a section id, or 'videos'
+  image?: string;
+  article?: { published: Date; section: string };
+  noindex?: boolean; // internal pages: ask search engines not to list them
+  staff?: boolean; // staff panel pages: compact header, no section menu, news bar, ads or big footer
+}
+const { title, description = SITE.description, active, image, article, noindex: noindexProp, staff = false } = Astro.props;
+// The test copy is never indexed (SITE.testSite), so Google doesn't see a second copy of NotiCel's stories
+const noindex = noindexProp || SITE.testSite;
+const fullTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+// Local images ('images/x.jpg') need the base path; full URLs are used as-is
+const ogImage = new URL(image ? (image.startsWith('http') ? image : url(image)) : url('icon-512.png'), Astro.site).toString();
+const F = SITE.features;
+// Deportes and Entretenimiento pages skip the red bar, except for a real ÚLTIMA HORA alert
+const quietBar = active === 'deportes' || active === 'entretenimiento';
+const bar = await getBreaking();
+const breaking = quietBar && bar?.label !== 'ÚLTIMA HORA' ? null : bar;
+const today = new Date().toLocaleDateString('es-PR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+const todayCap = today.charAt(0).toUpperCase() + today.slice(1);
+// Holiday logo: automatic by date, never during an ÚLTIMA HORA alert (a festive logo next to bad news looks wrong)
+const holiday = F.holidayLogo && bar?.label !== 'ÚLTIMA HORA' ? holidayOn(todayPR()) : undefined;
+// Phones: bottom tab bar, like a news app (icons are 24px stroke paths)
+const here = Astro.url.pathname;
+const TABS = [
+  { label: 'Portada', href: url(), on: active === 'home', icon: 'M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10' },
+  { label: 'Deportes', href: sectionUrl('deportes'), on: active === 'deportes', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7l3.5 2.5-1.3 4h-4.4l-1.3-4zM12 3v4M20.5 9.5l-5 0M3.5 9.5h5M10 13.5l-3 5M14 13.5l3 5' },
+  ...(F.live ? [{ label: 'En vivo', href: url('en-vivo'), on: active === 'en-vivo', icon: 'M3 7h18v12H3zM8 3l4 4 4-4M10 10.5v5l4-2.5z' }] : []),
+  { label: 'Juegos', href: url('juegos'), on: here.includes('/juegos'), icon: 'M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6l-.6-.6H9.6l-.6.6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M16 11.5h.01M18 13.5h.01' },
+  { label: 'Guardadas', href: url('guardadas'), on: here.includes('/guardadas'), icon: 'M6 3h12v18l-6-4-6 4z' },
+];
 ---
 <!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#000000" />
-  <title>{pageTitle}</title>
-  <meta name="description" content={description} />
-  {(noindex || SITE.testSite) && <meta name="robots" content="noindex, nofollow" />}
-  <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
-  <link rel="icon" href={url('logo.png')} />
-  <meta property="og:site_name" content={SITE.name} />
-  <meta property="og:title" content={title ?? pageTitle} />
-  <meta property="og:description" content={description} />
-  <meta property="og:type" content={article ? 'article' : 'website'} />
-  <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />
-  {image && <meta property="og:image" content={image} />}
-  <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
-  {article && <meta property="article:published_time" content={article.published.toISOString()} />}
-  {article?.section && <meta property="article:section" content={article.section} />}
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Merriweather:wght@400;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet" />
-</head>
-<body data-base={url()} class:list={{ staff }}>
-  <a class="skip" href="#main">Saltar al contenido</a>
-
-  <div class="topbar"><div class="wrap">
-    <span>{today.charAt(0).toUpperCase() + today.slice(1)}</span>
-    <div class="r">{staff ? <a href={url()}>Ver el sitio ↗</a> : <a href={url('en')} lang="en">English</a>}</div>
-  </div></div>
-
-  <header class="mast"><div class="wrap">
-    <div class="l">{staff ? <b>Panel de la redacción</b> : <><b>{SITE.tagline}</b>{SITE.subtitle}</>}</div>
-    <a href={url()} aria-label={SITE.name}><img class="logo-img" src={url('logo.png')} alt="NotiCel. La verdad como es" width="210" height="88" /></a>
-    {staff ? <div class="rt"></div> : <div class="rt">
-      <button class="icon-btn" id="searchToggle" aria-label="Buscar" aria-expanded="false" aria-controls="searchbar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button>
-      <a href={categoryUrl('ultima-hora')} class="live-btn"><span class="dot"></span>Última Hora</a>
-    </div>}
-  </div>
-  <div class="searchbar" id="searchbar"><div class="wrap">
-    <form role="search" action={url('buscar')}><label class="sr" for="q">Buscar</label><input id="q" name="q" type="search" placeholder="Buscar en NotiCel" /><button class="btn" type="submit">Buscar</button></form>
-  </div></div>
-  </header>
-
-  {!staff && <nav class="nav" aria-label="Secciones" data-nav><div class="wrap">
-    {/* Small logo that slides in on the left once the big header scrolls away (same as Noticias Xtra) */}
-    <a href={url()} class="nav-logo" tabindex="-1" aria-hidden="true"><img src={url('logo.png')} alt="" width="72" height="30" /></a>
-    {MENU.map((slug) => <a href={categoryUrl(slug)} aria-current={active === slug ? 'page' : undefined}>{CATEGORIES[slug]}</a>)}
-  </div></nav>}
-
-  {breaking && !staff && (
-    <div class="breaking"><div class="wrap"><b>ÚLTIMA HORA</b><a href={url(breaking.data.path)}>{breaking.data.title}</a></div></div>
-  )}
-
-  <slot />
-
-  <footer hidden={staff}>
-    <div class="wrap">
-      <div>
-        <a href={url()} aria-label={SITE.name}><img class="logo-img logo-sm" src={url('logo.png')} alt="NotiCel" width="105" height="44" /></a>
-        <p>{SITE.description}</p>
+<html lang="es" data-theme={active === 'deportes' ? 'dark' : undefined} data-force-dark={active === 'deportes' ? '' : undefined}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" type="image/png" href={url('favicon.png')} />
+    <link rel="apple-touch-icon" href={url('apple-touch-icon.png')} />
+    <link rel="manifest" href={url('manifest.webmanifest')} />
+    {SITE.gaId && !staff && (
+      <script is:inline define:vars={{ gaId: SITE.gaId }}>
+        // Google Analytics: only on the real site, never on local copies or the staff panel
+        if (/(^|\.)noticel\.com$/.test(location.hostname)) {
+          window.dataLayer = window.dataLayer || [];
+          window.gtag = function () { dataLayer.push(arguments); };
+          gtag('js', new Date());
+          gtag('config', gaId);
+          const s = document.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + gaId; document.head.appendChild(s);
+        }
+      </script>
+    )}
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={title ?? SITE.name} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
+    <meta property="og:locale" content="es_PR" />
+    {article && <meta property="article:published_time" content={article.published.toISOString()} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Merriweather:wght@400;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet" />
+    <script is:inline>
+      // Theme before the page paints (no white flash). Automatic by Puerto Rico time: dark from 7 p.m. to 6 a.m.,
+      // light during the day. A reader's switch in the profile menu lasts until the next automatic change.
+      // Sports pages are always dark (data-force-dark).
+      (function () {
+        var h = (new Date().getUTCHours() + 20) % 24; // Puerto Rico is UTC-4 all year
+        var auto = h >= 19 || h < 6 ? 'dark' : 'light';
+        var t = null;
+        try { var m = JSON.parse(localStorage.getItem('nc-theme-manual') || 'null'); if (m && Date.now() < m.until) t = m.theme; localStorage.removeItem('nc-theme'); } catch (e) {}
+        if (!document.documentElement.hasAttribute('data-force-dark')) document.documentElement.dataset.theme = t || auto;
+      })();
+      // Reader's text size for stories (set on the story page), applied before paint
+      try { var f = [0.9, 1, 1.12, 1.25, 1.4][JSON.parse(localStorage.getItem('nc-font') || '1')]; if (f) document.documentElement.style.setProperty('--read-scale', f); } catch (e) {}
+    </script>
+  </head>
+  <body data-base={url()} class:list={{ staff }}>
+    {SITE.demoMode && <div class="demo">Sitio de demostración. Las noticias que aparecen son ejemplos.</div>}
+    <div class="demo demo-guest" data-demo-bar hidden>Modo demostración: los anuncios, los comentarios y los números del panel marcados <b>EJEMPLO</b> o <b>DEMO</b> son de muestra. Las noticias son reales.</div>
+    <script>
+      import { isDemo } from '../lib/demo';
+      if (isDemo()) {
+        document.querySelector<HTMLElement>('[data-demo-bar]')!.hidden = false; document.documentElement.dataset.demo = '1';
+        // Guests see the new NotiCel being built, not the current noticel.com
+        document.querySelectorAll<HTMLAnchorElement>('a[data-noticel-preview]').forEach((a) => (a.href = a.dataset.noticelPreview!));
+      }
+    </script>
+    <header class="masthead">
+      <div class="wrap">
+        <Logo holiday={holiday} />
+        {/* Today's date beside the logo (wide screens; phones see it in the profile menu) */}
+        {staff ? <a class="mh-staff" href={url('redaccion')}>Panel de la redacción</a> : <time class="mh-date" datetime={new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' })}>{todayCap}</time>}
+        <form class="search" role="search" action={url('buscar')} method="get" hidden={staff}>
+          <label for="q" class="sr">Buscar noticias</label>
+          <input id="q" name="q" type="search" placeholder="Buscar noticias" />
+          <button type="submit" aria-label="Buscar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
+          </button>
+        </form>
+        <div class="mh-right">
+          {/* Live button, then two icons: search (phones) and the profile menu with every reader setting */}
+ {staff && <a class="mh-site" href={url()}>Ver el sitio ↗</a>}
+          {F.live && !staff && <a href={url('en-vivo')} class="live-btn" aria-current={active === 'en-vivo' ? 'page' : undefined}><span class="dot" aria-hidden="true"></span>En vivo</a>}
+          <div class="mh-icons">
+            <a href={url('buscar')} class="mh-ico search-btn" aria-label="Buscar noticias">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
+            </a>
+            <div class="pf-wrap">
+              <button type="button" class="mh-ico pf-btn" data-pf-btn data-pf-toggle aria-haspopup="true" aria-expanded="false" aria-controls="pf-menu" aria-label="Mi cuenta y ajustes" title="Mi cuenta y ajustes">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+              </button>
+              <span class="pf-dot" data-nf-dot hidden></span>
+              <div class="pf-menu" id="pf-menu" data-pf-menu hidden>
+                <div class="pf-menu-h">
+                  <span class="pf-menu-av" data-pf-av aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></span>
+                  <span><b data-pf-name>Mi cuenta</b><small>{todayCap}</small></span>
+                </div>
+                {/* Reader accounts (src/lib/account.ts): shown only once Supabase is connected */}
+                <button type="button" class="pf-menu-i pf-auth-in" data-auth-open hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" /></svg>Entrar o crear cuenta
+                </button>
+                <button type="button" class="pf-menu-i" data-nf-toggle aria-expanded="false" aria-controls="nf-panel">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z" /><path d="M10 21h4" /></svg>Notificaciones
+                  <span class="pf-badge red" data-nf-count hidden></span>
+                </button>
+                <div class="nf-panel" id="nf-panel" data-nf-panel data-story-url={sectionUrl('noticias')} data-game-url={url('juegos/domino')} hidden>
+                  <ul class="nf-list" data-nf-list></ul>
+                  <div class="nf-foot"><button type="button" data-nf-readall>Marcar como leídas</button><a href={`${url('perfil')}#notificaciones`}>Ver todas ›</a></div>
+                </div>
+                {/* Staff only: shown once someone has logged into the staff panel on this device */}
+                <a class="pf-menu-i pf-staff" href={url('redaccion')} data-staff-link hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 14h3M8 17h6" /></svg>Panel de la redacción
+                  <span class="pf-badge red" data-staff-count hidden></span>
+                </a>
+                <a class="pf-menu-i" href={url('perfil')}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>Mi perfil
+                </a>
+                <a class="pf-menu-i" href={url('guardadas')}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>Noticias guardadas
+                  <span class="pf-badge" data-saved-count hidden></span>
+                </a>
+                <button type="button" class="pf-menu-i notranslate" translate="no" data-translate aria-label="Read this page in English">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h10M8 3v2M5.5 5c.6 3.6 3 6.6 6.5 8.3M10.5 5c-.8 4-3.4 7.2-7.5 9"/><path d="M13 21l4.2-10L21.4 21M14.6 17.5h5.2"/></svg>
+                  <span data-lang-label>English</span>
+                  <span class="lang-tag" data-lang-tag>EN</span>
+                </button>
+                <button type="button" class="pf-menu-i" data-theme-toggle aria-pressed="false">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>Modo oscuro
+                  <span class="pf-switch" aria-hidden="true"></span>
+                </button>
+                <a class="pf-menu-i" href={url('contacto')}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z" /><path d="M12 7v4M12 13.5h.01" /></svg>Envía tu denuncia
+                </a>
+                <hr />
+                <a class="pf-menu-i" href={url('publicidad/panel')}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>Panel de anunciante
+                </a>
+                <a class="pf-menu-i" href={url('publicidad')}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11v2l13 5V6L3 11z" /><path d="M16 9a3 3 0 0 1 0 6" /></svg>Anúnciate
+                </a>
+                <button type="button" class="pf-menu-i" data-auth-out hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>Salir de mi cuenta
+                </button>
+              </div>
+            </div>
+          </div>
+          {!staff && <a class="mh-ad-btn" href={url('publicidad')}>Anúnciate</a>}
+        </div>
       </div>
-      <div><h4>Secciones</h4><ul>{MENU.map((slug) => <li><a href={categoryUrl(slug)}>{CATEGORIES[slug]}</a></li>)}</ul></div>
-      <div><h4>NotiCel</h4><ul><li><a href={url('quienes-somos')}>Quiénes somos</a></li><li><a href={url('contacto')}>Contacto</a></li><li><a href={url('privacidad')}>Privacidad</a></li></ul></div>
-      <div><h4>Idioma</h4><ul><li><a href={url()}>Español</a></li><li><a href={url('en')} lang="en">English</a></li></ul></div>
-    </div>
-    <div class="legal"><div class="wrap">© {new Date().getFullYear()} {SITE.name}</div></div>
-  </footer>
+    </header>
 
-  <script>
-    // The section menu stays on top while scrolling; once the big header is out of sight, the small logo shows
-    const navBar = document.querySelector<HTMLElement>('[data-nav]');
-    const mast = document.querySelector<HTMLElement>('.mast');
-    if (navBar && mast) new IntersectionObserver(([e]) => navBar.classList.toggle('stuck', !e.isIntersecting)).observe(mast);
+    {!staff && <nav class="nav" aria-label="Secciones">
+      <div class="wrap">
+        <a href={url()} class="nav-logo" tabindex="-1" aria-hidden="true"><img src={url('logo.png')} alt="" width="72" height="30" /></a>
+        <div class="nav-links">
+          <a class="nav-ad" href={url('publicidad')}>Anúnciate</a>
+          <a href={url()} aria-current={active === 'home' ? 'page' : undefined}>Portada</a>
+          {SECTIONS.map((s) => (
+            <a href={sectionUrl(s.id)} aria-current={active === s.id ? 'page' : undefined}>{s.name}</a>
+          ))}
+        </div>
+      </div>
+    </nav>}
+    <script is:inline>
+      // Phones: the section menu scrolls sideways. Keep it where the reader left it when they open another section,
+      // and make sure the current section is in view (runs right away so the menu doesn't jump).
+      (function () {
+        // Pinned header height, for everything that sticks under it (section menu, panel side menu and tabs)
+        var head = document.querySelector('.masthead');
+        var setMh = function () { if (head) document.documentElement.style.setProperty('--mh-h', head.offsetHeight + 'px'); };
+        setMh(); addEventListener('resize', setMh);
+        var bar = document.querySelector('.nav .wrap');
+        if (!bar) return;
+        try { var x = sessionStorage.getItem('nc-nav-x'); if (x) bar.scrollLeft = +x; } catch (e) { /* storage blocked */ }
+        var cur = bar.querySelector('[aria-current="page"]');
+        if (cur) {
+          var b = bar.getBoundingClientRect(), r = cur.getBoundingClientRect();
+          if (r.left < b.left || r.right > b.right) bar.scrollLeft += r.left - b.left - (b.width - r.width) / 2;
+        }
+        bar.addEventListener('click', function () { try { sessionStorage.setItem('nc-nav-x', String(bar.scrollLeft)); } catch (e) { /* storage blocked */ } });
+        // Phones lock the logo bar on top; the menu sits right under it
+        var mast = document.querySelector('.masthead');
+        var setH = function () { if (mast) document.documentElement.style.setProperty('--mh-h', mast.offsetHeight + 'px'); };
+        setH(); addEventListener('resize', setH);
+      })();
+    </script>
 
-    const btn = document.getElementById('searchToggle');
-    const bar = document.getElementById('searchbar');
-    btn?.addEventListener('click', () => {
-      const open = bar?.classList.toggle('open');
-      btn.setAttribute('aria-expanded', String(!!open));
-      if (open) (document.getElementById('q') as HTMLInputElement | null)?.focus();
-    });
-  </script>
-</body>
+    {breaking && !staff && (
+      <div class="breaking">
+        <div class="wrap"><b>{breaking.label}</b><a href={breaking.href}>{breaking.text}</a></div>
+      </div>
+    )}
+    {/* Top banner (Valla digital / Banner exclusivo): appears only when an ad fills it */}
+    {!staff && <div class="wrap"><AdSlot size="leaderboard" class="ad-top" quiet /></div>}
+
+    <slot />
+
+    {!staff && <div class="wrap"><AdSlot size="leaderboard" class="ad-bottom" /></div>}
+    <footer hidden={staff}>
+      <div class="wrap">
+        <div>
+          <a href={url()} class="flogo" aria-label={SITE.name}><img src={url('logo.png')} alt="" /></a>
+          <p>{SITE.tagline}. Noticias de Puerto Rico, Estados Unidos y el mundo.</p>
+        </div>
+        <div class="f-secs"><h4>Secciones</h4><ul>{SECTIONS.map((s) => <li><a href={sectionUrl(s.id)}>{s.name}</a></li>)}</ul></div>
+        <div>
+          <h4>{SITE.name}</h4>
+          <ul>
+            <li><a href={url('quienes-somos')}>Quiénes somos</a></li>
+            <li><a href={url('normas-editoriales')}>Normas editoriales y correcciones</a></li>
+            <li><a href={url('contacto')}>Envía tu denuncia</a></li>
+            <li><a href={url('publicidad')}>Anúnciate con nosotros</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Más</h4>
+          <ul>
+            {F.live && <li><a href={url('en-vivo')}>En vivo</a></li>}
+            {F.videos && <li><a href={url('videos')}>Videos</a></li>}
+            <li><a href={url('juegos')}>Juegos NotiCel</a></li>
+            <li><a href={url('foro')}>Foro NotiCel</a></li>
+            <li><a href={url('horoscopo')}>Horóscopo</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="legal"><div class="wrap"><span>© {new Date().getFullYear()} {SITE.name}.{SITE.demoMode && ' Sitio de demostración con contenido de ejemplo.'}</span><span class="legal-links"><a href={url('privacidad')}>Privacidad</a><a href={url('terminos')}>Términos de uso</a><a href={url('terminos-anunciantes')}>Términos para anunciantes</a><a href={url('redaccion')}>Acceso de la redacción</a></span></div></div>
+    </footer>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    {!staff && <AuthDialog />}
+
+    {!staff && (
+      <nav class="tabbar" aria-label="Accesos rápidos">
+        {TABS.map((t) => (
+          <a href={t.href} aria-current={t.on ? 'page' : undefined}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={t.icon} /></svg>
+            <span>{t.label}</span>
+          </a>
+        ))}
+      </nav>
+    )}
+    <script is:inline>
+      // Autoplaying YouTube players (iframe data-src) load only when the reader gets near them, so they don't slow down the page
+      (function () {
+        var frames = document.querySelectorAll('iframe[data-src]');
+        var load = function (f) { if (f.dataset.src) { f.src = f.dataset.src; f.removeAttribute('data-src'); } };
+        if (!('IntersectionObserver' in window)) { frames.forEach(load); return; }
+        var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { load(e.target); io.unobserve(e.target); } }); }, { rootMargin: '0px 0px 300px 0px' });
+        frames.forEach(function (f) { io.observe(f); });
+      })();
+    </script>
+    <script is:inline>
+      // Phones: the logo bar slides away while reading down and comes back on any scroll up (like a news app)
+      (function () {
+        if (document.body.classList.contains('staff')) return;
+        var root = document.documentElement, mast = document.querySelector('.masthead'), last = scrollY, phone = matchMedia('(max-width:760px)');
+        // Only scrolling done by the reader (finger, wheel, keys) moves the bars, never scrolling done by a script
+        var touched = 0, mark = function () { touched = Date.now(); };
+        ['touchmove', 'wheel', 'keydown'].forEach(function (t) { addEventListener(t, mark, { passive: true }); });
+        addEventListener('scroll', function () {
+          var y = scrollY, d = y - last;
+          if (Math.abs(d) < 8) return;
+          if (Date.now() - touched > 1200) { last = y; return; }
+          // Keep it on screen at the top, or while something in it is open (search, profile menu)
+          var busy = mast && (mast.contains(document.activeElement) && document.activeElement !== document.body || mast.querySelector('[aria-expanded="true"]'));
+          root.classList.toggle('bars-up', phone.matches && d > 0 && y > 160 && !busy);
+          last = y;
+        }, { passive: true });
+      })();
+    </script>
+
+    <script>
+      import { seedExamples, unreadCount, getNotifs, markRead, syncNotifs, type Notif } from '../lib/notifications';
+      import { accountsOn, loggedIn, signOut, askLogin } from '../lib/account';
+      import { startSavedSync } from '../lib/saved-sync';
+      startSavedSync(); // saved stories follow the reader's account to any device
+      import { startPointsSync } from '../lib/points-sync';
+      startPointsSync(); // Juegos NotiCel points follow the reader's account (real leaderboards)
+      import { renderNotifs, sentence } from '../lib/notif-view';
+      // Profile menu: every reader setting in one place, opens over the page (Escape or a tap outside closes it)
+      const pfBtn = document.querySelector<HTMLButtonElement>('[data-pf-toggle]');
+      const pfMenu = document.querySelector<HTMLElement>('[data-pf-menu]');
+      if (pfBtn && pfMenu) {
+        const setOpen = (open: boolean) => { pfMenu.hidden = !open; pfBtn.setAttribute('aria-expanded', String(open)); };
+        pfBtn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(pfMenu.hidden); if (!pfMenu.hidden) pfMenu.querySelector<HTMLElement>('a,button')?.focus({ preventScroll: true }); });
+        document.addEventListener('click', (e) => { if (!pfMenu.hidden && !pfMenu.contains(e.target as Node)) setOpen(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pfMenu.hidden) { setOpen(false); pfBtn.focus(); } });
+      }
+
+      // Dark mode switch (remembered in this browser)
+      const themeBtn = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
+      // Sports pages are always dark, so the switch is hidden there
+      if (themeBtn && document.documentElement.hasAttribute('data-force-dark')) themeBtn.hidden = true;
+      else if (themeBtn) {
+        const sync = () => {
+          const dark = document.documentElement.dataset.theme === 'dark';
+          themeBtn.setAttribute('aria-pressed', String(dark));
+        };
+        sync();
+        // Next automatic change: 6 a.m. or 7 p.m. Puerto Rico time (UTC-4)
+        const nextSwitch = () => {
+          const pr = new Date(Date.now() - 4 * 36e5); const h = pr.getUTCHours();
+          const at = h < 6 ? 6 : h < 19 ? 19 : 30; // 30 = tomorrow 6 a.m.
+          return Date.UTC(pr.getUTCFullYear(), pr.getUTCMonth(), pr.getUTCDate(), at + 4);
+        };
+        const autoTheme = () => { const h = (new Date().getUTCHours() + 20) % 24; return h >= 19 || h < 6 ? 'dark' : 'light'; };
+        themeBtn.addEventListener('click', () => {
+          const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem('nc-theme-manual', JSON.stringify({ theme: next, until: nextSwitch() })); } catch { /* storage blocked */ }
+          sync();
+        });
+        // Switch by itself at 6 a.m. / 7 p.m. while the page is open (unless the reader chose otherwise)
+        setInterval(() => {
+          let manual = false;
+          try { const m = JSON.parse(localStorage.getItem('nc-theme-manual') || 'null'); manual = !!m && Date.now() < m.until; } catch { /* storage blocked */ }
+          if (!manual && document.documentElement.dataset.theme !== autoTheme()) { document.documentElement.dataset.theme = autoTheme(); sync(); }
+        }, 60000);
+      }
+
+      // English: the page is translated in place by Google's translation tool, with Google's bar and pop-ups hidden.
+      // The tool loads only after a reader taps EN; the choice is remembered (localStorage 'nc-lang' and Google's
+      // 'googtrans' cookie), so every page they open stays in English until they tap ES.
+      // Readers who arrive on Google's translated copy (*.translate.goog) get an ES button back to the original.
+      const langBtns = document.querySelectorAll<HTMLElement>('[data-translate]');
+      const setTag = (t: string, label: string) => langBtns.forEach((a) => {
+        const tag = a.querySelector('[data-lang-tag]'); if (tag) tag.textContent = t;
+        const lbl = a.querySelector('[data-lang-label]'); if (lbl) lbl.textContent = t === 'EN' ? 'English' : 'Español';
+        a.setAttribute('aria-label', label); a.title = label;
+      });
+      const setCookie = (v: string | null) => {
+        const base = v ? `googtrans=${v}; path=/` : 'googtrans=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = base;
+        if (location.hostname.includes('.')) document.cookie = `${base}; domain=${location.hostname}`;
+      };
+      const getLang = () => { try { return localStorage.getItem('nc-lang'); } catch { return null; } };
+      const putLang = (v: string | null) => { try { v ? localStorage.setItem('nc-lang', v) : localStorage.removeItem('nc-lang'); } catch { /* storage blocked */ } };
+      let gtLoaded = false;
+      function loadTranslator() {
+        if (gtLoaded) return; gtLoaded = true;
+        document.documentElement.classList.add('nc-en');
+        const el = document.createElement('div'); el.id = 'gt-el'; el.hidden = true; document.body.append(el);
+        (window as any).nxGT = () => {
+          const g = (window as any).google;
+          new g.translate.TranslateElement({ pageLanguage: 'es', includedLanguages: 'en', autoDisplay: false }, 'gt-el');
+          // Pick English in Google's hidden menu (it may already show English but still needs the change event to start)
+          const pick = (n = 0) => {
+            const sel = document.querySelector<HTMLSelectElement>('.goog-te-combo');
+            if (sel && sel.options.length > 1) { sel.value = 'en'; sel.dispatchEvent(new Event('change')); }
+            else if (n < 40) setTimeout(() => pick(n + 1), 150);
+          };
+          pick();
+        };
+        const sc = document.createElement('script');
+        sc.src = 'https://translate.google.com/translate_a/element.js?cb=nxGT';
+        sc.onerror = () => { gtLoaded = false; document.documentElement.classList.remove('nc-en'); putLang(null); setCookie(null); setTag('EN', 'Read this page in English'); toast('No se pudo cargar la traducción. Intenta otra vez.'); };
+        document.body.append(sc);
+      }
+      if (location.hostname.endsWith('.translate.goog')) {
+        const orig = location.hostname.replace(/\.translate\.goog$/, '').replace(/--/g, '\u0000').replace(/-/g, '.').replace(/\u0000/g, '-');
+        const q = new URLSearchParams(location.search); [...q.keys()].filter((k) => k.startsWith('_x_tr_')).forEach((k) => q.delete(k));
+        const back = `https://${orig}${location.pathname}${q.toString() ? `?${q}` : ''}`;
+        langBtns.forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); location.href = back; }));
+        setTag('ES', 'Leer en español');
+      } else {
+        if (getLang() === 'en') { setTag('ES', 'Leer en español'); loadTranslator(); }
+        langBtns.forEach((a) => a.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (getLang() === 'en') { // back to Spanish: forget the choice and show the original page
+            putLang(null); setCookie(null); location.reload();
+          } else {
+            putLang('en'); setCookie('/es/en'); setTag('ES', 'Leer en español'); loadTranslator();
+          }
+        }));
+      }
+
+      // When the masthead scrolls away, the sticky menu shows a small logo beside the sections
+      const mast = document.querySelector('.masthead');
+      const navBar = document.querySelector('.nav');
+      if (mast && navBar && 'IntersectionObserver' in window) {
+        new IntersectionObserver(([e]) => navBar.classList.toggle('stuck', !e.isIntersecting)).observe(mast);
+      }
+
+      // Relative times: "Hace 2 horas"
+      function relTimes() {
+        const now = Date.now();
+        document.querySelectorAll<HTMLTimeElement>('time[data-rel]').forEach((t) => {
+          const h = Math.floor((now - new Date(t.dateTime).getTime()) / 36e5);
+          if (h < 0) return;
+          if (h < 1) t.textContent = 'Hace minutos';
+          else if (h < 24) t.textContent = `Hace ${h} ${h === 1 ? 'hora' : 'horas'}`;
+        });
+      }
+      relTimes();
+
+      const toastEl = document.getElementById('toast')!;
+      let toastTimer: number | undefined;
+      function toast(msg: string) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => toastEl.classList.remove('show'), 2600);
+      }
+
+      document.querySelectorAll<HTMLElement>('[data-app]').forEach((b) =>
+        b.addEventListener('click', (e) => { e.preventDefault(); toast('La app estará disponible próximamente.'); }),
+      );
+      document.querySelectorAll<HTMLElement>('[data-play]').forEach((b) =>
+        b.addEventListener('click', () => toast('Video de demostración. Aquí se reproducirá el contenido real.')),
+      );
+
+      // Share buttons
+      // Profile button: shows the reader's initial once they sign in (demo profile in localStorage 'nc-profile')
+      const showProfile = () => {
+        let p: { name?: string; color?: string; photo?: string } = {};
+        try { p = JSON.parse(localStorage.getItem('nc-profile') || '{}'); } catch { /* storage blocked */ }
+        // With real accounts, only a logged-in reader counts as signed in (not an old preview profile)
+        if (accountsOn() && !loggedIn()) p = { color: p.color };
+        document.querySelectorAll<HTMLElement>('[data-auth-open]').forEach((b) => (b.hidden = !accountsOn() || loggedIn()));
+        document.querySelectorAll<HTMLElement>('[data-auth-out]').forEach((b) => (b.hidden = !accountsOn() || !loggedIn()));
+        document.querySelectorAll<HTMLElement>('[data-pf-btn]').forEach((b) => {
+          b.dataset.icon ??= b.innerHTML;
+          b.classList.toggle('in', !!p.name);
+          b.style.background = p.name ? p.color || '#2B1185' : '';
+          b.style.backgroundImage = p.name && p.photo ? `url("${p.photo}")` : '';
+          b.classList.toggle('has-photo', !!(p.name && p.photo));
+          if (p.name) b.textContent = p.photo ? '' : p.name[0].toUpperCase(); else b.innerHTML = b.dataset.icon;
+          b.title = p.name ? `Mi cuenta: ${p.name}` : 'Mi cuenta y ajustes';
+        });
+        const nm = document.querySelector<HTMLElement>('[data-pf-name]'), av = document.querySelector<HTMLElement>('[data-pf-av]');
+        if (nm) nm.textContent = p.name || 'Mi cuenta';
+        if (av) {
+          av.dataset.icon ??= av.innerHTML; av.style.background = p.name ? p.color || '#2B1185' : ''; av.style.color = p.name ? '#fff' : '';
+          av.style.backgroundImage = p.name && p.photo ? `url("${p.photo}")` : ''; av.classList.toggle('has-photo', !!(p.name && p.photo));
+          if (p.name) av.textContent = p.photo ? '' : p.name[0].toUpperCase(); else av.innerHTML = av.dataset.icon;
+        }
+      };
+      showProfile();
+      addEventListener('nc-profile-change', showProfile);
+      addEventListener('nc-account', () => { showProfile(); void syncNotifs(); });
+      document.querySelectorAll<HTMLElement>('[data-auth-open]').forEach((b) => b.addEventListener('click', () => askLogin()));
+      document.querySelectorAll<HTMLElement>('[data-auth-out]').forEach((b) => b.addEventListener('click', async () => { await signOut(); toast('Saliste de tu cuenta.'); }));
+      addEventListener('nc-toast', (e) => toast(String((e as CustomEvent).detail)));
+      // Saved stories counter in the header (list kept only in this browser, key 'nc-saved')
+      const showSaved = () => {
+        let n = 0;
+        try { n = JSON.parse(localStorage.getItem('nc-saved') || '[]').length; } catch { /* storage blocked */ }
+        document.querySelectorAll<HTMLElement>('[data-saved-count]').forEach((el) => {
+          const grew = n > Number(el.textContent || 0);
+          el.textContent = String(n); el.hidden = !n;
+          if (grew) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); } // a little bounce when a story is saved
+        });
+      };
+      showSaved();
+      addEventListener('nc-saved-change', showSaved);
+      addEventListener('storage', (e) => e.key === 'nc-saved' && showSaved());
+      // Staff panel link: only for people who logged into /redaccion/ on this device (preview login, 'nc-staff')
+      const showStaff = () => {
+        let staff = false, n = 0;
+        try { staff = !!localStorage.getItem('nc-staff'); n = Number(localStorage.getItem('nc-staff-pending') || 0); } catch { /* storage blocked */ }
+        document.querySelectorAll<HTMLElement>('[data-staff-link]').forEach((a) => (a.hidden = !staff));
+        document.querySelectorAll<HTMLElement>('[data-staff-count]').forEach((b) => { b.textContent = String(n); b.hidden = !staff || !n; });
+      };
+      showStaff();
+      addEventListener('nc-staff-change', showStaff);
+      addEventListener('storage', (e) => (e.key === 'nc-staff' || e.key === 'nc-staff-pending') && showStaff());
+      // Notifications: count on the profile icon, latest five in the profile menu, a toast when a new one arrives
+      const nfPanel = document.querySelector<HTMLElement>('[data-nf-panel]');
+      if (nfPanel) {
+        if (!accountsOn()) seedExamples(nfPanel.dataset.storyUrl!, nfPanel.dataset.gameUrl!); // examples only in preview mode
+        void syncNotifs(); // real notifications from other readers (logged in)
+        const nfBtn = document.querySelector<HTMLButtonElement>('[data-nf-toggle]')!;
+        const showNotifs = () => {
+          const n = unreadCount();
+          document.querySelectorAll<HTMLElement>('[data-nf-dot],[data-nf-count]').forEach((el) => { el.textContent = n > 9 ? '9+' : String(n); el.hidden = !n; });
+          pfBtn?.setAttribute('aria-label', n ? `Mi cuenta y ajustes: ${n} notificaciones nuevas` : 'Mi cuenta y ajustes');
+          nfPanel.querySelector('[data-nf-list]')!.innerHTML = renderNotifs(getNotifs().slice(0, 5)) || '<li class="nf-empty">No tienes notificaciones.</li>';
+        };
+        showNotifs();
+        nfBtn.addEventListener('click', () => { nfPanel.hidden = !nfPanel.hidden; nfBtn.setAttribute('aria-expanded', String(!nfPanel.hidden)); });
+        nfPanel.querySelector('[data-nf-readall]')!.addEventListener('click', () => markRead());
+        nfPanel.addEventListener('click', (e) => { const a = (e.target as HTMLElement).closest<HTMLElement>('[data-nf-id]'); if (a) markRead(a.dataset.nfId); });
+        addEventListener('nc-notifs', (e) => {
+          showNotifs();
+          const n = (e as CustomEvent).detail?.added as Notif | undefined;
+          if (n) toast(`🔔 ${sentence(n)}`);
+        });
+        addEventListener('storage', (e) => e.key === 'nc-notifs' && showNotifs());
+      }
+      document.querySelectorAll<HTMLButtonElement>('[data-share]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const u = encodeURIComponent(location.href);
+          const t = encodeURIComponent(document.title);
+          const kind = b.dataset.share;
+          if (kind === 'copy') {
+            try { await navigator.clipboard.writeText(location.href); toast('Enlace copiado'); }
+            catch { toast('Copia el enlace desde la barra del navegador'); }
+          }
+          if (kind === 'facebook') window.open(`https://www.facebook.com/sharer/sharer.php?u=${u}`, '_blank', 'noopener');
+          if (kind === 'whatsapp') window.open(`https://wa.me/?text=${t}%20${u}`, '_blank', 'noopener');
+          if (kind === 'more') {
+            // Phones (and most browsers): the device's own share menu, so people send it with any app they have
+            const title = document.title.replace(/ \| NotiCel$/, '');
+            if (navigator.share) {
+              try { await navigator.share({ title, text: title, url: location.href }); } catch { /* closed without sharing */ }
+              return;
+            }
+            // Otherwise a small menu with the usual ways to send it
+            // Placed on the byline: the button row scrolls sideways on narrow screens and would cut the menu off
+            const host = b.closest<HTMLElement>('.byline') ?? b.parentElement!;
+            let menu = host.querySelector<HTMLElement>('.share-menu');
+            if (!menu) {
+              menu = document.createElement('div'); menu.className = 'share-menu'; menu.setAttribute('role', 'menu');
+              const tt = encodeURIComponent(title);
+              const opts: Array<[string, string]> = [
+                ['X', `https://x.com/intent/post?text=${tt}&url=${u}`],
+                ['Telegram', `https://t.me/share/url?url=${u}&text=${tt}`],
+                ['LinkedIn', `https://www.linkedin.com/sharing/share-offsite/?url=${u}`],
+                ['Correo', `mailto:?subject=${tt}&body=${tt}%0A%0A${u}`],
+              ];
+              menu.innerHTML = opts.map(([n, h]) => `<a role="menuitem" href="${h}" target="_blank" rel="noopener">${n}</a>`).join('') + '<button type="button" role="menuitem" data-share-copy>Copiar enlace</button>';
+              menu.querySelector('[data-share-copy]')!.addEventListener('click', async () => {
+                try { await navigator.clipboard.writeText(location.href); toast('Enlace copiado'); } catch { toast('Copia el enlace desde la barra del navegador'); }
+                menu!.hidden = true; b.setAttribute('aria-expanded', 'false');
+              });
+              host.append(menu);
+              document.addEventListener('click', (e) => { if (!menu!.hidden && !menu!.contains(e.target as Node) && !b.contains(e.target as Node)) { menu!.hidden = true; b.setAttribute('aria-expanded', 'false'); } });
+              menu.hidden = true;
+            }
+            menu.hidden = !menu.hidden; b.setAttribute('aria-expanded', String(!menu.hidden));
+            if (!menu.hidden) { const r = b.getBoundingClientRect(), h = host.getBoundingClientRect(); menu.style.top = `${r.bottom - h.top + 8}px`; menu.style.right = `${Math.max(0, h.right - r.right)}px`; }
+          }
+        }),
+      );
+
+      // Newsletter (demo only: nothing is sent yet)
+      document.querySelectorAll<HTMLFormElement>('form[data-newsletter]').forEach((f) => {
+        const input = f.querySelector('input')!;
+        const err = f.querySelector<HTMLElement>('.err')!;
+        input.addEventListener('input', () => (err.hidden = true));
+        f.addEventListener('submit', (e) => {
+          e.preventDefault();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value.trim())) {
+            err.textContent = 'Escribe un correo válido, por ejemplo nombre@correo.com.';
+            err.hidden = false;
+            input.focus();
+            return;
+          }
+          f.hidden = true;
+          (f.nextElementSibling as HTMLElement).hidden = false;
+        });
+      });
+
+      // Tip form (validates, then hands the message to the reader's email app)
+      const tip = document.querySelector<HTMLFormElement>('form[data-tip]');
+      if (tip) {
+        const msg = tip.querySelector('textarea')!;
+        const err = tip.querySelector<HTMLElement>('.err')!;
+        const ok = tip.querySelector<HTMLElement>('.ok')!;
+        msg.addEventListener('input', () => (err.hidden = true));
+        tip.addEventListener('submit', (e) => {
+          e.preventDefault();
+          if (msg.value.trim().length < 10) {
+            err.textContent = 'Describe lo que está pasando en al menos una oración.';
+            err.hidden = false;
+            msg.focus();
+            return;
+          }
+          const to = tip.dataset.tip;
+          if (!to) return;
+          const town = tip.querySelector<HTMLInputElement>('#tipTown')!.value.trim();
+          const contact = tip.querySelector<HTMLInputElement>('#tipContact')!.value.trim();
+          const body = [msg.value.trim(), town && `Pueblo: ${town}`, contact && `Contacto: ${contact}`].filter(Boolean).join('\n\n');
+          location.href = `mailto:${to}?subject=${encodeURIComponent('Denuncia para NotiCel')}&body=${encodeURIComponent(body)}`;
+          ok.hidden = false;
+        });
+      }
+    </script>
+  </body>
 </html>

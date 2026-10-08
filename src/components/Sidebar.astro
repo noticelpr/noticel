@@ -1,17 +1,83 @@
 ---
-// Right column on story and category pages: Lo último, an ad space and Lo más leído
-import Latest from './Latest.astro';
+// Right column: optional live video box (section pages, see SECTION_LIVE), Clima and Lotería (home page only), Tendencias (numbered photos), ad, Lo último, newsletter, and a tall ad
+// that stays in view while scrolling so the column never leaves an empty gap.
+import Ph from './Ph.astro';
+import Time from './Time.astro';
+import WeatherBox from './WeatherBox.astro';
+import LotteryBox from './LotteryBox.astro';
 import AdSlot from './AdSlot.astro';
-import { allStories, mostRead, url } from '../lib/site';
-const all = await allStories();
-const top = mostRead(all, 5);
+import DominoBox from './DominoBox.astro';
+import LiveBox from './LiveBox.astro';
+import HomeExtras from './HomeExtras.astro';
+import { getStories, mostRead, url, SITE , storyUrl , sectionUrl } from '../lib/site';
+import { getBreaking } from '../lib/breaking';
+import foro from '../data/foro.json';
+interface Props { newsletter?: boolean; foro?: boolean; extras?: boolean; live?: string }
+const { newsletter = true, foro: showForo = false, extras = false, live } = Astro.props;
+// Small Foro NotiCel teaser (home page): the three most-voted sample topics
+const foroTop = [...foro].sort((a, b) => b.votes - a.votes).slice(0, 3);
+const stories = await getStories();
+// The story matching what Puerto Rico is searching for goes first, then featured and newest
+const trend = await getBreaking();
+const first = trend ? stories.find((s) => s.id === trend.id) : undefined;
+const top = [first, ...mostRead(stories, 6)].filter((s, i, all) => s && all.indexOf(s) === i).slice(0, 5) as typeof stories;
+const isNew = (d: Date) => Date.now() - d.valueOf() < 6 * 36e5; // published in the last 6 hours
+const latest = stories.filter((s) => !top.includes(s)).slice(0, 5);
+const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Puerto_Rico' });
 ---
-<aside>
-  <Latest stories={all.slice(0, 6)} />
-  <AdSlot style="aspect-ratio:auto;height:250px" />
+<aside class="right">
+  {live && <LiveBox source={live} />}
+  {/* Clima and Lotería only on the home page */}
+  {extras && <WeatherBox />}
+  {extras && <LotteryBox />}
   {top.length > 0 && (
-    <div class="box"><h2 class="box-h">Lo más leído</h2>
-      <ol class="mini-list">{top.map((s, i) => <li><b>{i + 1}</b><a href={url(s.data.path)} class="hl">{s.data.title}</a></li>)}</ol>
+    <section class="tr-box">
+      <h2 class="tr-h"><svg width="22" height="22" viewBox="0 0 24 24" fill="#B9A7F5" stroke="var(--purple)" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>Tendencias</h2>
+      <ol class="tr-list">
+        {top.map((s, i) => (
+          <li>
+            <a href={storyUrl(s)}>
+              <span class="tr-pic"><Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} sizes="120px" /><b>{i + 1}</b></span>
+              <span class="tr-text"><span class="tr-title">{s.data.title}</span>{isNew(s.data.date) && <span class="tr-new">Nuevo</span>}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+      <a class="tr-more" href={sectionUrl('noticias')}>Ver más noticias <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></a>
+    </section>
+  )}
+  <AdSlot size="rectangle" />
+  <DominoBox />
+  {latest.length > 0 && (
+    <section class="lu-box">
+      <h2 class="lu-h">Lo último</h2>
+      <ol class="lu-list">
+        {latest.map((s) => (
+          <li><span class="lu-time">{Date.now() - s.data.date.valueOf() < 864e5 ? hhmm(s.data.date) : <Time date={s.data.date} />}</span><a href={storyUrl(s)}>{s.data.title}</a></li>
+        ))}
+      </ol>
+    </section>
+  )}
+  {newsletter && SITE.features.newsletter && (
+    <div class="newsletter">
+      <h3>Boletín Xtra</h3>
+      <p>Las noticias más importantes de Puerto Rico, cada mañana en tu correo.</p>
+      <form data-newsletter novalidate>
+        <label for="nlEmail" class="sr">Correo electrónico</label>
+        <input id="nlEmail" type="email" placeholder="tu@correo.com" autocomplete="email" />
+        <p class="err" hidden></p>
+        <button class="btn" type="submit">Suscribirme</button>
+      </form>
+      <p class="ok" style="color:#fff" hidden>¡Gracias! El Boletín Xtra comenzará muy pronto.</p>
     </div>
   )}
+  {showForo && (
+    <section class="fx-box">
+      <h2 class="fx-h"><span aria-hidden="true">💬</span> Foro NotiCel <span class="sp-demo">DEMO</span></h2>
+      <ul>{foroTop.map((t) => <li><a href={url('foro')}><span class="fx-v">▲ {t.votes}</span>{t.title}</a></li>)}</ul>
+      <a class="fx-go" href={url('foro')}>Únete a la conversación ›</a>
+    </section>
+  )}
+  {extras && <HomeExtras />}
+  <AdSlot size="halfpage" sticky />
 </aside>

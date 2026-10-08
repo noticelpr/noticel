@@ -1,0 +1,64 @@
+---
+// Extra right-column boxes for the home page, so the column stays full while reading down the page:
+// scores, upcoming events, today's horoscope, the latest opinion pieces, and a second ad.
+import AdSlot from './AdSlot.astro';
+import GamesTeaser from './GamesTeaser.astro';
+import TeamLogo from './deportes/TeamLogo.astro';
+import { getStories, url , storyUrl , sectionUrl } from '../lib/site';
+import { scores, gameTime } from '../lib/scores';
+import { league, LEAGUES } from '../lib/leagues';
+import { upcomingEvents, dateTile } from '../lib/events';
+import { SIGNS, horoscope, signOfTheDay } from '../lib/daily';
+const games = scores(undefined, 6);
+const events = upcomingEvents().slice(0, 3);
+const sign = signOfTheDay();
+const signText = horoscope(SIGNS.indexOf(sign));
+const opinion = (await getStories()).filter((s) => s.data.section === 'opiniones').slice(0, 3);
+const bsn = LEAGUES.find((l) => l.id === 'bsn') as { youtube?: string } | undefined;
+const status = (g: (typeof games)[number]) => g.status === 'en-vivo' ? (g.note ?? 'En vivo') : g.status === 'final' ? 'Final' : gameTime(g.date);
+---
+{games.length > 0 && (
+  <section class="hx-box">
+    <div class="hx-h"><h2>Marcadores</h2><a href={sectionUrl('deportes')}>Deportes ›</a></div>
+    <ul class="hx-games">{games.map((g) => (
+      <li><a href={url(g.id ? `deportes/juego/${g.id}` : `deportes/${g.league}`)} class="notranslate" translate="no">
+        <span class="hx-g-lg">{league(g.league)?.name}{g.demo && <i class="sp-demo">DEMO</i>}<em class:list={{ live: g.status === 'en-vivo' }}>{status(g)}</em></span>
+        {[[g.away, g.awayScore], [g.home, g.homeScore]].map(([n, sc]) => (
+          <span class="hx-g-t"><TeamLogo league={g.league} name={n as string} size={18} /><span>{n}</span>{g.status !== 'programado' && <b>{sc}</b>}</span>
+        ))}
+      </a></li>
+    ))}</ul>
+  </section>
+)}
+{events.length > 0 && (
+  <section class="hx-box">
+    <div class="hx-h"><h2>Próximos eventos</h2><a href={(sectionUrl('entretenimiento') + '#eventos')}>Ver todos ›</a></div>
+    <ul class="hx-events">{events.map((e) => { const t = dateTile(e.date); return (
+      <li><a href={sectionUrl('entretenimiento') + '#eventos'}>
+        <span class="hx-date"><small>{t.top}</small><b>{t.big}</b></span>
+        <span><strong>{e.title}</strong><small class="notranslate" translate="no">{e.venue}</small></span>
+      </a></li>
+    ); })}</ul>
+  </section>
+)}
+<a class="hx-box hx-horo" href={url('horoscopo')}>
+  <span class="hx-sign hs-zodiac" aria-hidden="true">{sign.symbol}{'︎'}</span>
+  <span><small>Horóscopo de hoy · {sign.name}</small><b>{signText}</b><em>Ver los 12 signos ›</em></span>
+</a>
+<AdSlot size="rectangle" />
+{opinion.length > 0 && (
+  <section class="hx-box">
+    <div class="hx-h"><h2>Opinión</h2><a href={sectionUrl('opiniones')}>Ver todo ›</a></div>
+    <ul class="hx-list">{opinion.map((s) => <li><a href={storyUrl(s)}><small>{s.data.author}</small>{s.data.title}</a></li>)}</ul>
+  </section>
+)}
+<GamesTeaser compact />
+{bsn?.youtube && (
+  <section class="hx-box lg-video">
+    <div class="hx-h"><h2>Video del BSN</h2><a href={`https://www.youtube.com/channel/${bsn.youtube}`} rel="noopener" target="_blank">Canal ↗</a></div>
+    <div class="lg-video-frame">
+      <iframe data-src={`https://www.youtube-nocookie.com/embed/videoseries?list=UU${bsn.youtube.slice(2)}&autoplay=1&mute=1&rel=0&playsinline=1`} title="Último video del BSN en YouTube" loading="lazy"
+        referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+    </div>
+  </section>
+)}

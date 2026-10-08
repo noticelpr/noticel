@@ -1,0 +1,53 @@
+[
+  {
+    "id": "e1",
+    "cat": "Puerto Rico",
+    "title": "¿Qué harían ustedes para mejorar el servicio de luz?",
+    "body": "Cada mes la factura sube. ¿Qué soluciones prácticas ven para las familias?",
+    "by": "vecino_de_caguas",
+    "votes": 128,
+    "ago": "hace 3 h",
+    "replies": [
+      { "id": "e1-1", "by": "ingeniera_pr", "text": "Placas solares con baterías ayudan mucho, pero hacen falta más incentivos.", "votes": 41, "ago": "hace 2 h" },
+      { "id": "e1-2", "parent": "e1-1", "by": "jibaro_moderno", "text": "Yo las puse el año pasado. La factura bajó casi a la mitad, pero la inversión al principio es fuerte.", "votes": 17, "ago": "hace 2 h" },
+      { "id": "e1-3", "parent": "e1-2", "by": "ingeniera_pr", "text": "Por eso digo lo de los incentivos: con financiamiento a bajo interés lo podrían hacer más familias.", "votes": 9, "ago": "hace 1 h" },
+      { "id": "e1-4", "by": "don_ramon", "text": "Que se mantengan las plantas al día. Mantenimiento primero.", "votes": 22, "ago": "hace 2 h" },
+      { "id": "e1-5", "parent": "e1-4", "by": "la_nena_de_ponce", "text": "De acuerdo. Y que publiquen el plan de mantenimiento para que uno sepa qué esperar.", "votes": 6, "ago": "hace 1 h" }
+    ]
+  },
+  {
+    "id": "e2",
+    "cat": "Deportes",
+    "title": "¿Quién gana La Pro este año?",
+    "body": "Arranca el 4 de noviembre. Yo digo Santurce. ¿Ustedes?",
+    "by": "fanatico_cangrejero",
+    "votes": 96,
+    "ago": "hace 5 h",
+    "replies": [
+      { "id": "e2-1", "by": "criollo_de_corazon", "text": "Caguas, sin duda. 🔥", "votes": 18, "ago": "hace 4 h" },
+      { "id": "e2-2", "parent": "e2-1", "by": "fanatico_cangrejero", "text": "Eso lo veremos en la final. 😄", "votes": 11, "ago": "hace 4 h" }
+    ]
+  },
+  {
+    "id": "e3",
+    "cat": "Educación",
+    "title": "Ideas para que los jóvenes lean más",
+    "body": "En mi casa apagamos el celular una hora cada noche. ¿Qué les funciona a ustedes?",
+    "by": "maestra_retirada",
+    "votes": 74,
+    "ago": "ayer",
+    "replies": [
+      { "id": "e3-1", "by": "papa_lector", "text": "Dejarles escoger el libro. Si les interesa el tema, leen solos.", "votes": 12, "ago": "ayer" }
+    ]
+  },
+  {
+    "id": "e4",
+    "cat": "Fe y familia",
+    "title": "Actividades familiares gratis este fin de semana",
+    "body": "Compartan lo que conozcan en su pueblo.",
+    "by": "mamá_de_tres",
+    "votes": 51,
+    "ago": "ayer",
+    "replies": []
+  }
+]

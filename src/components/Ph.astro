@@ -1,6 +1,40 @@
 ---
-// Photo block: the story's photo over a NotiCel-blue background (shown when there is no photo)
-interface Props { src?: string; alt?: string; eager?: boolean }
-const { src, alt = '', eager = false } = Astro.props;
+// Photo block. Shows the story image if there is one, otherwise a branded placeholder.
+import fs from 'node:fs';
+import path from 'node:path';
+import { ICONS, defaultPhoto, section, url, type SectionId } from '../lib/site';
+
+interface Props {
+  sectionId: SectionId;
+  image?: string;
+  place?: string;
+  duration?: string; // when set, renders as a video thumbnail
+  alt?: string;
+  league?: string; // sports: picks a photo for that sport when there is no image
+  priority?: boolean; // the first big photo on a page: load it right away instead of lazily
+  sizes?: string; // how wide the photo shows, so phones download the smallest copy that looks sharp
+}
+const { sectionId, image, place, duration, alt = '', league, priority = false, sizes = '(max-width:760px) 100vw, 480px' } = Astro.props;
+const s = section(sectionId);
+// Stories without their own photo use their section's default photo (videos keep the placeholder)
+const pic = image ?? (duration ? undefined : defaultPhoto(sectionId, league).src);
+const src = pic ? (pic.startsWith('http') ? pic : url(pic)) : undefined;
+// Lighter WebP copies made by scripts/optimize-images.mjs (public/images/opt/<name>-480|960.webp)
+const base = pic && !pic.startsWith('http') && /^images\/[^/]+\.(jpe?g|png)$/i.test(pic) ? pic.replace(/^images\//, '').replace(/\.[^.]+$/, '') : undefined;
+const opt = (w: number) => `images/opt/${base}-${w}.webp`;
+const srcset = base && [480, 960].every((w) => fs.existsSync(path.join(process.cwd(), 'public', opt(w))))
+  ? `${url(opt(480))} 480w, ${url(opt(960))} 960w` : undefined;
 ---
-<div class="ph" style="--c:#006FA6">{src && <img src={src} alt={alt} loading={eager ? 'eager' : 'lazy'} decoding="async" />}</div>
+<div class="ph" style={`--c:${s.color}`} aria-hidden={alt ? undefined : 'true'}>
+  {!duration && !src && (
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><Fragment set:html={ICONS[sectionId]} /></svg>
+  )}
+  {src && <img src={src} srcset={srcset} sizes={srcset ? sizes : undefined} alt={alt} loading={priority ? 'eager' : 'lazy'} fetchpriority={priority ? 'high' : undefined} decoding={priority ? undefined : 'async'} />}
+  {duration && (
+    <>
+      <div class="play"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span></div>
+      <span class="dur">{duration}</span>
+    </>
+  )}
+  {place && !duration && <span class="place notranslate" translate="no">{place}</span>}
+</div>

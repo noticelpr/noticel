@@ -1,0 +1,11 @@
+---
+// The masthead logo: NotiCel's logo (it goes on the black header in light and dark mode).
+// `holiday` is kept so the layout matches Noticias Xtra's; NotiCel's holiday decorations are off (SITE.features.holidayLogo).
+import { SITE, url } from '../lib/site';
+import type { Holiday } from '../lib/holidays';
+interface Props { holiday?: Holiday; href?: string }
+const { href = url() } = Astro.props;
+---
+<a href={href} class="logo" aria-label={`${SITE.name}, ir a portada`}>
+  <img src={url('logo.png')} alt={SITE.name} width="150" height="63" />
+</a>

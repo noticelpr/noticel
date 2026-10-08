@@ -1,0 +1,639 @@
+---
+// Comments under each story, Reddit style: ▲▼ votes, replies to replies (indented, with lines; − folds a conversation),
+// sorted by Mejores / Recientes / Antiguos. Avatars, level badges, stickers and photos as before.
+// With reader accounts (Supabase: supabase/comments.sql, connect-all.sql, reddit.sql) everyone sees the same comments.
+// Without them (preview, demo mode) new comments are saved only in this reader's browser ('nc-comments-<story id>'),
+// next to sample comments marked EJEMPLO.
+interface Props { storyId: string; kind?: 'story' | 'game' }
+const { storyId, kind = 'story' } = Astro.props;
+// Sample comments (preview and demo only): invented usernames, clearly labeled EJEMPLO. `parent` makes a reply.
+const SAMPLES = kind === 'game' ? [
+  { id: 's1', name: 'tito_domino', text: '¡Hoy llegué a 100 primero! Este juego me tiene enganchao. 🔥', likes: 18, ago: 'hace 1 h', level: 'diamante' },
+  { id: 's2', name: 'la_nena_de_caguas', text: '¿Alguien más se tranca siempre en el nivel difícil? Denme un truco.', likes: 9, ago: 'hace 3 h', level: 'top' },
+  { id: 's4', parent: 's2', name: 'tito_domino', text: 'Juega más lento en el difícil: piensa cada ficha antes de tirarla.', likes: 4, ago: 'hace 2 h', level: 'diamante' },
+  { id: 's3', name: 'abuela_sudoku', text: 'Lo juego todas las mañanas con el café. ☕', likes: 6, ago: 'hace 6 h', level: 'voz', media: 'gif-cafe' },
+] : [
+  { id: 's1', name: 'lectora_bayamon', text: 'Muy buena información, gracias por explicarlo claro. 👏', likes: 24, ago: 'hace 2 h', level: 'diamante' },
+  { id: 's4', parent: 's1', name: 'boricua_en_orlando', text: 'Desde Orlando también lo seguimos. Gracias por la cobertura.', likes: 5, ago: 'hace 1 h', level: 'voz' },
+  { id: 's5', parent: 's4', name: 'lectora_bayamon', text: '¡Saludos a la diáspora! 🇵🇷', likes: 3, ago: 'hace 50 min', level: 'diamante' },
+  { id: 's2', name: 'jose.boricua', text: 'Gracias por mantenernos al día. Pendiente a los próximos detalles.', likes: 11, ago: 'hace 3 h', level: 'top' },
+  { id: 's3', name: 'abuela_de_ponce', text: '🇵🇷🙏', likes: 7, ago: 'hace 5 h', level: 'comentarista', media: 'te-quiero-pr' },
+];
+// Commenter levels (src/lib/reputation.ts): badge shown next to the name
+import { LEVELS, RULES, LEVEL_INFO, SPECIALS } from '../lib/reputation';
+import { BADGE } from '../lib/badges';
+const levelName = (id: string) => LEVELS.find((l) => l.id === id)?.name ?? '';
+// Our own drawn stickers (public/stickers/). Emojis and GIFs are off for now; GIF search (GIPHY) comes after launch
+import { SITE, url } from '../lib/site';
+const samples = SAMPLES.map((c) => ({ ...c, levelName: levelName(c.level), media: 'media' in c && c.media ? url(`stickers/${c.media}.svg`) : '' }));
+const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Bandera de Puerto Rico'], ['te-quiero-pr', 'Te quiero PR'], ['jajaja', 'Jajaja'], ['fuego', 'Fuego'],
+  ['palante', "¡Pa'lante!"], ['que-bueno', '¡Qué bueno!'], ['bravo', '¡Bravo!'], ['cafe', 'Buenos días'], ['capicu', '¡Capicú!']];
+---
+{/* Phones: a preview card (newest comments + "Añade un comentario…") opens the comments in a panel that slides up, like Instagram */}
+<div class="cm-teaser" data-cm-teaser>
+  <button type="button" class="cm-teaser-h" data-cm-open aria-controls="comentarios" aria-expanded="false">💬 Comentarios <b data-cm-teaser-n></b><span>Ver todos ›</span></button>
+  <ul class="cm-teaser-list" data-cm-teaser-list></ul>
+  <button type="button" class="cm-teaser-write" data-cm-open-write aria-controls="comentarios"><span class="cm-av me" aria-hidden="true">+</span>Añade un comentario…</button>
+</div>
+<div class="cm-backdrop" data-cm-backdrop></div>
+<section class="cm" id="comentarios" data-comments={storyId} data-badges={JSON.stringify(BADGE)} data-samples={JSON.stringify(samples)} aria-labelledby="cm-h">
+  <div class="cm-grab" data-cm-grab aria-hidden="true"><span></span></div>
+  <div class="cm-head">
+    <h2 id="cm-h">Comentarios <span data-cm-count></span></h2>
+    <span class="sp-demo">DEMO</span>
+    <button type="button" class="cm-close" data-cm-close aria-label="Cerrar comentarios">✕</button>
+  </div>
+  <p class="cm-note">Vista previa de los comentarios: lo que escribas se guarda solo en este dispositivo.</p>
+
+  <form class="cm-form" data-cm-form novalidate>
+    <span class="cm-av me" data-cm-me aria-hidden="true">T</span>
+    <div class="cm-box">
+      <p class="cm-replying" data-cm-replying hidden>Respondiendo a <b></b> <button type="button" data-cm-unreply aria-label="No responder">✕</button></p>
+      <label for={`cm-text-${storyId}`} class="sr">Escribe un comentario</label>
+      <textarea id={`cm-text-${storyId}`} rows="1" maxlength="500" placeholder="Añade un comentario…"></textarea>
+      <div class="cm-media-prev" data-media-prev hidden><img alt="" /><button type="button" data-media-rm aria-label="Quitar">✕</button></div>
+      <div class="cm-picker" data-picker hidden>
+        <div class="cm-pk-grid" data-pane="sticker" hidden>{STICKER_IMGS.map(([id, alt]) => <button type="button" data-media="sticker" data-src={url(`stickers/${id}.svg`)} aria-label={alt} title={alt}><img src={url(`stickers/${id}.svg`)} alt="" /></button>)}</div>
+      </div>
+      <div class="cm-tools">
+        <div class="cm-pick-btns" role="group" aria-label="Agregar">
+          <button type="button" data-pick-tab="sticker" aria-pressed="false">Sticker</button>
+          <label class="cm-photo-btn" title="Añadir una foto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>Foto<input type="file" accept="image/*" data-cm-photo class="sr" /></label>
+        </div>
+        <span class="cm-err" data-cm-err hidden></span>
+        <button type="submit" class="cm-send">Publicar</button>
+      </div>
+    </div>
+  </form>
+
+
+  <div class="fo-sort cm-sort" role="group" aria-label="Ordenar comentarios">
+    <button type="button" data-cm-sort="best" aria-pressed="true">Mejores</button>
+    <button type="button" data-cm-sort="new" aria-pressed="false">Recientes</button>
+    <button type="button" data-cm-sort="old" aria-pressed="false">Antiguos</button>
+  </div>
+  <ul class="cm-list" data-cm-list></ul>
+</section>
+
+<script>
+  import { addComment, removeComment, getRep, levelOf, specialsOf, syncRep, repsOf, RULES, SPECIALS, type Rep } from '../lib/reputation';
+  import { ago, parseAgo, tree, voteBox, foldable, type Sort } from '../lib/threads';
+  import { notify } from '../lib/notifications';
+  import { accountsOn, loggedIn, askLogin, api, myId, uploadCommentPhoto } from '../lib/account';
+  import { assess, serverSays, judgeReport, getReports, saveReports, upsertReport, isHidden, myReports, saveMyReports, isWeakReporter, REPORT_REASONS, type Report } from '../lib/moderation';
+  type Mine = { id: string; name: string; text: string; at: number; replyTo?: string; media?: { kind: string; src: string } };
+  const store = {
+    get: <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || '') ?? d; } catch { return d; } },
+    set: (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } },
+  };
+  const profile = store.get<{ name?: string; photo?: string }>('nc-profile', {});
+  const myName = profile.name || 'Tú';
+  // Comment text with @mentions highlighted (built from text nodes, never HTML)
+  const fillText = (el: Element, text: string) => {
+    el.replaceChildren(...text.split(/(@[\p{L}\p{N}._]+)/u).map((part) => {
+      if (!part.startsWith('@')) return document.createTextNode(part);
+      const at = document.createElement('span'); at.className = 'cm-at'; at.textContent = part; return at;
+    }));
+  };
+
+  /** Photo → JPEG data URL at most 1280 px on its longest side. */
+  function shrinkPhoto(file: File): Promise<string> {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(img.src); res(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => rej(new Error('read')); img.src = URL.createObjectURL(file);
+    });
+  }
+  // Sticker/emoji/GIF picker and the growing text box (shared by preview and real comments)
+  function setupPicker(root: HTMLElement) {
+    const form = root.querySelector<HTMLFormElement>('[data-cm-form]')!;
+    const ta = form.querySelector('textarea')!;
+    const err = root.querySelector<HTMLElement>('[data-cm-err]')!;
+    const picker = root.querySelector<HTMLElement>('[data-picker]')!;
+    const prev = root.querySelector<HTMLElement>('[data-media-prev]')!;
+    let media: Mine['media'];
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[data-pick-tab]')];
+    tabs.forEach((b) => b.addEventListener('click', () => {
+      const open = b.getAttribute('aria-pressed') !== 'true';
+      tabs.forEach((x) => x.setAttribute('aria-pressed', String(open && x === b)));
+      picker.hidden = !open;
+      picker.querySelectorAll<HTMLElement>('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== b.dataset.pickTab));
+    }));
+    const close = () => { picker.hidden = true; tabs.forEach((x) => x.setAttribute('aria-pressed', 'false')); };
+    root.querySelectorAll<HTMLButtonElement>('[data-stk]').forEach((b) => b.addEventListener('click', () => { ta.value += b.dataset.stk; ta.focus(); close(); }));
+    const setMedia = (m: Mine['media']) => { media = m; prev.hidden = !m; if (m) prev.querySelector('img')!.src = m.src; dispatchEvent(new Event('nc-media')); };
+    picker.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-media]');
+      if (b) { setMedia({ kind: b.dataset.media!, src: b.dataset.src! }); close(); err.hidden = true; }
+    });
+    prev.querySelector('[data-media-rm]')!.addEventListener('click', () => setMedia(undefined));
+    // A photo from the phone or computer: shrunk here (max 1280 px, JPEG) so it uploads fast; shown small in the comment
+    root.querySelector<HTMLInputElement>('[data-cm-photo]')?.addEventListener('change', async (e) => {
+      const inp = e.target as HTMLInputElement; const f = inp.files?.[0]; inp.value = ''; if (!f) return;
+      if (!f.type.startsWith('image/')) { err.textContent = 'Escoge una foto (JPG o PNG).'; err.hidden = false; return; }
+      try { setMedia({ kind: 'photo', src: await shrinkPhoto(f) }); close(); err.hidden = true; }
+      catch { err.textContent = 'No pudimos leer esa foto. Prueba con otra.'; err.hidden = false; }
+    });
+    // GIPHY search (only when a key is set in SITE.giphyKey); G-rated results only
+    const gifPane = picker.querySelector<HTMLElement>('[data-giphy]');
+    const gifQ = picker.querySelector<HTMLInputElement>('[data-gif-q]');
+    if (gifPane?.dataset.giphy && gifQ) {
+      const grid = gifPane.querySelector<HTMLElement>('[data-gif-grid]')!; const own = grid.innerHTML; let t = 0;
+      gifQ.addEventListener('input', () => {
+        clearTimeout(t);
+        t = window.setTimeout(async () => {
+          const q = gifQ.value.trim(); if (!q) { grid.innerHTML = own; return; }
+          try {
+            const d = await (await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${gifPane.dataset.giphy}&q=${encodeURIComponent(q)}&limit=18&rating=g&lang=es`)).json();
+            grid.innerHTML = d.data.map((g: any) => `<button type="button" data-media="gif" data-src="${g.images.fixed_width.url}" aria-label="${(g.title || 'GIF').replace(/"/g, '')}"><img src="${g.images.fixed_width_small.url}" alt="" loading="lazy" /></button>`).join('') || '<p class="cm-pk-note">Sin resultados.</p>';
+          } catch { grid.innerHTML = own; }
+        }, 400);
+      });
+    }
+    ta.addEventListener('input', () => { err.hidden = true; ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight}px`; });
+    return { media: () => media, setMedia, close };
+  }
+
+  // Phones: the comments open in a panel that slides up from the bottom (Instagram style); computers keep them in the page
+  function sheet(root: HTMLElement) {
+    const backdrop = root.previousElementSibling as HTMLElement, teaser = backdrop.previousElementSibling as HTMLElement;
+    const openBtn = teaser.querySelector<HTMLButtonElement>('[data-cm-open]')!;
+    const html = document.documentElement, phone = matchMedia('(max-width: 760px)');
+    const ta = root.querySelector<HTMLTextAreaElement>('[data-cm-form] textarea')!;
+    const isOpen = () => html.classList.contains('cm-open');
+    const open = (push = true) => {
+      if (!phone.matches || isOpen()) return;
+      html.classList.add('cm-open'); openBtn.setAttribute('aria-expanded', 'true');
+      if (push) history.pushState({ cm: 1 }, ''); // the phone's back button closes the panel
+    };
+    const close = (fromBack = false) => {
+      if (!isOpen()) return;
+      html.classList.remove('cm-open'); openBtn.setAttribute('aria-expanded', 'false'); ta.blur();
+      if (!fromBack && history.state?.cm) history.back();
+    };
+    // Any part of the card opens the comments; "Añade un comentario…" opens them ready to write (keyboard up)
+    teaser.addEventListener('click', (e) => {
+      const write = (e.target as HTMLElement).closest('[data-cm-open-write]');
+      open();
+      if (write) ta.focus();
+    });
+    backdrop.addEventListener('click', () => close());
+    root.querySelector('[data-cm-close]')!.addEventListener('click', () => close());
+    addEventListener('popstate', () => close(true));
+    addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    // Swipe the top of the panel down to close it
+    let y0 = 0, dy = 0, drag = false;
+    [root.querySelector('[data-cm-grab]')!, root.querySelector('.cm-head')!].forEach((h) => h.addEventListener('touchstart', (e) => {
+      y0 = (e as TouchEvent).touches[0].clientY; dy = 0; drag = true; root.style.transition = 'none';
+    }, { passive: true }));
+    root.addEventListener('touchmove', (e) => { if (!drag) return; dy = Math.max(0, e.touches[0].clientY - y0); root.style.transform = `translateY(${dy}px)`; }, { passive: true });
+    root.addEventListener('touchend', () => { if (!drag) return; drag = false; root.style.transition = ''; root.style.transform = ''; if (dy > 110) close(); });
+    // The writing bar stays above the phone's keyboard
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', () => html.style.setProperty('--kb', `${vv.scale > 1.01 ? 0 : Math.max(0, Math.round(innerHeight - vv.height - vv.offsetTop))}px`));
+    // The card on the story: how many comments there are and the newest three
+    const paint = () => {
+      const items = [...root.querySelectorAll<HTMLElement>('.cm-item:not(.cm-hidden):not(.reply)')].slice(0, 3);
+      teaser.querySelector('[data-cm-teaser-n]')!.textContent = root.querySelector('[data-cm-count]')!.textContent || '';
+      const ul = teaser.querySelector('[data-cm-teaser-list]')!;
+      ul.replaceChildren(...items.map((it) => {
+        const li = document.createElement('li');
+        const b = document.createElement('b'); b.textContent = it.querySelector('b')?.textContent ?? '';
+        const media = it.querySelector<HTMLImageElement>('.cm-media');
+        const txt = it.querySelector('.cm-text')?.textContent?.trim() || (media ? (media.classList.contains('photo') ? '📷 envió una foto' : '🏷️ envió un sticker') : '');
+        li.append(b, ' ', txt);
+        return li;
+      }));
+      if (!items.length) { const li = document.createElement('li'); li.className = 'cm-teaser-empty'; li.textContent = 'Sé la primera persona en comentar.'; ul.append(li); }
+      const av = teaser.querySelector<HTMLElement>('.cm-teaser-write .cm-av')!; const mine = root.querySelector<HTMLElement>('[data-cm-me]')!;
+      av.textContent = mine.textContent; av.style.cssText = mine.style.cssText;
+    };
+    new MutationObserver(paint).observe(root.querySelector('[data-cm-list]')!, { childList: true, subtree: true, characterData: true });
+    paint();
+    if (location.hash === '#comentarios') setTimeout(() => open(false), 300); // links from notifications open the panel
+    // Quick emojis above the text box
+    root.querySelectorAll<HTMLButtonElement>('[data-quick]').forEach((b) => b.addEventListener('click', () => {
+      ta.value += b.dataset.quick; ta.focus(); ta.dispatchEvent(new Event('input'));
+    }));
+  }
+
+
+  // ---------- One comment, the same for real and preview comments ----------
+  const COLORS = ['#2B1185', '#1F90DA', '#B0306A', '#0F8C8C', '#C8202F', '#5C3D99', '#2E7D32', '#E8590C'];
+  const colorOf = (name: string) => COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % COLORS.length];
+  const avatar = (el: HTMLElement, name: string, photo?: string | null) => {
+    el.textContent = photo ? '' : (name[0] || '?').toUpperCase();
+    el.style.background = photo ? '' : colorOf(name);
+    if (photo) el.style.backgroundImage = `url("${photo}")`;
+    el.classList.toggle('has-photo', !!photo);
+  };
+  type View = {
+    id: string; name: string; photo?: string | null; me?: boolean; badge?: { id: string; name: string } | null; sample?: boolean;
+    text: string; media?: Mine['media'] | null; when: string; score: number; vote: number; mine: boolean; deleted?: boolean;
+    report?: 'Reportar' | 'Reportado' | ''; note?: string; depth: number; kids: number;
+  };
+  function commentItem(v: View, badges: Record<string, string>): HTMLLIElement {
+    const li = document.createElement('li');
+    li.className = `cm-item${v.depth ? ' reply' : ''}${v.mine ? ' mine' : ''}${v.deleted ? ' gone' : ''}`;
+    li.dataset.id = v.id; li.dataset.depth = String(v.depth); li.dataset.kids = String(v.kids);
+    li.style.setProperty('--d', String(Math.min(v.depth, 6)));
+    li.innerHTML = `<span class="cm-av${v.me ? ' me' : ''}" aria-hidden="true"></span><div class="cm-body"><p><b></b> <span class="cm-text"></span></p><div class="cm-meta"></div></div>`;
+    const av = li.querySelector<HTMLElement>('.cm-av')!;
+    if (v.deleted) av.textContent = '?'; else avatar(av, v.name, v.photo);
+    const b = li.querySelector('b')!; b.textContent = v.deleted ? '[eliminado]' : v.name;
+    const tail: Node[] = [];
+    if (v.badge && !v.deleted) { const bd = document.createElement('span'); bd.className = `cm-badge cm-b-${v.badge.id}`; bd.title = v.badge.name; bd.innerHTML = `${badges[v.badge.id] ?? ''} `; bd.append(v.badge.name); tail.push(document.createTextNode(' '), bd); }
+    if (v.sample) { const ej = document.createElement('span'); ej.className = 'sp-demo'; ej.textContent = 'EJEMPLO'; tail.push(document.createTextNode(' '), ej); }
+    b.after(...tail);
+    const txt = li.querySelector<HTMLElement>('.cm-text')!;
+    if (v.deleted) { txt.textContent = 'Este comentario fue eliminado.'; txt.classList.add('gone'); } else fillText(txt, v.text);
+    if (v.media && !v.deleted) { const im = document.createElement('img'); im.className = `cm-media${v.media.kind === 'photo' ? ' photo' : ''}`; im.src = v.media.src; im.alt = v.media.kind === 'gif' ? 'GIF' : v.media.kind === 'photo' ? 'Foto del comentario' : 'Sticker'; im.loading = 'lazy'; li.querySelector('.cm-body p')!.after(im); }
+    const meta = li.querySelector<HTMLElement>('.cm-meta')!;
+    if (!v.deleted) meta.append(voteBox(v.score, v.vote));
+    const when = document.createElement('span'); when.textContent = v.when; meta.append(when);
+    const btn = (label: string, data: string, disabled = false) => { const x = document.createElement('button'); x.type = 'button'; x.textContent = label; x.setAttribute(data, ''); x.disabled = disabled; meta.append(x); return x; };
+    if (!v.deleted) btn('Responder', 'data-reply');
+    if (v.mine && !v.deleted) btn('Borrar', 'data-del');
+    else if (v.report && !v.deleted) btn(v.report, 'data-report', v.report === 'Reportado');
+    if (v.kids) { const f = btn('Ocultar respuestas', 'data-fold'); f.dataset.foldLabel = ''; f.dataset.open = 'Ocultar respuestas'; f.dataset.closed = `Ver ${v.kids} ${v.kids === 1 ? 'respuesta' : 'respuestas'}`; f.className = 'cm-fold'; }
+    if (v.note) { const hn = document.createElement('p'); hn.className = 'cm-hid-note'; hn.textContent = v.note; li.querySelector('.cm-body')!.prepend(hn); li.classList.add('cm-hidden'); }
+    return li;
+  }
+  // Sort buttons above the list; the choice is remembered on this device
+  function sortButtons(root: HTMLElement, onChange: () => void): () => Sort {
+    let sort: Sort = 'best'; try { sort = (localStorage.getItem('nc-cm-sort') as Sort) || 'best'; } catch { /* storage blocked */ }
+    const btns = [...root.querySelectorAll<HTMLButtonElement>('[data-cm-sort]')];
+    const paint = () => btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cmSort === sort)));
+    btns.forEach((b) => b.addEventListener('click', () => { sort = b.dataset.cmSort as Sort; try { localStorage.setItem('nc-cm-sort', sort); } catch { /* storage blocked */ } paint(); onChange(); }));
+    paint();
+    return () => sort;
+  }
+  // Double tap (or double click) a comment to vote ▲, with a little arrow
+  function doubleTapUp(list: HTMLElement) {
+    let lastTap = 0, lastId = '';
+    const up = (li: HTMLElement) => {
+      const b = li.querySelector<HTMLButtonElement>(':scope > .cm-body > .cm-meta [data-vote="1"]'); if (!b) return;
+      const burst = document.createElement('span'); burst.className = 'cm-burst up'; burst.textContent = '▲'; li.append(burst); setTimeout(() => burst.remove(), 800);
+      if (b.getAttribute('aria-pressed') !== 'true') b.click();
+    };
+    list.addEventListener('dblclick', (e) => { const li = (e.target as HTMLElement).closest<HTMLElement>('.cm-item'); if (li && !(e.target as HTMLElement).closest('button,a')) up(li); });
+    list.addEventListener('touchend', (e) => {
+      const li = (e.target as HTMLElement).closest<HTMLElement>('.cm-item'); if (!li || (e.target as HTMLElement).closest('button,a,form')) return;
+      const now = Date.now();
+      if (now - lastTap < 320 && lastId === li.dataset.id) { e.preventDefault(); lastTap = 0; up(li); } else { lastTap = now; lastId = li.dataset.id!; }
+    });
+  }
+
+  // ---------- Real comments (Supabase): everyone sees the same ones ----------
+  type Row = { id: string; parent: string | null; body: string; media: Mine['media'] | null; status: 'visible' | 'review' | 'removed'; likes: number; dislikes?: number; deleted?: boolean;
+    created_at: string; user_id: string; author: { username: string; photo: string | null } | null };
+
+  function live(root: HTMLElement) {
+    const sid = root.dataset.comments!;
+    const list = root.querySelector<HTMLUListElement>('[data-cm-list]')!;
+    const form = root.querySelector<HTMLFormElement>('[data-cm-form]')!;
+    const ta = form.querySelector('textarea')!;
+    const err = root.querySelector<HTMLElement>('[data-cm-err]')!;
+    const count = root.querySelector<HTMLElement>('[data-cm-count]')!;
+    const meAv = root.querySelector<HTMLElement>('[data-cm-me]')!;
+    root.querySelector('.cm-head .sp-demo')?.remove();
+    // Reputation is counted by the server (badges next to names); the reader's own progress is only in Mi perfil
+    const BADGES: Record<string, string> = JSON.parse(root.dataset.badges || '{}');
+    let reps: Record<string, Rep> = {};
+    const refreshRep = () => { if (loggedIn()) void syncRep(); };
+    const note = root.querySelector<HTMLElement>('.cm-note')!;
+    const pk = setupPicker(root);
+    let rows: Row[] = [], liked = new Set<string>(), disliked = new Set<string>(), reported = new Set<string>(), parentId: string | null = null, warned = '';
+    const folded = new Set<string>();
+    const applyFold = foldable(list, folded);
+    const sortNow = sortButtons(root, () => render());
+    const replying = root.querySelector<HTMLElement>('[data-cm-replying]')!;
+    const setReply = (c: Row | null) => {
+      parentId = c ? c.id : null; // any comment can be answered, so conversations branch like Reddit
+      replying.hidden = !c;
+      if (c) { replying.querySelector('b')!.textContent = `@${c.author?.username ?? ''}`; ta.value = `@${c.author?.username ?? ''} `; ta.focus(); }
+    };
+    root.querySelector('[data-cm-unreply]')!.addEventListener('click', () => { ta.value = ta.value.replace(/^@[\w.]+\s*/, ''); setReply(null); ta.focus(); });
+    const paintMe = () => {
+      let p: { name?: string; photo?: string } = {}; try { p = JSON.parse(localStorage.getItem('nc-profile') || '{}'); } catch { /* storage blocked */ }
+      if (loggedIn() && p.name) avatar(meAv, p.name, p.photo); else { meAv.textContent = '?'; meAv.style.cssText = ''; }
+      ta.placeholder = loggedIn() ? 'Añade un comentario…' : 'Entra a tu cuenta para comentar…';
+      note.innerHTML = loggedIn() ? `Comentas como <b></b>. Sé respetuoso: los comentarios con insultos, amenazas o datos personales se ocultan.` : 'Lee los comentarios de todos. Para comentar, votar o reportar, <button type="button" class="cm-login">entra o crea tu cuenta</button>.';
+      note.querySelector('b') && (note.querySelector('b')!.textContent = `@${p.name ?? ''}`);
+      note.querySelector('.cm-login')?.addEventListener('click', () => askLogin('Entra para comentar.'));
+    };
+    const need = (why: string) => { if (loggedIn()) return true; askLogin(why); return false; };
+    const myVote = (id: string) => (liked.has(id) ? 1 : disliked.has(id) ? -1 : 0);
+
+    // Columns from supabase/reddit.sql (▼ votes, "[eliminado]"); until it runs, the older columns still work
+    let extra = 'dislikes,deleted,';
+    const fetchRows = async (filter: string) => {
+      const q = () => api(`comments?story=eq.${encodeURIComponent(sid)}${filter}&select=id,parent,body,media,status,likes,${extra}created_at,user_id,author:profiles!comments_user_id_fkey(username,photo)&order=created_at.asc&limit=600`, {}, filter.includes('user_id'));
+      let r = await q();
+      if (r && !r.ok && extra) { extra = ''; r = await q(); }
+      return r;
+    };
+    async function load() {
+      const r = await fetchRows('');
+      rows = r?.ok ? await r.json() : [];
+      // Logged in: also my own comments under review (the public read above only returns visible ones)
+      if (loggedIn()) {
+        const mine = await fetchRows(`&user_id=eq.${myId()}&status=neq.visible`);
+        if (mine?.ok) rows = [...rows, ...(await mine.json())];
+        const ids = rows.map((x) => x.id);
+        if (ids.length) {
+          const inIds = `comment=in.(${ids.join(',')})`;
+          const [lk, dk, rp] = await Promise.all([
+            api(`comment_likes?user_id=eq.${myId()}&${inIds}&select=comment`),
+            api(`comment_dislikes?user_id=eq.${myId()}&${inIds}&select=comment`),
+            api(`comment_reports?user_id=eq.${myId()}&${inIds}&select=comment`),
+          ]);
+          liked = new Set(lk?.ok ? (await lk.json()).map((x: any) => x.comment) : []);
+          disliked = new Set(dk?.ok ? (await dk.json()).map((x: any) => x.comment) : []);
+          reported = new Set(rp?.ok ? (await rp.json()).map((x: any) => x.comment) : []);
+        }
+      } else { liked = new Set(); disliked = new Set(); reported = new Set(); }
+      render();
+      // Level badges next to each commenter's name (counted by the server)
+      reps = await repsOf([...new Set(rows.map((x) => x.user_id))]);
+      render();
+    }
+    function render() {
+      const ordered = tree(rows.map((c) => ({ ...c, score: c.likes - (c.dislikes ?? 0), at: Date.parse(c.created_at) })), sortNow());
+      list.replaceChildren(...ordered.map(({ item: c, depth, kids }) => {
+        const lv = reps[c.user_id] ? levelOf(reps[c.user_id]) : null;
+        return commentItem({
+          id: c.id, name: c.author?.username ?? 'lector', photo: c.author?.photo, badge: lv && lv.index > 0 ? { id: lv.id, name: lv.name } : null,
+          text: c.body, media: c.media, when: ago(Date.parse(c.created_at)), score: c.likes - (c.dislikes ?? 0), vote: myVote(c.id),
+          mine: c.user_id === myId(), deleted: c.deleted, report: reported.has(c.id) ? 'Reportado' : 'Reportar', depth, kids,
+          note: c.status === 'review' ? 'Solo tú ves este comentario mientras la redacción lo revisa.' : c.status === 'removed' ? 'La redacción quitó este comentario por incumplir las reglas. Solo tú lo ves.' : '',
+        }, BADGES);
+      }));
+      applyFold();
+      const n = rows.filter((c) => c.status === 'visible' && !c.deleted).length;
+      count.textContent = n ? `(${n})` : '';
+      if (!rows.length) { const e = document.createElement('li'); e.className = 'cm-empty'; e.textContent = 'Sé la primera persona en comentar.'; list.append(e); }
+    }
+    async function vote(c: Row, v: number) {
+      if (!need('Entra para votar.')) return;
+      const cur = myVote(c.id), next = cur === v ? 0 : v;
+      // Right away on screen; the server keeps the real totals (▲ and ▼ cancel each other there too)
+      if (cur === 1) { liked.delete(c.id); c.likes = Math.max(0, c.likes - 1); }
+      if (cur === -1) { disliked.delete(c.id); c.dislikes = Math.max(0, (c.dislikes ?? 0) - 1); }
+      if (next === 1) { liked.add(c.id); c.likes++; }
+      if (next === -1) { disliked.add(c.id); c.dislikes = (c.dislikes ?? 0) + 1; }
+      render();
+      const r = next === 1 ? await api('comment_likes', { method: 'POST', body: JSON.stringify({ comment: c.id }) })
+        : next === -1 ? await api('comment_dislikes', { method: 'POST', body: JSON.stringify({ comment: c.id }) })
+        : await api(`${cur === 1 ? 'comment_likes' : 'comment_dislikes'}?comment=eq.${c.id}&user_id=eq.${myId()}`, { method: 'DELETE' });
+      if (!r?.ok && r?.status !== 409) { dispatchEvent(new CustomEvent('nc-toast', { detail: 'No se pudo guardar tu voto.' })); void load(); }
+    }
+
+    list.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const li = t.closest<HTMLElement>('.cm-item'); if (!li) return;
+      const c = rows.find((x) => x.id === li.dataset.id)!;
+      const vb = t.closest<HTMLElement>('[data-vote]');
+      if (vb) return void vote(c, Number(vb.dataset.vote));
+      if (t.closest('[data-reply]')) {
+        if (!need('Entra para responder.')) return;
+        setReply(c);
+      }
+      if (t.closest('[data-del]')) {
+        const { ask } = await import('../lib/dialogs');
+        if (!(await ask('¿Borrar tu comentario? Si otras personas ya te respondieron, sus respuestas se quedan.', { ok: 'Borrar', danger: true }))) return;
+        // remove_comment (supabase/reddit.sql) keeps the replies; before it runs, a plain delete
+        let r = await api('rpc/remove_comment', { method: 'POST', body: JSON.stringify({ cid: c.id }) });
+        if (r?.status === 404) r = await api(`comments?id=eq.${c.id}`, { method: 'DELETE' });
+        if (r?.ok) void load(); else dispatchEvent(new CustomEvent('nc-toast', { detail: 'No se pudo borrar.' }));
+      }
+      const rb = t.closest<HTMLButtonElement>('[data-report]');
+      if (rb && !rb.disabled) {
+        if (!need('Entra para reportar un comentario.')) return;
+        const open = li.querySelector('.cm-rp'); if (open) { open.remove(); return; }
+        const f = document.createElement('form'); f.className = 'cm-rp';
+        f.innerHTML = `<fieldset><legend>¿Por qué reportas este comentario?</legend>${REPORT_REASONS.map((r, i) => `<label><input type="radio" name="rp-${c.id}" value="${r.id}"${i ? '' : ' required'} /> ${r.name}</label>`).join('')}</fieldset><div class="cm-rp-acts"><button type="submit" class="cm-rp-send">Enviar reporte</button><button type="button" data-rp-cancel>Cancelar</button></div><p class="cm-rp-note">Si varios lectores lo reportan, se oculta hasta que la redacción lo revise.</p>`;
+        li.querySelector('.cm-body')!.append(f);
+        f.querySelector('[data-rp-cancel]')!.addEventListener('click', () => f.remove());
+        f.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          const reason = (f.querySelector('input:checked') as HTMLInputElement | null)?.value; if (!reason) return;
+          const r = await api('comment_reports', { method: 'POST', body: JSON.stringify({ comment: c.id, reason }) });
+          const msg = document.createElement('p'); msg.className = 'cm-rp-done review'; msg.setAttribute('role', 'status');
+          msg.textContent = r?.ok || r?.status === 409 ? 'Gracias. La redacción lo verá; si más lectores lo reportan, se oculta enseguida.' : 'No se pudo enviar. Intenta otra vez.';
+          f.replaceWith(msg); setTimeout(() => msg.remove(), 6000);
+          if (r?.ok || r?.status === 409) { reported.add(c.id); const b = li.querySelector<HTMLButtonElement>('[data-report]'); if (b) { b.textContent = 'Reportado'; b.disabled = true; } }
+        });
+      }
+    });
+    doubleTapUp(list);
+    ta.addEventListener('focus', () => { if (!loggedIn()) { ta.blur(); askLogin('Entra para comentar.'); } });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!need('Entra para comentar.')) return;
+      const text = ta.value.trim(); const media = pk.media();
+      if (!text && !media) { err.textContent = 'Escribe algo o escoge un sticker o GIF.'; err.hidden = false; return; }
+      // Automatic check before posting: clear violations are blocked; doubtful ones get one warning, then go to review
+      const chk = assess(text); const whyTxt = chk.reasons.join(', ').toLowerCase();
+      if (chk.verdict === 'block') { err.textContent = `No se puede publicar: ${whyTxt}. Revisa el texto.`; err.hidden = false; return; }
+      if (chk.verdict === 'review' && warned !== text) { warned = text; err.textContent = `Ojo: ${whyTxt}. Edítalo, o pulsa Publicar otra vez y la redacción lo revisará.`; err.hidden = false; return; }
+      if (parentId && !text.startsWith('@')) setReply(null); // the reader erased the @name: it's a new comment
+      const send = form.querySelector<HTMLButtonElement>('.cm-send')!; send.disabled = true;
+      let att = media ?? null;
+      if (att?.kind === 'photo' && att.src.startsWith('data:')) {
+        send.textContent = 'Subiendo foto…';
+        const src = await uploadCommentPhoto(att.src);
+        send.textContent = 'Publicar';
+        if (!src) { send.disabled = false; err.textContent = 'No se pudo subir la foto. Intenta otra vez.'; err.hidden = false; return; }
+        att = { kind: 'photo', src };
+      }
+      const r = await api('comments', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ story: sid, url: `${location.pathname}#comentarios`, parent: parentId, body: text, media: att,
+        status: chk.verdict === 'review' ? 'review' : 'visible', flags: chk.reasons }) });
+      send.disabled = false;
+      if (!r?.ok) { err.textContent = r?.status === 403 ? 'Tu cuenta no puede comentar ahora mismo.' : await serverSays(r, 'No se pudo publicar. Intenta otra vez.'); err.hidden = false; return; }
+      if (parentId) folded.delete(parentId); // show the conversation with the new reply
+      warned = ''; ta.value = ''; ta.style.height = 'auto'; setReply(null); pk.setMedia(undefined); pk.close();
+      if (chk.verdict === 'review') { err.textContent = 'Publicado. La redacción lo revisará antes de que otros lo vean.'; err.hidden = false; }
+      const newId = ((await r.json().catch(() => [])) as Array<{ id: string }>)[0]?.id;
+      await load(); refreshRep();
+      // Show the new comment: scroll to it and flash it
+      const mineLi = newId ? list.querySelector<HTMLElement>(`.cm-item[data-id="${newId}"]`) : null;
+      if (mineLi) {
+        mineLi.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        mineLi.classList.add('cm-new'); setTimeout(() => mineLi.classList.remove('cm-new'), 2500);
+        dispatchEvent(new CustomEvent('nc-toast', { detail: chk.verdict === 'review' ? 'Publicado: la redacción lo revisará.' : 'Publicado ✓' }));
+      }
+    });
+    addEventListener('nc-account', () => { paintMe(); void load(); refreshRep(); });
+    addEventListener('nc-profile-change', paintMe);
+    paintMe(); load().catch((e) => { console.error('Comentarios (load):', e); note.textContent = `No pudimos cargar los comentarios (${e instanceof Error ? e.message : String(e)}). Recarga la página.`; }); refreshRep();
+  }
+
+  // ---------- Preview comments (no accounts, or demo mode): samples + what this reader writes, kept in this browser ----------
+  type Sample = { id: string; parent?: string; name: string; text: string; likes: number; ago: string; level: string; levelName: string; media: string };
+  function preview(root: HTMLElement) {
+    const sid = root.dataset.comments!;
+    const key = `nc-comments-${sid}`, votesKey = `nc-votes-${sid}`;
+    const list = root.querySelector<HTMLUListElement>('[data-cm-list]')!;
+    const form = root.querySelector<HTMLFormElement>('[data-cm-form]')!;
+    const ta = form.querySelector('textarea')!;
+    const err = root.querySelector<HTMLElement>('[data-cm-err]')!;
+    const count = root.querySelector<HTMLElement>('[data-cm-count]')!;
+    const BADGES: Record<string, string> = JSON.parse(root.dataset.badges || '{}');
+    const samples: Sample[] = JSON.parse(root.dataset.samples || '[]');
+    // The reader's own avatar: their profile photo if they added one (/perfil), otherwise their initial
+    const myAvatar = (el: HTMLElement) => {
+      el.textContent = profile.photo ? '' : myName[0].toUpperCase();
+      el.style.backgroundImage = profile.photo ? `url("${profile.photo}")` : '';
+      el.classList.toggle('has-photo', !!profile.photo);
+    };
+    myAvatar(root.querySelector<HTMLElement>('[data-cm-me]')!);
+    let replyTo: string | undefined;
+    let warned = ''; // text that already got the "doubtful" warning once
+    const folded = new Set<string>();
+    const applyFold = foldable(list, folded);
+    const sortNow = sortButtons(root, () => render());
+    const votes = () => store.get<Record<string, number>>(votesKey, {});
+
+    const render = () => {
+      const mine = store.get<Mine[]>(key, []);
+      const v = votes();
+      const lv = levelOf(getRep());
+      type N = { id: string; parent: string | null; score: number; at: number; sample?: Sample; mine?: Mine };
+      const nodes: N[] = [
+        ...samples.map((s) => ({ id: s.id, parent: s.parent ?? null, score: s.likes + (v[s.id] ?? 0), at: parseAgo(s.ago), sample: s })),
+        ...mine.map((m) => ({ id: m.id, parent: m.replyTo ?? null, score: v[m.id] ?? 0, at: m.at, mine: m })),
+      ];
+      list.replaceChildren(...tree(nodes, sortNow()).map(({ item: n, depth, kids }) => {
+        const li = n.sample
+          ? commentItem({ id: n.id, name: n.sample.name, badge: { id: n.sample.level, name: n.sample.levelName }, sample: true, text: n.sample.text, media: n.sample.media ? { kind: 'sticker', src: n.sample.media } : null,
+              when: n.sample.ago, score: n.score, vote: v[n.id] ?? 0, mine: false, report: 'Reportar', depth, kids }, BADGES)
+          : commentItem({ id: n.id, name: n.mine!.name, me: true, badge: lv.index > 0 ? { id: lv.id, name: lv.name } : null, text: n.mine!.text, media: n.mine!.media,
+              when: ago(n.mine!.at), score: n.score, vote: v[n.id] ?? 0, mine: true, depth, kids }, BADGES);
+        if (n.mine) myAvatar(li.querySelector<HTMLElement>('.cm-av')!);
+        return li;
+      }));
+      applyFold();
+      count.textContent = `(${nodes.length})`;
+      applyMod();
+    };
+
+    // Moderation: hide comments that were hidden automatically, removed by the newsroom, or reported by 3+ readers
+    const applyMod = () => {
+      const reps = getReports().filter((r) => r.storyId === sid);
+      const done = myReports().ids;
+      list.querySelectorAll<HTMLElement>('.cm-item').forEach((li) => {
+        const r = reps.find((x) => x.commentId === li.dataset.id);
+        const hid = !!r && isHidden(r);
+        li.classList.toggle('cm-hidden', hid);
+        li.querySelector('.cm-hid-note')?.remove();
+        if (hid) {
+          const n = document.createElement('p'); n.className = 'cm-hid-note';
+          n.textContent = r!.status === 'review' ? 'Comentario oculto mientras la redacción lo revisa.' : r!.mine ? `Tu comentario fue ocultado por incumplir las reglas (${RULES.report} de reputación).` : 'Comentario oculto por incumplir las reglas de la comunidad.';
+          li.querySelector('.cm-body')!.prepend(n);
+        }
+        const rb = li.querySelector<HTMLButtonElement>('[data-report]');
+        if (rb && done.includes(`${sid}:${li.dataset.id}`)) { rb.textContent = 'Reportado'; rb.disabled = true; }
+      });
+    };
+    const textOf = (li: HTMLElement) => li.querySelector('.cm-text')?.textContent?.trim() ?? '';
+    list.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const li = t.closest<HTMLElement>('.cm-item'); if (!li) return;
+      const vb = t.closest<HTMLElement>('[data-vote]');
+      if (vb) { const all = votes(); const want = Number(vb.dataset.vote); all[li.dataset.id!] = (all[li.dataset.id!] ?? 0) === want ? 0 : want; store.set(votesKey, all); render(); return; }
+      if (t.closest('[data-reply]')) { replyTo = li.dataset.id; ta.value = `@${li.querySelector('b')?.textContent || ''} `; ta.focus(); return; }
+      if (t.closest('[data-del]')) {
+        // Deleting also takes away its replies here (preview only)
+        const id = li.dataset.id!; const gone = new Set([id]); const mine = store.get<Mine[]>(key, []);
+        let grew = true; while (grew) { grew = false; mine.forEach((m) => { if (m.replyTo && gone.has(m.replyTo) && !gone.has(m.id)) { gone.add(m.id); grew = true; } }); }
+        store.set(key, mine.filter((m) => !gone.has(m.id))); gone.forEach((x) => { removeComment(x); }); saveReports(getReports().filter((x) => !gone.has(x.commentId) || x.storyId !== sid)); render();
+        return;
+      }
+      // Report: pick a reason → the automatic check decides (hide now / keep / send to the newsroom's queue)
+      const b = t.closest<HTMLButtonElement>('[data-report]');
+      if (!b || b.disabled) return;
+      const open = li.querySelector('.cm-rp'); if (open) { open.remove(); return; }
+      const f = document.createElement('form'); f.className = 'cm-rp';
+      f.innerHTML = `<fieldset><legend>¿Por qué reportas este comentario?</legend>${REPORT_REASONS.map((r, i) => `<label><input type="radio" name="rp-${li.dataset.id}" value="${r.id}"${i ? '' : ' required'} /> ${r.name}</label>`).join('')}</fieldset><div class="cm-rp-acts"><button type="submit" class="cm-rp-send">Enviar reporte</button><button type="button" data-rp-cancel>Cancelar</button></div><p class="cm-rp-note">Lo revisa nuestro sistema al instante. Los reportes falsos le restan peso a tus próximos reportes.</p>`;
+      li.querySelector('.cm-body')!.append(f);
+      f.querySelector('[data-rp-cancel]')!.addEventListener('click', () => f.remove());
+      f.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const reason = (f.querySelector('input:checked') as HTMLInputElement | null)?.value; if (!reason) return;
+        const cid = li.dataset.id!; const rid = `${sid}:${cid}`;
+        const prev = getReports().find((x) => x.id === rid);
+        const reasons = [...new Set([...(prev?.reasons ?? []), reason])];
+        const cnt = (prev?.count ?? 0) + 1;
+        const my = myReports();
+        const { action, a } = judgeReport(textOf(li), reasons, cnt, isWeakReporter(my));
+        const status: Report['status'] = action === 'hide' ? 'auto' : action === 'review' || prev?.status === 'review' ? 'review' : 'kept';
+        upsertReport({ id: rid, at: Date.now(), storyId: sid, storyUrl: `${location.pathname}#comentarios`, title: document.querySelector('h1')?.textContent?.trim() || document.title,
+          commentId: cid, author: li.querySelector('b')?.textContent || '', text: textOf(li), media: li.querySelector<HTMLImageElement>('.cm-media')?.getAttribute('src') || undefined,
+          mine: li.classList.contains('mine'), source: 'report', reasons, count: cnt, score: a.score, flags: a.reasons, status });
+        my.ids = [...my.ids, rid].slice(-200); if (status === 'kept') my.wrong++; saveMyReports(my);
+        const msg = document.createElement('p'); msg.className = `cm-rp-done ${status}`; msg.setAttribute('role', 'status');
+        msg.textContent = status === 'auto' ? 'Gracias. Lo ocultamos de inmediato: incumple las reglas.'
+          : status === 'review' ? 'Gracias. La redacción lo revisará pronto.'
+          : 'Gracias. Lo revisamos y no parece incumplir las reglas, así que se queda publicado.';
+        f.replaceWith(msg); setTimeout(() => msg.remove(), 6000);
+        applyMod();
+      });
+    });
+    doubleTapUp(list);
+
+    const pk = setupPicker(root);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = ta.value.trim(); const media = pk.media();
+      if (!text && !media) { err.textContent = 'Escribe algo o escoge un sticker o GIF.'; err.hidden = false; return; }
+      // Automatic check before posting: clear violations are blocked; doubtful ones get one warning, then go to the queue
+      const chk = assess(text);
+      const why = chk.reasons.join(', ').toLowerCase();
+      if (chk.verdict === 'block') { err.textContent = `No se puede publicar: ${why}. Revisa el texto.`; err.hidden = false; return; }
+      if (chk.verdict === 'review' && warned !== text) { warned = text; err.textContent = `Ojo: ${why}. Edítalo, o pulsa Publicar otra vez y la redacción lo revisará.`; err.hidden = false; return; }
+      if (replyTo && !text.startsWith('@')) replyTo = undefined; // the reader erased the @name: it's a new comment
+      const mine = store.get<Mine[]>(key, []);
+      const id = `m${Date.now()}`;
+      mine.push({ id, name: myName, text, at: Date.now(), replyTo, media });
+      store.set(key, mine);
+      const before = getRep(); const lvBefore = levelOf(before).index; const spBefore = specialsOf(before);
+      addComment(id, text, !!replyTo);
+      if (chk.verdict === 'review') upsertReport({ id: `${sid}:${id}`, at: Date.now(), storyId: sid, storyUrl: `${location.pathname}#comentarios`, title: document.querySelector('h1')?.textContent?.trim() || document.title,
+        commentId: id, author: myName, text, media: media?.src, mine: true, source: 'post', reasons: [], count: 0, score: chk.score, flags: chk.reasons, status: 'review' });
+      warned = '';
+      // Notifications: a new level or special badge (real), and an example vote from another reader (preview)
+      const after = getRep(); const lvAfter = levelOf(after); const spAfter = specialsOf(after);
+      const here = `${location.pathname}#comentarios`;
+      if (lvAfter.index > lvBefore) notify({ id: `lv-${lvAfter.id}`, kind: 'badge', text: `¡Subiste a ${lvAfter.name}! Ya aparece junto a tu nombre en los comentarios.`, url: here });
+      SPECIALS.forEach((x) => { if (spAfter[x.id] && !spBefore[x.id]) notify({ id: `sp-${x.id}`, kind: 'badge', text: `Ganaste la insignia ${x.name}: ${x.means.toLowerCase()}`, url: here }); });
+      const fan = samples[0]?.name || 'lectora_bayamon';
+      setTimeout(() => notify({ id: `like-${id}`, kind: 'like', who: fan, text: 'votó a favor de tu comentario.', quote: text.slice(0, 80) || 'Sticker', url: here, demo: true }), 6000);
+      if (chk.verdict === 'review') { err.textContent = 'Publicado. La redacción lo revisará antes de que otros lo vean.'; err.hidden = false; }
+      if (replyTo) folded.delete(replyTo);
+      ta.value = ''; ta.style.height = 'auto'; replyTo = undefined; pk.setMedia(undefined); pk.close();
+      render();
+      const li = list.querySelector<HTMLElement>(`.cm-item[data-id="${id}"]`);
+      if (li) { li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); li.classList.add('cm-new'); setTimeout(() => li.classList.remove('cm-new'), 2500); }
+    });
+    render();
+  }
+
+  // Start every comments box last, once everything above (colors, helpers) is defined: starting earlier broke
+  // the box for signed-in readers whose avatar is painted right away
+  document.querySelectorAll<HTMLElement>('[data-comments]').forEach((root) => {
+    // The phone panel and the comments are separate: if one fails on some browser, the other still works,
+    // and the error is shown in the box so it can be reported
+    const oops = (where: string, e: unknown) => {
+      console.error(`Comentarios (${where}):`, e);
+      const n = root.querySelector<HTMLElement>('.cm-note');
+      if (n) n.textContent = `No pudimos cargar los comentarios (${where}: ${e instanceof Error ? e.message : String(e)}). Recarga la página.`;
+    };
+    try { sheet(root); } catch (e) { console.error('Comentarios (panel):', e); }
+    try { if (accountsOn()) live(root); else preview(root); } catch (e) { oops(accountsOn() ? 'live' : 'preview', e); }
+  });
+</script>

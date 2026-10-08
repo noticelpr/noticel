@@ -1,0 +1,21 @@
+---
+import Base from '../layouts/Base.astro';
+import { url } from '../lib/site';
+---
+<Base title="Página no encontrada">
+  <main class="wrap" id="main">
+    <div class="empty"><p data-nf-msg>No encontramos esta página. Es posible que el enlace esté incompleto o que la noticia se haya movido.</p><a class="btn" href={url()}>Ir a la portada</a></div>
+  </main>
+  <script is:inline>
+    // Old addresses: the site used to live under /noticias-xtra/ (saved stories, comment notifications and links
+    // shared before the move keep working), and noticel.com used to run EFE's service (/593_puerto-rico/123_….html).
+    (function () {
+      var p = location.pathname;
+      if (/^\/noticias-xtra(\/|$)/.test(p)) { location.replace(p.replace(/^\/noticias-xtra/, '') + location.search + location.hash || '/'); return; }
+      if (/^\/\d+_[a-z-]+\//.test(p)) {
+        var m = document.querySelector('[data-nf-msg]');
+        if (m) m.textContent = 'Esta noticia era de la versión anterior de NotiCel y ya no está disponible. Mira lo último en la portada.';
+      }
+    })();
+  </script>
+</Base>

@@ -1,0 +1,187 @@
+---
+// League page, laid out like big sports portals: header (section links in the title row), score strip, then three columns.
+// Left: titulares + equipos. Center: top story, juegos, more stories, team stats, playoffs.
+// Right: compact standings, season facts, ad. Every block hides or explains itself when empty.
+import Base from '../../layouts/Base.astro';
+import Time from '../../components/Time.astro';
+import Ph from '../../components/Ph.astro';
+import LeagueBadge from '../../components/deportes/LeagueBadge.astro';
+import TeamLogo from '../../components/deportes/TeamLogo.astro';
+import ScoreStrip from '../../components/deportes/ScoreStrip.astro';
+import GamesList from '../../components/deportes/GamesList.astro';
+import StandingsTable from '../../components/deportes/StandingsTable.astro';
+import BracketView from '../../components/deportes/BracketView.astro';
+import TeamStatsTable from '../../components/deportes/TeamStatsTable.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { getStories, url , storyUrl , sectionUrl } from '../../lib/site';
+import { LEAGUES, type League } from '../../lib/leagues';
+import { standings, isDemoTable } from '../../lib/scores';
+import teamsData from '../../data/equipos.json';
+
+export function getStaticPaths() {
+  return LEAGUES.map((l) => ({ params: { liga: l.id }, props: { l } }));
+}
+const { l } = Astro.props as { l: League };
+const news = (await getStories()).filter((s) => s.data.section === 'deportes' && s.data.league === l.id);
+const top = news[0];
+const more = news.slice(1);
+const season = 'season' in l ? l.season : undefined;
+const official = 'url' in l ? l.url : undefined;
+// Official YouTube channel: its "uploads" list ("UU" + channel id without "UC") always starts with the newest video
+const yt = 'youtube' in l ? l.youtube : undefined;
+// equipos.json: a plain list, or teams grouped by section ({ "Sección Este": [...] })
+const teamsEntry = (teamsData as Record<string, string[] | Record<string, string[]>>)[l.id] ?? [];
+const teamGroups: Array<[string, string[]]> = Array.isArray(teamsEntry) ? [['', teamsEntry]] : Object.entries(teamsEntry);
+const teamCount = teamGroups.reduce((n, [, t]) => n + t.length, 0);
+const st = standings(l.id);
+// Boxing and tennis are one-on-one sports: no standings, team stats, playoffs or team list
+const individual = l.photo === 'boxing' || l.photo === 'tennis';
+const stDemo = !!st && isDemoTable('standings', l.id);
+const pct = (w: number, p: number) => (w + p ? (w / (w + p)).toFixed(3).replace(/^0/, '') : '.000');
+// Quick links to the page's sections: icon buttons in the header row (a dropdown on phones)
+const ICON = {
+  posiciones: '<path d="M4 6h16M4 12h16M4 18h10" />',
+  estadisticas: '<path d="M5 20V10M12 20V4M19 20v-7" />',
+  equipos: '<circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6" />',
+  noticias: '<rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10M7 12h10M7 16h6" />',
+};
+const tabs: Array<[keyof typeof ICON, string]> = individual ? [['noticias', 'Noticias']] : [
+  ['posiciones', 'Posiciones'], ['estadisticas', 'Estadísticas'], ['equipos', 'Equipos'], ['noticias', 'Noticias'],
+];
+---
+<Base title={`${l.full} | Deportes`} active="deportes" description={`${l.full}: ${l.about}`}>
+  <div class="ys lg" id="inicio">
+    <header class="lg-head" style={`--lc:${l.color}`}>
+      <div class="wrap">
+        <div class="lg-title">
+          <LeagueBadge id={l.id} size="lg" />
+          <div class="lg-name">
+            <p class="lg-crumb"><a href={sectionUrl('deportes')}>NotiCel Deportes</a> <span aria-hidden="true">›</span> {l.name}</p>
+            <h1>{l.full}</h1>
+            <p class="lg-about">{l.about}</p>
+          </div>
+          <nav class="lg-jump" aria-label={`Secciones de ${l.name}`}>
+            {tabs.map(([id, label]) => (
+              <a href={`#${id}`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><Fragment set:html={ICON[id]} /></svg>{label}</a>
+            ))}
+          </nav>
+          <details class="lg-jump-m">
+            <summary>Secciones</summary>
+            <nav aria-label={`Secciones de ${l.name}`}>{tabs.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>
+          </details>
+          {official && <a class="lg-site" href={official} rel="noopener" target="_blank">Sitio oficial ↗</a>}
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap ys-page" id="main">
+      <div id="marcadores"><ScoreStrip only={l.id} /></div>
+
+      <div class="lg-grid">
+        <!-- Left: headlines and teams -->
+        <aside class="lg-left">
+          <section class="ys-card">
+            <div class="ys-card-h"><h2>Titulares</h2></div>
+            {news.length ? (
+              <ul class="lg-heads">{news.slice(0, 6).map((s) => <li><a href={storyUrl(s)}>{s.data.title}</a></li>)}</ul>
+            ) : <p class="sp-note">Todavía no hay noticias de {l.name}.</p>}
+          </section>
+          {!individual && <section class="ys-card" id="equipos">
+            <div class="ys-card-h"><h2>Equipos{teamCount > 8 && <span class="lg-count">{teamCount}</span>}</h2></div>
+            {teamCount ? teamGroups.map(([group, list]) => (
+              <>
+                {group && <h3 class="lg-group">{group}</h3>}
+                <ul class="lg-teams">{list.map((t) => <li><TeamLogo league={l.id} name={t} size={30} /><span class="notranslate" translate="no">{t}</span></li>)}</ul>
+              </>
+            )) : <p class="sp-note">La lista de equipos se publicará con la temporada.</p>}
+          </section>}
+        </aside>
+
+        <!-- Center: top story, games, more stories, stats, playoffs -->
+        <main class="lg-main">
+          {top ? (
+            <article class="ys-card lg-top" id="noticias">
+              <a href={storyUrl(top)} tabindex="-1" aria-hidden="true"><Ph sectionId="deportes" image={top.data.image} league={top.data.league} sizes="(max-width:760px) 100vw, 760px" priority /></a>
+              <a href={storyUrl(top)}><h2 class="hl">{top.data.title}</h2></a>
+              <p>{top.data.description}</p>
+              <Time date={top.data.date} />
+            </article>
+          ) : (
+            <section class="ys-card lg-empty" id="noticias">
+              <LeagueBadge id={l.id} size="md" />
+              <div><h2>{l.full}</h2><p>{season ?? 'Muy pronto publicaremos noticias de esta liga.'}</p></div>
+            </section>
+          )}
+
+          {!individual && <GamesList league={l.id} season={season} />}
+
+          {more.length > 0 && (
+            <section class="ys-card">
+              <div class="ys-card-h"><h2>Más noticias de {l.name}</h2></div>
+              <div class="lg-more">
+                {more.slice(0, 6).map((s) => (
+                  <a class="ys-mini" href={storyUrl(s)}>
+                    <Ph sectionId="deportes" image={s.data.image} league={s.data.league} />
+                    <h3 class="hl">{s.data.title}</h3>
+                    <span class="ys-by"><Time date={s.data.date} /></span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!individual && (
+            <>
+              <div id="estadisticas"><TeamStatsTable league={l.id} /></div>
+              <StandingsTable league={l.id} />
+              <BracketView league={l.id} />
+            </>
+          )}
+        </main>
+
+        <!-- Right: compact standings, season facts, ad -->
+        <aside class="lg-right">
+          {yt && (
+            <section class="ys-card lg-video" id="videos">
+              <div class="ys-card-h"><h2>Videos</h2><a href={`https://www.youtube.com/channel/${yt}`} rel="noopener" target="_blank">Canal oficial ↗</a></div>
+              <div class="lg-video-frame">
+                <iframe data-src={`https://www.youtube-nocookie.com/embed/videoseries?list=UU${yt.slice(2)}&autoplay=1&mute=1&rel=0&playsinline=1`}
+                  title={`Último video de ${l.name} en YouTube`} loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+              </div>
+              <p class="vsrc">El video más reciente del canal oficial de {l.name} en YouTube.</p>
+            </section>
+          )}
+          {!individual && <section class="ys-card" id="posiciones">
+            <div class="ys-card-h"><h2>Posiciones{stDemo && <span class="sp-demo">DEMO</span>}</h2></div>
+            {st?.groups?.length ? st.groups.map((g) => (
+              <>
+                {g.name && <h3 class="lg-group">{g.name}</h3>}
+                <table class="lg-mini-table">
+                  <thead><tr><th scope="col">Equipo</th><th scope="col">G</th><th scope="col">P</th><th scope="col">PCT</th></tr></thead>
+                  <tbody>{g.rows.map((r) => (
+                    <tr><th scope="row" class="notranslate" translate="no"><TeamLogo league={l.id} name={r.team} size={20} /><span>{r.team.split(' de ')[0]}</span></th><td>{r.w}</td><td>{r.l}</td><td>{pct(r.w, r.l)}</td></tr>
+                  ))}</tbody>
+                </table>
+              </>
+            )) : <p class="sp-note">Las posiciones se publicarán cuando comience la temporada.</p>}
+          </section>}
+          {(season || official) && (
+            <section class="ys-card lg-season" style={`--lc:${l.color}`}>
+              <div class="ys-card-h"><h2>Temporada</h2></div>
+              {season && <p>{season}</p>}
+              {official && <a href={official} rel="noopener" target="_blank">Sitio oficial de la liga ↗</a>}
+            </section>
+          )}
+          <AdSlot size="rectangle" />
+        </aside>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Phones: close the "Secciones" dropdown after picking a section
+    document.querySelectorAll<HTMLDetailsElement>('.lg-jump-m').forEach((d) =>
+      d.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => (d.open = false))),
+    );
+  </script>
+</Base>

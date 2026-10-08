@@ -1,0 +1,64 @@
+---
+// Columnist profile: /opinion/<name>/ — picture, topic, bio, every column they wrote (newest first) and the other columnists.
+import Base from '../../layouts/Base.astro';
+import StoryCard from '../../components/StoryCard.astro';
+import Sidebar from '../../components/Sidebar.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import { getStories, url , sectionUrl } from '../../lib/site';
+import { COLUMNISTS, columnsBy, initials, type Columnist } from '../../lib/columnists';
+
+export function getStaticPaths() {
+  return COLUMNISTS.map((c) => ({ params: { slug: c.slug }, props: { c } }));
+}
+const { c } = Astro.props as { c: Columnist };
+const cols = columnsBy(await getStories(), c);
+const others = COLUMNISTS.filter((o) => o.slug !== c.slug);
+const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+---
+<Base title={`${c.name} · Opinión`} active="opinion" description={c.bio ?? `Columnas de ${c.name} en NotiCel.`}>
+  <main class="wrap" id="main">
+    <div class="crumbs"><a href={sectionUrl('opiniones')}>Opinión</a> / <span>Columnistas</span></div>
+    <div class="art-grid">
+      <div>
+        <section class="cp-head">
+          {c.photo ? <img class="cp-pic" src={url(c.photo)} alt={`Retrato de ${c.name}`} /> : <span class="cp-pic col-ini" aria-hidden="true">{initials(c.name)}</span>}
+          <div class="cp-info">
+            {c.role && <span class="col-role">{c.role}</span>}
+            <h1>{c.name}{c.demo && <span class="sp-demo">EJEMPLO</span>}</h1>
+            {c.bio && <p class="cp-bio">{c.bio}</p>}
+            <ul class="cp-stats">
+              <li><b>{cols.length}</b> {cols.length === 1 ? 'columna' : 'columnas'}</li>
+              {last && <li>Última: <b>{last}</b></li>}
+            </ul>
+            {c.demo && <p class="cp-note">Perfil de ejemplo: este espacio será para un columnista real.</p>}
+          </div>
+        </section>
+
+        <section>
+          <div class="sec-h"><h2>Columnas de {c.name}</h2></div>
+          {cols.length > 0 ? (
+            <div class="cp-list">{cols.map((s) => <StoryCard story={s} variant="item" />)}</div>
+          ) : (
+            <div class="empty"><p>{c.demo ? 'Este perfil es un ejemplo. Aquí aparecerán sus columnas.' : 'Su primera columna llega muy pronto.'}</p><a class="btn" href={sectionUrl('opiniones')}>Ver todas las columnas</a></div>
+          )}
+        </section>
+
+        <AdSlot size="infeed" />
+
+        <section>
+          <div class="sec-h"><h2>Otros columnistas</h2></div>
+          <div class="cp-others">
+            {others.map((o) => (
+              <a class="cp-other" href={url(`opinion/${o.slug}`)}>
+                {o.photo ? <img src={url(o.photo)} alt="" loading="lazy" /> : <span class="col-ini" aria-hidden="true">{initials(o.name)}</span>}
+                <b>{o.name}</b>
+                {o.role && <small>{o.role}</small>}
+              </a>
+            ))}
+          </div>
+        </section>
+      </div>
+      <Sidebar />
+    </div>
+  </main>
+</Base>

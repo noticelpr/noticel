@@ -1,0 +1,6 @@
+---
+import { section, type Story } from '../lib/site';
+interface Props { story: Story }
+const { story } = Astro.props;
+---
+{story.data.live ? <span class="badge live">EN VIVO</span> : <span class="badge">{section(story.data.section).name}</span>}

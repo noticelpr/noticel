@@ -1,0 +1,104 @@
+---
+// Palabra NotiCel: guess the 5-letter word of the day in six tries.
+// Green = right letter, right spot. Yellow = in the word, other spot. Gray = not in the word.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+import { url } from '../../lib/site';
+---
+<Base title="Palabra NotiCel" description="Adivina la palabra del día en seis intentos.">
+  <main class="wrap" id="main">
+    <GameLayout id="palabra">
+    <div class="jg-game" data-palabra>
+      <p class="tv-kicker"><a href={url('juegos')}>Juegos NotiCel</a> · Palabra del día</p>
+      <h1>Palabra NotiCel</h1>
+      <p class="jg-help">Adivina la palabra de 5 letras en 6 intentos. <b class="pl-k ok">Verde</b>: letra en su sitio. <b class="pl-k in">Amarillo</b>: está en otro sitio. <b class="pl-k no">Gris</b>: no está.</p>
+      <div class="pl-board" aria-label="Tablero" role="grid"></div>
+      <p class="jg-msg" aria-live="polite"></p>
+      <div class="pl-keys" aria-label="Teclado"></div>
+    </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    // Everyday Spanish words, written without accents (the game ignores accents)
+    const WORDS = ['PLAYA', 'SALSA', 'COQUI', 'MANGO', 'PLENA', 'BOMBA', 'ARROZ', 'CIELO', 'MONTE', 'VERDE', 'NOCHE', 'RITMO',
+      'FUEGO', 'LLAVE', 'PIANO', 'RADIO', 'TORRE', 'BARCO', 'PLATO', 'QUESO', 'LIMON', 'DULCE', 'AMIGO', 'CANTO', 'CALLE',
+      'GENTE', 'HOGAR', 'JUEGO', 'LECHE', 'MAREA', 'NUBES', 'PALMA', 'RUMBA', 'SABOR', 'TARDE', 'CARRO', 'ISLAS', 'BRISA',
+      'CAMPO', 'FIRME', 'LUNES', 'MUSICA', 'PERLA', 'ROCIO', 'SELVA', 'TAINO', 'VIENTO', 'YUCAS', 'GUIRO', 'CUERO'].filter((w) => w.length === 5);
+    const box = document.querySelector<HTMLElement>('[data-palabra]')!;
+    const board = box.querySelector<HTMLElement>('.pl-board')!;
+    const keys = box.querySelector<HTMLElement>('.pl-keys')!;
+    const msg = box.querySelector<HTMLElement>('.jg-msg')!;
+    const day = Math.floor((Date.now() - 4 * 3600e3) / 86400e3); // Puerto Rico day
+    const answer = WORDS[(day * 7) % WORDS.length];
+    const key = `nc-palabra-${day}`;
+    let rows: string[] = [];
+    try { rows = JSON.parse(localStorage.getItem(key) || '[]'); } catch { /* storage blocked */ }
+    let cur = '';
+    let over = false;
+
+    // Board: 6 rows x 5 tiles
+    const tiles: HTMLElement[][] = [];
+    for (let r = 0; r < 6; r++) {
+      const row = document.createElement('div');
+      row.className = 'pl-row'; row.setAttribute('role', 'row');
+      tiles.push([...Array(5)].map(() => { const t = document.createElement('span'); t.className = 'pl-tile'; t.setAttribute('role', 'gridcell'); row.append(t); return t; }));
+      board.append(row);
+    }
+    // Keyboard (with Ñ)
+    const keyEls = new Map<string, HTMLButtonElement>();
+    ['QWERTYUIOP', 'ASDFGHJKLÑ', '⌫ZXCVBNM↵'].forEach((line) => {
+      const row = document.createElement('div'); row.className = 'pl-krow';
+      [...line].forEach((ch) => {
+        const b = document.createElement('button'); b.type = 'button'; b.textContent = ch === '↵' ? 'Enviar' : ch;
+        if (ch === '⌫') b.setAttribute('aria-label', 'Borrar');
+        if (ch === '↵' || ch === '⌫') b.classList.add('wide');
+        b.addEventListener('click', () => press(ch));
+        keyEls.set(ch, b); row.append(b);
+      });
+      keys.append(row);
+    });
+
+    // Colors for one guess: 2 = right spot, 1 = elsewhere, 0 = not in the word
+    function score(guess: string) {
+      const res = [0, 0, 0, 0, 0];
+      const left = [...answer];
+      [...guess].forEach((c, i) => { if (c === answer[i]) { res[i] = 2; left[i] = ''; } });
+      [...guess].forEach((c, i) => { if (res[i] !== 2) { const j = left.indexOf(c); if (j >= 0) { res[i] = 1; left[j] = ''; } } });
+      return res;
+    }
+    const CLS = ['no', 'in', 'ok'];
+    function paint() {
+      tiles.forEach((row, r) => {
+        const word = rows[r] ?? (r === rows.length ? cur : '');
+        const sc = rows[r] ? score(rows[r]) : null;
+        row.forEach((t, i) => { t.textContent = word[i] ?? ''; t.className = `pl-tile${sc ? ' ' + CLS[sc[i]] : word[i] ? ' typed' : ''}`; });
+      });
+      const best = new Map<string, number>();
+      rows.forEach((w) => score(w).forEach((s, i) => best.set(w[i], Math.max(best.get(w[i]) ?? -1, s))));
+      keyEls.forEach((b, ch) => { b.classList.remove('ok', 'in', 'no'); if (best.has(ch)) b.classList.add(CLS[best.get(ch)!]); });
+      const won = rows.includes(answer);
+      if (won) award('palabra', 110 - rows.length * 10, `Palabra en ${rows.length} ${rows.length === 1 ? 'intento' : 'intentos'}`, key);
+      over = won || rows.length >= 6;
+      msg.textContent = won ? `¡Excelente! Lo lograste en ${rows.length} ${rows.length === 1 ? 'intento' : 'intentos'}. Vuelve mañana por otra palabra.`
+        : over ? `La palabra era ${answer}. ¡Mañana hay otra!` : '';
+    }
+    function press(ch: string) {
+      if (over) return;
+      if (ch === '⌫') cur = cur.slice(0, -1);
+      else if (ch === '↵') {
+        if (cur.length < 5) { msg.textContent = 'Faltan letras.'; return; }
+        rows.push(cur); cur = '';
+        try { localStorage.setItem(key, JSON.stringify(rows)); } catch { /* storage blocked */ }
+      } else if (cur.length < 5) cur += ch;
+      paint();
+    }
+    addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'Enter') press('↵');
+      else if (e.key === 'Backspace') press('⌫');
+      else if (/^[a-zñ]$/i.test(e.key)) press(e.key.toUpperCase());
+    });
+    paint();
+  </script>
+</Base>

@@ -1,0 +1,17 @@
+---
+import StoryCard from './StoryCard.astro';
+import { section, url, type SectionId, type Story , sectionUrl } from '../lib/site';
+interface Props { sectionId: SectionId; stories: Story[]; exclude?: string[] }
+const { sectionId, stories, exclude = [] } = Astro.props;
+const list = stories.filter((s) => s.data.section === sectionId && !exclude.includes(s.id));
+const s = section(sectionId);
+---
+{list.length > 0 && (
+  <section class={`sec-block sec-${sectionId}`}>
+    <div class="sec-h"><h2>{s.name}</h2><a href={sectionUrl(sectionId)}>Ver todo</a></div>
+    <div class="block">
+      <StoryCard story={list[0]} variant="big" />
+      <div class="list">{list.slice(1, 4).map((st) => <StoryCard story={st} variant="item" />)}</div>
+    </div>
+  </section>
+)}

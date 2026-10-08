@@ -1,0 +1,31 @@
+[
+  {
+    "title": "José Alberto “El Canario”: 50 años de carrera",
+    "kind": "Concierto",
+    "date": "2026-10-24",
+    "venue": "Charles F. Dodge City Center",
+    "city": "Pembroke Pines, Florida"
+  },
+  {
+    "title": "Dalvin “La Melodía”: “La otra”",
+    "kind": "Concierto",
+    "date": "2027-01-16",
+    "venue": "Coliseo de Puerto Rico José Miguel Agrelot",
+    "city": "San Juan",
+    "tickets": "Ticketera"
+  },
+  {
+    "title": "Hilary Duff: “Lucky Me Tour”",
+    "kind": "Concierto",
+    "date": "2027-08-10",
+    "venue": "Coliseo de Puerto Rico José Miguel Agrelot",
+    "city": "San Juan"
+  },
+  {
+    "title": "La Centenaria Banda Colegial en el Desfile de las Rosas",
+    "kind": "Desfile",
+    "date": "2028-01",
+    "venue": "Desfile de las Rosas",
+    "city": "Pasadena, California"
+  }
+]

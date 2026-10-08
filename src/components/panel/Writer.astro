@@ -11,12 +11,12 @@
 // Without Supabase it's a preview: articles stay on this device ('nc-articles') and can be downloaded as story files.
 // NotiCel version: "Sección" is one of NotiCel's WordPress categories, and a new story gets an address in the same
 // style as WordPress (/<category path>/<YYYYMMDD>/<slug>/, kept forever once published). "Destacada" is `topStory`.
-import { SECTIONS, CATEGORY_INFO, PR_MUNICIPIOS, url } from '../../lib/site';
+import { CATEGORY_OPTIONS, CATEGORY_INFO, PR_MUNICIPIOS, url } from '../../lib/site';
 import PhotoLibrary from './PhotoLibrary.astro';
 type Pub = { id: string; title: string; section: string; author: string; date: string; url: string; ai: boolean };
 interface Props { recent: Array<{ id: string; title: string }>; published: Pub[] }
 const { recent, published } = Astro.props;
-const secs = SECTIONS.map(({ id, name }) => ({ id, name }));
+const secs = CATEGORY_OPTIONS.map(({ id, name }) => ({ id, name }));
 const catPaths = Object.fromEntries(Object.entries(CATEGORY_INFO).map(([k, v]) => [k, v.path])); // for new story addresses
 const secPhotos = {}; // social image when a story has no photo (NotiCel has no default photos per category yet)
 const I = (d: string) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;

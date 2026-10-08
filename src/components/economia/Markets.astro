@@ -1,0 +1,192 @@
+---
+// Market numbers that matter in Puerto Rico: local companies on Wall Street, the big indexes, oil, gasoline, gold and crypto.
+// Prices come from Yahoo Finance when the site is built (it rebuilds every hour), so they can be up to an hour late.
+// Bitcoin and Ethereum refresh live in the reader's browser every minute (CoinGecko). If a source fails, that item is left out.
+//   tape  → the scrolling strip under the Economía header (tap an item to open its details below)
+//   strip → the same strip on its own (home page), with a "Mercados" link; items open their details on Economía
+//   (none)→ the "Mercados" board: filter chips, tap a row for a chart (5 días / 1 mes / 3 meses), day range, 52-week range
+import { url , sectionUrl } from '../../lib/site';
+interface Props { tape?: boolean; strip?: boolean }
+const { tape: tapeOnly = false, strip = false } = Astro.props;
+const tape = tapeOnly || strip;
+
+import { LIST, GROUPS, CHIPS, getMarkets, type Quote } from '../../lib/markets';
+const { at, list } = await getMarkets();
+
+const fmt = (q: Quote, v = q.price) => v.toLocaleString('en-US', { minimumFractionDigits: q.digits ?? 2, maximumFractionDigits: q.digits ?? 2 });
+const cur = (q: Quote) => (q.group === 'us' ? '' : '$');
+const pct = (q: Quote) => ((q.price - q.prev) / q.prev) * 100;
+const spark = (v: number[]) => {
+  if (v.length < 2) return '';
+  const lo = Math.min(...v), hi = Math.max(...v), w = 90, h = 28;
+  return v.map((x, i) => `${((i / (v.length - 1)) * w).toFixed(1)},${(h - 2 - ((x - lo) / (hi - lo || 1)) * (h - 4)).toFixed(1)}`).join(' ');
+};
+const when = at.toLocaleString('es-PR', { weekday: 'long', hour: 'numeric', minute: '2-digit', timeZone: 'America/Puerto_Rico' });
+const board = sectionUrl('economia');
+// Data for the detail panels (dates as seconds, closes)
+const data = Object.fromEntries(list.map((q) => [q.key, { name: q.name, about: q.about, d: q.digits ?? 2, cur: cur(q), suf: q.suf ?? '', price: q.price, prev: q.prev, hi: q.hi, lo: q.lo, hi52: q.hi52, lo52: q.lo52, t: q.t, c: q.c, gas: q.sym === 'RB=F' }]));
+---
+{list.length > 0 && (tape ? (
+  <div class:list={['eco-tape', { 'eco-strip': strip }]} aria-label="Mercados" data-tape>
+    {strip && <a class="eco-strip-l" href={board}>Mercados <span aria-hidden="true">›</span></a>}
+    <div class="eco-tape-view">
+      <div class="eco-tape-track">
+        {[0, 1].map((copy) => (
+          <ul aria-hidden={copy ? 'true' : undefined}>
+            {list.map((q) => { const p = pct(q); return (
+              <li data-coin={q.coin} data-digits={q.digits ?? 2}>
+                <a href={`${board}#m-${q.key}`} tabindex={copy ? -1 : undefined} data-open={q.key}>
+                  <b>{q.name.replace(/ \(.*/, '')}</b> <span class="eco-n"><span data-price>{fmt(q)}</span>{q.suf}</span> <span class:list={['eco-ch', p >= 0 ? 'up' : 'down']} data-ch>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</span>
+                </a>
+              </li>
+            ); })}
+          </ul>
+        ))}
+      </div>
+    </div>
+    <button type="button" class="eco-tape-btn" data-tape-toggle aria-pressed="false" aria-label="Pausar">❚❚</button>
+  </div>
+) : (
+  <section class="eco-board" id="mercados" aria-labelledby="eco-m" data-board={JSON.stringify(data)}>
+    <div class="eco-board-h">
+      <h2 id="eco-m">Mercados</h2>
+      <p>Actualizado el {when} · los precios pueden tener una hora de atraso</p>
+    </div>
+    <div class="eco-chips" role="group" aria-label="Filtrar">
+      {Object.entries(CHIPS).map(([id, label], i) => <button type="button" data-filter={id} aria-pressed={String(i === 0)}>{label}</button>)}
+    </div>
+    <p class="eco-hint">Toca cualquier precio para ver su gráfica.</p>
+    <div class="eco-groups">
+      {Object.entries(GROUPS).map(([id, title]) => { const qs = list.filter((q) => q.group === id); return qs.length > 0 && (
+        <div class="eco-group" data-group={id}>
+          <h3>{title}</h3>
+          <ul>
+            {qs.map((q) => { const p = pct(q); return (
+              <li data-coin={q.coin} data-digits={q.digits ?? 2} id={`m-${q.key}`}>
+                <button type="button" class="eco-row" data-row={q.key} aria-expanded="false">
+                  <span class="eco-name"><b>{q.name}</b><small>{q.key}</small></span>
+                  <svg class:list={['eco-spark', (q.c.at(-1) ?? 0) >= (q.c.at(-20) ?? q.c[0] ?? 0) ? 'up' : 'down']} viewBox="0 0 90 28" aria-hidden="true"><polyline points={spark(q.c.slice(-20))} /></svg>
+                  <span class="eco-val"><b class="eco-n">{cur(q)}<span data-price>{fmt(q)}</span>{q.suf}</b><span class:list={['eco-ch', p >= 0 ? 'up' : 'down']} data-ch>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</span></span>
+                </button>
+                <div class="eco-detail" data-detail hidden></div>
+              </li>
+            ); })}
+          </ul>
+        </div>
+      ); })}
+    </div>
+    <p class="eco-note">Fuente: Yahoo Finance y CoinGecko. Información, no consejo de inversión.</p>
+  </section>
+))}
+<script>
+  // ---- Ticker strip: pause button; on Economía, tapping an item opens it on the board instead of reloading ----
+  document.querySelectorAll<HTMLElement>('[data-tape]').forEach((t) => {
+    const btn = t.querySelector<HTMLButtonElement>('[data-tape-toggle]')!;
+    btn.addEventListener('click', () => {
+      const paused = t.classList.toggle('paused');
+      btn.setAttribute('aria-pressed', String(paused)); btn.setAttribute('aria-label', paused ? 'Seguir' : 'Pausar'); btn.textContent = paused ? '▶' : '❚❚';
+    });
+    t.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('[data-open]');
+      if (a && document.querySelector('[data-board]')) { e.preventDefault(); openRow(a.dataset.open!, true); }
+    });
+  });
+
+  // ---- Board: filters and detail panels ----
+  type D = { name: string; about: string; d: number; cur: string; suf: string; price: number; prev: number; hi?: number; lo?: number; hi52?: number; lo52?: number; t: number[]; c: number[]; gas: boolean };
+  const board = document.querySelector<HTMLElement>('[data-board]');
+  const DATA: Record<string, D> = board ? JSON.parse(board.dataset.board!) : {};
+  const money = (d: D, v: number) => `${d.cur}${v.toLocaleString('en-US', { minimumFractionDigits: d.d, maximumFractionDigits: d.d })}${d.suf}`;
+  const day = (s: number, o: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }) => new Date(s * 1000).toLocaleDateString('es-PR', { ...o, timeZone: 'America/New_York' });
+
+  function chart(box: HTMLElement, k: string, n: number) {
+    const d = DATA[k]; const t = d.t.slice(-n), c = d.c.slice(-n);
+    if (c.length < 2) { box.innerHTML = '<p class="eco-hint">No hay suficientes datos.</p>'; return; }
+    const W = 600, H = 190, L = 8, R = 8, T = 12, B = 24;
+    const lo = Math.min(...c), hi = Math.max(...c), pad = (hi - lo) * 0.1 || 1;
+    const x = (i: number) => L + (i * (W - L - R)) / (c.length - 1);
+    const y = (v: number) => T + (H - T - B) * (1 - (v - (lo - pad)) / (hi - lo + pad * 2));
+    const up = c.at(-1)! >= c[0];
+    const pts = c.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const labels = [0, Math.floor((c.length - 1) / 2), c.length - 1].map((i, j) => `<text x="${x(i)}" y="${H - 6}" text-anchor="${['start', 'middle', 'end'][j]}" class="eco-ax">${day(t[i])}</text>`).join('');
+    const ch = ((c.at(-1)! - c[0]) / c[0]) * 100;
+    box.innerHTML = `<p class="eco-period">${n <= 5 ? 'En 5 días' : n <= 22 ? 'En 1 mes' : 'En 3 meses'}: <b class="${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(ch).toFixed(2)}%</b></p>
+      <svg viewBox="0 0 ${W} ${H}" class="eco-big ${up ? 'up' : 'down'}" role="img" aria-label="Gráfica de ${d.name}"><polygon points="${L},${y(lo - pad)} ${pts} ${x(c.length - 1)},${y(lo - pad)}" class="eco-area"/><polyline points="${pts}" class="eco-line"/>${labels}<line class="eco-cur" y1="${T}" y2="${H - B}" hidden/><circle r="5" class="eco-dot" hidden/><rect x="0" y="0" width="${W}" height="${H}" fill="transparent" data-hit/></svg>
+      <p class="eco-read" data-read>Pasa el dedo sobre la gráfica para ver cada día.</p>`;
+    const svg = box.querySelector('svg')!, cl = svg.querySelector('.eco-cur')!, dot = svg.querySelector('.eco-dot')!, read = box.querySelector<HTMLElement>('[data-read]')!;
+    const at = (cx: number) => {
+      const r = svg.getBoundingClientRect(); const i = Math.max(0, Math.min(c.length - 1, Math.round((((cx - r.left) * (W / r.width)) - L) / (W - L - R) * (c.length - 1))));
+      cl.removeAttribute('hidden'); dot.removeAttribute('hidden');
+      cl.setAttribute('x1', String(x(i))); cl.setAttribute('x2', String(x(i))); dot.setAttribute('cx', String(x(i))); dot.setAttribute('cy', String(y(c[i])));
+      read.innerHTML = `<b>${day(t[i], { weekday: 'long', day: 'numeric', month: 'long' })}:</b> ${money(d, c[i])}`;
+    };
+    svg.addEventListener('pointermove', (e) => at(e.clientX));
+    svg.addEventListener('pointerdown', (e) => at(e.clientX));
+  }
+
+  function detail(k: string) {
+    const d = DATA[k];
+    const diff = d.price - d.prev;
+    const range = (lo?: number, hi?: number, label = '') => (lo != null && hi != null && hi > lo
+      ? `<div class="eco-range"><span>${label}</span><div class="eco-range-bar"><i style="left:${Math.max(0, Math.min(100, ((d.price - lo) / (hi - lo)) * 100))}%"></i></div><small><span>${money(d, lo)}</span><span>${money(d, hi)}</span></small></div>` : '');
+    return `<p class="eco-about">${d.about}</p>
+      <p class="eco-diff">Hoy: <b class="${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : '−'}${money(d, Math.abs(diff))}</b> desde el cierre anterior${d.gas ? ` · ≈ <b>$${(d.price / 3.785).toFixed(2)}</b> por litro, mayorista` : ''}</p>
+      <div class="eco-tabs" role="group" aria-label="Período">${[[5, '5 días'], [22, '1 mes'], [70, '3 meses']].map(([n, l], i) => `<button type="button" data-n="${n}" aria-pressed="${i === 1}">${l}</button>`).join('')}</div>
+      <div data-chart></div>
+      <div class="eco-ranges">${range(d.lo, d.hi, 'Rango de hoy')}${range(d.lo52, d.hi52, 'Rango de 52 semanas')}</div>`;
+  }
+
+  function openRow(k: string, scroll = false) {
+    const li = document.getElementById(`m-${k}`); if (!li || !DATA[k]) return;
+    // Show its group if a filter hides it
+    const g = li.closest<HTMLElement>('[data-group]')!;
+    if (g.hidden) setFilter('all');
+    const btn = li.querySelector<HTMLButtonElement>('[data-row]')!, box = li.querySelector<HTMLElement>('[data-detail]')!;
+    const open = btn.getAttribute('aria-expanded') !== 'true' || scroll;
+    document.querySelectorAll<HTMLElement>('[data-row][aria-expanded="true"]').forEach((b) => { if (b !== btn) { b.setAttribute('aria-expanded', 'false'); (b.nextElementSibling as HTMLElement).hidden = true; } });
+    btn.setAttribute('aria-expanded', String(open)); box.hidden = !open;
+    if (open) {
+      box.innerHTML = detail(k); chart(box.querySelector('[data-chart]')!, k, 22);
+      box.querySelectorAll<HTMLButtonElement>('[data-n]').forEach((b) => b.addEventListener('click', () => {
+        box.querySelectorAll('[data-n]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        chart(box.querySelector('[data-chart]')!, k, Number(b.dataset.n));
+      }));
+      if (scroll) li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+  function setFilter(f: string) {
+    document.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === f)));
+    document.querySelectorAll<HTMLElement>('[data-group]').forEach((g) => (g.hidden = f !== 'all' && g.dataset.group !== f));
+    board?.classList.toggle('one', f !== 'all');
+  }
+  if (board) {
+    board.querySelectorAll<HTMLButtonElement>('[data-row]').forEach((b) => b.addEventListener('click', () => openRow(b.dataset.row!)));
+    board.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((b) => b.addEventListener('click', () => setFilter(b.dataset.filter!)));
+    const h = location.hash.match(/^#m-(.+)$/); if (h) setTimeout(() => openRow(decodeURIComponent(h[1]), true), 300);
+  }
+
+  // ---- Bitcoin and Ethereum: live price and 24-hour change, every minute, with a flash when it moves ----
+  const coins = document.querySelectorAll<HTMLElement>('[data-coin]');
+  const live = () => {
+    if (!coins.length || document.hidden) return;
+    const ids = [...new Set([...coins].map((e) => e.dataset.coin))].join(',');
+    fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`)
+      .then((r) => r.json())
+      .then((d) => coins.forEach((el) => {
+        const c = d[el.dataset.coin!]; if (!c?.usd) return;
+        const price = el.querySelector<HTMLElement>('[data-price]')!, ch = el.querySelector<HTMLElement>('[data-ch]')!;
+        const dg = Number(el.dataset.digits ?? 2);
+        const txt = c.usd.toLocaleString('en-US', { minimumFractionDigits: dg, maximumFractionDigits: dg });
+        if (price.textContent !== txt) {
+          const upNow = c.usd >= Number(price.textContent!.replace(/,/g, ''));
+          price.textContent = txt;
+          price.classList.remove('flash-up', 'flash-down'); void price.offsetWidth; price.classList.add(upNow ? 'flash-up' : 'flash-down');
+        }
+        const p = c.usd_24h_change ?? 0;
+        ch.textContent = `${p >= 0 ? '▲' : '▼'} ${Math.abs(p).toFixed(2)}%`;
+        ch.classList.toggle('up', p >= 0); ch.classList.toggle('down', p < 0);
+      }))
+      .catch(() => { /* keep the last numbers */ });
+  };
+  live(); setInterval(live, 60000);
+</script>

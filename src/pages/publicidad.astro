@@ -1,0 +1,638 @@
+---
+// Anúnciate: a short page built around one step-by-step guide (one question at a time):
+//   1 format → 2 where and when → 3 the ad (upload it, or write what it should say and we create it) → 4 details and pay.
+// Requests go to the approval page (src/pages/publicidad/aprobar.astro) for the one employee who reviews and designs ads.
+// Prices, discounts, payments and where requests are saved: src/lib/ads.ts. Everything else is folded into "Preguntas".
+import Base from '../layouts/Base.astro';
+import { SITE, url } from '../lib/site';
+import { FORMATS, REGIONS, AUDIENCE, LAUNCH_DISCOUNT, DURATION_DISCOUNTS, OTHER_DISCOUNTS, MAX_DISCOUNT, REWARDS, VOLUME_TIERS, AGENCY_COMMISSION, WEEK_SHARE, periodCost, VIEW_PACKS, VIEW_DISCOUNTS, LAUNCH_VIEWS,
+  DESIGN_FEE, DESIGN_FREE_FROM_MONTHS, UPLOAD, PAYMENTS, APPROVAL_HOURS, ROTATE_SECONDS, TAKEOVER_CPM, TAKEOVER_VIEW_PACKS } from '../lib/ads';
+import { THEMES } from '../lib/adcreative';
+
+const money = (n: number) => `$${n.toLocaleString('en-US')}`;
+// Cheapest way in: the smallest views package of the cheapest display ad
+const cheapest = Math.min(...FORMATS.filter((f) => 'cpm' in f).map((f) => ('cpm' in f ? f.cpm : 99) * (VIEW_PACKS[0] / 1000)));
+// Simplified map of Puerto Rico (viewBox 0 0 690 215): the island outline, cut into regions
+const ISLAND = 'M46 13L132 20L231 20L330 23L396 26L462 36L554 56L554 99L512 142L485 175L413 191L330 201L231 191L149 198L99 191L33 198L36 149L26 116L10 59Z';
+const CUTS: Record<string, string> = {
+  oeste: 'M0 0H120V215H0Z', norte: 'M120 0H370V88L120 92Z', metro: 'M370 0H470V100L370 88Z',
+  centro: 'M120 92L370 88L470 100V140L120 145Z', sur: 'M120 145L470 140V215H120Z', este: 'M470 0H562V215H470Z',
+};
+const LABELS: Record<string, [number, number]> = { oeste: [64, 108], norte: [245, 58], metro: [420, 62], centro: [292, 120], sur: [292, 176], este: [514, 112], islas: [622, 172] };
+// Campaign length in days (prices: src/lib/ads.ts quote; a week costs WEEK_SHARE of the month)
+const DURATIONS = [
+  { v: '7', label: '1 semana', off: 0 }, { v: '14', label: '2 semanas', off: 0 }, { v: '30', label: '1 mes', off: 0 },
+  ...DURATION_DISCOUNTS.map((d) => ({ v: String(d.months * 30), label: `${d.months} meses`, off: d.pct })),
+];
+// Rate card for the price table: week, month and 3 months (with the length discount) for each format
+const rate = (f: (typeof FORMATS)[number]) => f.per === 'día' ? null : { week: Math.round(periodCost(f.price, 7)), month: f.price, three: Math.round(f.price * 3 * (1 - (DURATION_DISCOUNTS[0]?.pct ?? 0) / 100)) };
+const cfg = { formats: FORMATS.map((f) => ({ id: f.id, name: f.name, price: f.price, per: f.per, art: f.art, cpm: 'cpm' in f ? f.cpm : 0 })), audience: AUDIENCE, launch: LAUNCH_DISCOUNT, duration: DURATION_DISCOUNTS,
+  other: OTHER_DISCOUNTS, max: MAX_DISCOUNT, rewards: REWARDS, volume: VOLUME_TIERS, design: DESIGN_FEE, designFree: DESIGN_FREE_FROM_MONTHS, upload: UPLOAD,
+  pay: PAYMENTS, regions: REGIONS.map(({ id, name }) => ({ id, name })), tkCpm: TAKEOVER_CPM };
+const CTAS = ['Llama hoy', 'Visítanos', 'Ordena ya', 'Escríbenos por WhatsApp', 'Ver ofertas'];
+---
+<Base title="Anúnciate" description={`Anúnciate en NotiCel desde ${money(cheapest)} por ${VIEW_PACKS[0].toLocaleString('en-US')} vistas: crea tu anuncio en 4 pasos, paga en línea y sale en ${APPROVAL_HOURS} horas.`}>
+  <main class="wrap ad-page" id="main">
+    <section class="adp-hero adp-hero-s">
+      <p class="adp-kicker">Publicidad en NotiCel</p>
+      <h1>Anúnciate desde {money(cheapest)} por {VIEW_PACKS[0].toLocaleString('en-US')} vistas</h1>
+      <p class="adp-lead">Crea tu anuncio en 4 pasos, paga en línea y sale en {APPROVAL_HOURS} horas.</p>
+      <div class="adp-ctas">
+        <a class="adp-btn red" href="#campana">Crear mi anuncio</a>
+        <a class="adp-btn ghost" href="#contacto">Prefiero hablar con alguien</a>
+      </div>
+      <ol class="adp-how">
+        <li><span>1</span>Escoge tu anuncio</li>
+        <li><span>2</span>Sube tu arte o dinos qué decir</li>
+        <li><span>3</span>Paga en línea</li>
+        <li><span>4</span>Lo revisamos y sale</li>
+      </ol>
+    </section>
+
+    <section class="wiz" id="campana" aria-labelledby="wiz-h">
+      <h2 id="wiz-h" class="sr">Crea tu anuncio</h2>
+      <ol class="wiz-prog" aria-label="Pasos">
+        <li><button type="button" data-goto="1" aria-current="step">Anuncio</button></li>
+        <li><button type="button" data-goto="2">Dónde y cuándo</button></li>
+        <li><button type="button" data-goto="3">Tu arte</button></li>
+        <li><button type="button" data-goto="4">Pago</button></li>
+      </ol>
+
+      <form class="wiz-form" data-wiz data-cfg={JSON.stringify(cfg)} data-email={SITE.email} novalidate>
+        <!-- 1 · Format -->
+        <fieldset class="wiz-step" data-step="1">
+          <legend>¿Qué anuncio quieres?</legend>
+          <p class="wiz-help">Puedes escoger más de uno (10% de descuento).</p>
+          <div class="wiz-fmts">
+            {FORMATS.map((f) => (
+              <label class="wiz-fmt">
+                <input type="checkbox" name="fmt" value={f.id} checked={f.popular} />
+                {f.popular && <span class="wiz-pop">El más pedido</span>}
+                <b>{f.name}</b>
+                <span class="wiz-price">{'cpm' in f ? <>{money(f.cpm)}<small>/1,000 vistas</small></> : <>{money(f.price)}<small>/{f.per}</small></>}</span>
+                <span class="wiz-about">{f.about}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <!-- 2 · Where and when -->
+        <fieldset class="wiz-step" data-step="2" hidden>
+          <legend>¿Dónde y cuándo?</legend>
+          <p class="wiz-q">¿Quién lo ve?</p>
+          <div class="wiz-chips">
+            <label><input type="radio" name="aud" value="all" checked /><span>Todos</span></label>
+            <label><input type="radio" name="aud" value="island" /><span>Solo Puerto Rico</span></label>
+            <label><input type="radio" name="aud" value="regions" /><span>Solo mi región</span></label>
+            <label><input type="radio" name="aud" value="diaspora" /><span>Solo la diáspora</span></label>
+          </div>
+          <div class="wiz-map" data-map-wrap hidden>
+            <svg class="adb-map" viewBox="0 0 690 215" role="group" aria-label="Mapa de regiones de Puerto Rico">
+              <defs><clipPath id="adb-isla"><path d={ISLAND} /></clipPath></defs>
+              <g clip-path="url(#adb-isla)">
+                {Object.entries(CUTS).map(([id, d]) => <path class="adb-reg" data-reg={id} d={d}><title>{REGIONS.find((r) => r.id === id)!.name}</title></path>)}
+              </g>
+              <g class="adb-reg" data-reg="islas"><title>Vieques y Culebra</title><ellipse cx="618" cy="143" rx="50" ry="9" /><ellipse cx="660" cy="80" rx="13" ry="6" /></g>
+              <path class="adb-outline" d={ISLAND} />
+              {Object.entries(LABELS).map(([id, [x, y]]) => <text x={x} y={y} class="adb-lbl" data-lbl={id}>{id === 'islas' ? 'Islas' : REGIONS.find((r) => r.id === id)!.name}</text>)}
+            </svg>
+            <div class="adb-regs">{REGIONS.map((r) => <button type="button" data-reg-btn={r.id} aria-pressed="false" title={r.towns}>{r.name}</button>)}</div>
+            <p class="wiz-help" data-aud-hint></p>
+          </div>
+          <div data-views-wrap>
+            <p class="wiz-q">¿Cuántas vistas quieres?</p>
+            <div class="wiz-chips">
+              {VIEW_PACKS.map((v) => { const d = [...VIEW_DISCOUNTS].reverse().find((x) => v >= x.from); return <label><input type="radio" name="views" value={v} checked={v === 10000} /><span>{v.toLocaleString('en-US')}{d && <small> −{d.pct}%</small>}</span></label>; })}
+            </div>
+            <p class="wiz-help">Pagas por vistas reales: cuenta cuando tu anuncio aparece en la pantalla de un lector. Cuando se cumplen, tu anuncio termina solo y te avisamos.</p>
+          </div>
+          <div data-time-wrap>
+          <p class="wiz-q" data-time-q>¿Por cuánto tiempo?</p>
+          <div class="wiz-chips">
+            {DURATIONS.map((d) => <label><input type="radio" name="months" value={d.v} checked={d.v === '30'} /><span>{d.label}{d.off > 0 && <small> −{d.off}%</small>}</span></label>)}
+          </div>
+          </div>
+          <div data-days-wrap hidden>
+            <p class="wiz-q">Toma de portada: ¿por días o por vistas?</p>
+            <div class="wiz-chips">
+              <label><input type="radio" name="tkmode" value="dias" checked /><span>Por días</span></label>
+              <label><input type="radio" name="tkmode" value="vistas" /><span>Por vistas</span></label>
+            </div>
+            <div class="wiz-chips" data-tk-views hidden>
+              {TAKEOVER_VIEW_PACKS.map((v) => <label><input type="radio" name="tkviews" value={v} checked={v === 50000} /><span>{v.toLocaleString('en-US')}</span></label>)}
+            </div>
+            <p class="wiz-help" data-tk-help></p>
+          </div>
+          <div class="wiz-row">
+            <label>Empieza el<input type="date" name="start" data-start /></label>
+            <label data-tk-days>Días de toma de portada<input type="number" name="days" min="1" max="14" value="1" /></label>
+          </div>
+        </fieldset>
+
+        <!-- 3 · The ad -->
+        <fieldset class="wiz-step" data-step="3" hidden>
+          <legend>Tu anuncio</legend>
+          <div class="wiz-two">
+            <label class="wiz-mode"><input type="radio" name="mode" value="upload" checked /><b>Ya tengo mi anuncio</b><span>Súbelo y lo revisamos.</span></label>
+            <label class="wiz-mode"><input type="radio" name="mode" value="design" /><b>Créenlo por mí</b><span data-design-price>{money(DESIGN_FEE)} · gratis en campañas de {DESIGN_FREE_FROM_MONTHS} meses o más</span></label>
+          </div>
+
+          <div class="wiz-pane" data-pane="upload">
+            <p class="wiz-help" data-sizes></p>
+            <label class="wiz-drop">
+              <input type="file" accept={UPLOAD.types.join(',')} multiple data-files />
+              <b>Toca para subir tu anuncio</b>
+              <span>JPG, PNG, GIF o WEBP · hasta {UPLOAD.maxMB} MB cada uno</span>
+            </label>
+            <ul class="wiz-thumbs" data-thumbs></ul>
+          </div>
+
+          <div class="wiz-pane" data-pane="design" hidden>
+            <div class="wiz-design">
+              <div class="wiz-fields">
+                <label class="wiz-drop sm">
+                  <input type="file" accept={UPLOAD.types.join(',')} data-logo />
+                  <b data-logo-label>Sube tu logo (opcional)</b>
+                </label>
+                <label>¿Qué dice el título? <small data-count="title">0/30</small><input name="title" maxlength="30" placeholder="Ej. Pan sobao calientito" /></label>
+                <label>Mensaje corto <small data-count="msg">0/80</small><textarea name="msg" rows="2" maxlength="80" placeholder="Ej. Todos los días desde las 6 a.m. en Bayamón"></textarea></label>
+                <label>Botón <small data-count="cta">0/24</small><input name="cta" maxlength="24" placeholder="Ej. Llama hoy" /></label>
+                <div class="wiz-sugg">{CTAS.map((c) => <button type="button" data-cta={c}>{c}</button>)}</div>
+                <p class="wiz-q">Colores</p>
+                <div class="wiz-themes">
+                  {THEMES.map((t, i) => <label title={t.name}><input type="radio" name="theme" value={t.id} checked={i === 0} /><span style={`background:linear-gradient(135deg,${t.a},${t.b})`}></span><b class="sr">{t.name}</b></label>)}
+                </div>
+                <label>Algo más para quien lo diseña (opcional)<textarea name="notes" rows="2" placeholder="Ej. Incluye el teléfono 787-555-0100"></textarea></label>
+              </div>
+              <div class="wiz-previews">
+                <p class="wiz-q">Así se verá</p>
+                <div data-previews></div>
+                <p class="wiz-help">Nuestro equipo lo revisa y lo mejora antes de publicarlo.</p>
+              </div>
+            </div>
+          </div>
+
+          <label class="wiz-link">¿A dónde lleva tu anuncio cuando lo tocan? (opcional)
+            <input name="link" type="url" inputmode="url" placeholder="https://tu-negocio.com o https://wa.me/1787…" />
+          </label>
+        </fieldset>
+
+        <!-- 4 · Details and payment -->
+        <fieldset class="wiz-step" data-step="4" hidden>
+          <legend>Tus datos y pago</legend>
+          <div class="wiz-pay">
+            <div class="wiz-fields">
+              <div class="wiz-row">
+                <label>Tu nombre<input name="nombre" autocomplete="name" /></label>
+                <label>Negocio<input name="negocio" autocomplete="organization" /></label>
+                <label>Correo<input name="correo" type="email" autocomplete="email" /></label>
+                <label>Teléfono<input name="telefono" type="tel" autocomplete="tel" /></label>
+              </div>
+              <label>Soy
+                <select name="who"><option value="retail">Negocio local</option><option value="agency">Agencia o marca grande</option><option value="nonprofit">Sin fines de lucro (−50%)</option></select>
+              </label>
+              <label class="adb-check"><input type="checkbox" name="founder" checked /> Es mi primera vez anunciándome aquí (−{LAUNCH_DISCOUNT.pct}%)</label>
+              <label class="adb-check"><input type="checkbox" name="prepay" checked /> Pago todo ahora (−{OTHER_DISCOUNTS.find((d) => d.id === 'prepago')!.pct}%)</label>
+            </div>
+            <div class="wiz-sum">
+              <h3>Resumen</h3>
+              <ul class="adb-lines" data-lines></ul>
+              <p class="adb-total"><span>Total</span><b data-total>$0</b></p>
+              <p class="adb-month" data-month></p>
+              <p class="adb-gift" data-gift hidden></p>
+              <p class="wiz-safe">🔒 Pagas en el próximo paso con tarjeta o ATH Móvil. Si no aprobamos tu anuncio, te devolvemos todo tu dinero.</p>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Pay (shown after step 4 when Stripe or ATH Móvil is set up in src/lib/ads.ts) -->
+        <div class="wiz-paybox" data-paybox hidden>
+          <h3>Paga tu anuncio</h3>
+          <p class="wiz-paytotal">Total a pagar <b data-pay-total></b></p>
+          <div class="wiz-paymethods">
+            {PAYMENTS.athMovilToken && (
+              <div class="wiz-method">
+                <p class="wiz-q">ATH Móvil</p>
+                <div id="ATHMovil_Checkout_Button_payment"></div>
+                <small data-ath-note>Se abre ATH Móvil para confirmar el pago.</small>
+              </div>
+            )}
+            {PAYMENTS.stripeLink && (
+              <div class="wiz-method">
+                <p class="wiz-q">Tarjeta, Apple Pay o Google Pay</p>
+                <a class="adp-btn" data-stripe href={PAYMENTS.stripeLink}>Pagar con tarjeta</a>
+                <small>En la página de pago escribe <b data-pay-total2></b> como cantidad (ya está copiado).</small>
+              </div>
+            )}
+          </div>
+          <p class="cm-err" data-pay-err hidden></p>
+          <p class="wiz-safe">🔒 Pago seguro. Si no aprobamos tu anuncio, te devolvemos todo tu dinero.</p>
+          <button type="button" class="wiz-backlink" data-pay-back>‹ Volver a editar</button>
+        </div>
+
+        <!-- Done -->
+        <div class="wiz-done" data-done hidden>
+          <span class="wiz-check" aria-hidden="true">✓</span>
+          <h3 data-done-h>¡Pago recibido! Gracias</h3>
+          <p class="wiz-help" data-done-ref></p>
+          <div class="wiz-send" data-send hidden>
+            <p><b>Último paso:</b> <span data-send-text></span></p>
+            <a class="adp-btn red" href="#" data-send-link>Enviar mi anuncio por correo</a>
+          </div>
+          <ol>
+            <li>Lo revisamos en menos de {APPROVAL_HOURS} horas<span data-done-design hidden> y lo diseñamos con lo que escribiste</span>.</li>
+            <li>Te escribimos a <b data-done-email></b> cuando esté aprobado.</li>
+            <li>Sale en la fecha que escogiste y lo sigues en tu panel.</li>
+          </ol>
+          <p class="adp-note wiz-preview-note" data-done-note hidden></p>
+          <div class="adp-ctas"><a class="adp-btn" href={url('publicidad/panel')}>Ver un panel de ejemplo</a><button type="button" class="adp-btn ghost-dark" data-again>Crear otro anuncio</button></div>
+        </div>
+
+        <p class="cm-err" data-err hidden></p>
+        <p class="adp-terms" data-pay-terms hidden>Al enviar tu solicitud aceptas los <a href={url('terminos-anunciantes')} target="_blank" rel="noopener">términos para anunciantes</a> y la <a href={url('privacidad')} target="_blank" rel="noopener">política de privacidad</a>.</p>
+        <div class="wiz-bar" data-bar>
+          <div class="wiz-bar-total"><span>Total</span><b data-bar-total>$0</b></div>
+          <button type="button" class="adp-btn ghost-dark" data-back hidden>Atrás</button>
+          <button type="button" class="adp-btn" data-next>Siguiente</button>
+          <button type="submit" class="adp-btn red" data-pay hidden>Pagar</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="adp-sec adp-faq" aria-labelledby="adp-faq-h">
+      <h2 id="adp-faq-h">Preguntas</h2>
+      <details>
+        <summary>Precios, descuentos y premios</summary>
+        <div class="adp-prices">
+          <table class="adp-table">
+            <thead><tr><th scope="col">Anuncio</th><th scope="col">Por 1,000 vistas</th><th scope="col">10,000 vistas</th><th scope="col">50,000 vistas</th></tr></thead>
+            <tbody>{FORMATS.map((f) => 'cpm' in f
+              ? <tr><td>{f.name}<small>{f.size}</small></td><td>{money(f.cpm)}</td><td><b>{money(f.cpm * 10)}</b></td><td>{money(Math.round(f.cpm * 50 * (1 - (VIEW_DISCOUNTS.find((d) => d.from === 50000)?.pct ?? 0) / 100)))}</td></tr>
+              : <tr><td>{f.name}<small>{f.size}</small></td><td colspan="3"><b>{money(f.price)}</b> por {f.per}{f.per === 'mes' && ` · ${money(rate(f)!.week)} por semana`}</td></tr>)}</tbody>
+          </table>
+          <div>
+            <ul class="adp-disc">
+              <li><b>{LAUNCH_DISCOUNT.pct}%</b><span>Tu primera vez: tus primeras {LAUNCH_VIEWS.toLocaleString('en-US')} vistas (o los primeros {LAUNCH_DISCOUNT.months} meses de un patrocinio)</span></li>
+              {VIEW_DISCOUNTS.map((d) => <li><b>{d.pct}%</b><span>Desde {d.from.toLocaleString('en-US')} vistas</span></li>)}
+              {DURATION_DISCOUNTS.map((d) => <li><b>{d.pct}%</b><span>Patrocinios de {d.months} meses</span></li>)}
+              {OTHER_DISCOUNTS.map((d) => <li><b>{d.pct}%</b><span>{d.text}</span></li>)}
+            </ul>
+            <p class="adb-fine">Los anuncios se pagan por vistas: una vista cuenta cuando tu anuncio aparece en la pantalla de un lector, y tu campaña termina sola al cumplirlas. Los patrocinios y la toma de portada se pagan por tiempo. Los descuentos se suman hasta {MAX_DISCOUNT}%. Solo en tu región pagas {Math.round(AUDIENCE.perRegion * 100)}% del precio por región; solo la diáspora, {Math.round(AUDIENCE.diaspora * 100)}%.</p>
+            <p class="wiz-q">Premios: anuncios gratis según lo que inviertas</p>
+            <ol class="adp-rewards">{REWARDS.map((r) => <li><b>{money(r.at)}</b><span>{r.gift}</span></li>)}</ol>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>Soy una agencia o una marca grande</summary>
+        <ul class="adp-list">
+          <li><b>Toma de portada:</b> todo el sitio con tu marca por {money(FORMATS.find((f) => f.id === 'takeover')!.price)} al día, o por vistas a {money(TAKEOVER_CPM)} cada 1,000 (termina sola al cumplirlas).</li>
+          <li><b>{AGENCY_COMMISSION}% de comisión de agencia</b> en cada orden, factura mensual y un panel para cada cliente.</li>
+          <li><b>Descuento por volumen</b> según el tamaño de la orden: {VOLUME_TIERS.map((t) => `${t.pct}% desde ${money(t.from)}`).join(' · ')}.</li>
+          <li><b>Pedidos a la medida:</b> artículos patrocinados, menciones en el boletín, redes sociales, video, eventos y fechas exactas. Te preparamos una propuesta.</li>
+        </ul>
+        <a class="adp-btn" href="#contacto">Hablemos</a>
+      </details>
+      <details>
+        <summary>¿Cómo funciona la valla digital?</summary>
+        <p>Tu anuncio comparte el espacio con hasta 3 marcas y cambia cada {ROTATE_SECONDS} segundos, como una valla en la carretera. Solo rota cuando el lector lo está mirando. Puedes subir 2 o 3 versiones y rotan solas.</p>
+      </details>
+      <details>
+        <summary>¿Mi anuncio sale antes que los de Google?</summary>
+        <p>Sí. Los anuncios de nuestros clientes siempre salen primero. Google solo llena los espacios que nadie compró.</p>
+      </details>
+      <details>
+        <summary>¿Cómo sé si mi anuncio funciona?</summary>
+        <p>Tienes un panel con cuántas personas lo vieron, cuántas lo tocaron y en qué regiones, y te enviamos un informe por correo cada semana. <a href={url('publicidad/panel')}>Ver un panel de ejemplo</a>.</p>
+      </details>
+      <details>
+        <summary>¿Qué anuncios no aceptamos?</summary>
+        <p>Contenido engañoso, para adultos, armas, apuestas sin licencia, tabaco o vapeo, ni anuncios que parezcan noticias. Si no lo aprobamos, te devolvemos el dinero.</p>
+      </details>
+    </section>
+
+    <section class="adp-sec adp-contact" id="contacto" aria-labelledby="adp-c">
+      <div>
+        <h2 id="adp-c">Prefiero hablar con alguien</h2>
+        <p>Déjanos tus datos y te llamamos o escribimos.</p>
+        {SITE.email && <p>O escríbenos a <a href={`mailto:${SITE.email}?subject=${encodeURIComponent('Publicidad en NotiCel')}`}>{SITE.email}</a>.</p>}
+      </div>
+      <form class="adp-form" data-ad-form data-email={SITE.email} novalidate>
+        <label>Nombre<input name="nombre" autocomplete="name" required /></label>
+        <label>Negocio<input name="negocio" autocomplete="organization" required /></label>
+        <label>Correo electrónico<input name="correo" type="email" autocomplete="email" required /></label>
+        <label>Teléfono<input name="telefono" type="tel" autocomplete="tel" /></label>
+        <label class="adp-wide">¿En qué te ayudamos?<textarea name="mensaje" rows="3" placeholder="¿Qué quieres anunciar, dónde y cuándo?"></textarea></label>
+        <p class="cm-err adp-wide" data-err hidden></p>
+        <button type="submit" class="adp-btn red adp-wide">Enviar</button>
+        <p class="adp-note adp-wide" data-note hidden></p>
+      </form>
+    </section>
+  </main>
+  <script>
+    import { drawAd, loadImage, THEMES } from '../lib/adcreative';
+    import { saveRequest, markPaid, sharedRequests, shrink, type ArtFile } from '../lib/adrequests';
+    import { quote, type QuoteInput } from '../lib/ads';
+
+    const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+    const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+    // ---- Contact form (opens the visitor's email app, or explains it's coming soon) ----
+    const cf = document.querySelector<HTMLFormElement>('[data-ad-form]')!;
+    cf.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const d = new FormData(cf); const v = (k: string) => String(d.get(k) || '').trim();
+      const er = cf.querySelector<HTMLElement>('[data-err]')!, note = cf.querySelector<HTMLElement>('[data-note]')!;
+      const msg = !v('nombre') || !v('negocio') ? 'Escribe tu nombre y el de tu negocio.' : !emailOk(v('correo')) ? 'Escribe un correo válido, por ejemplo nombre@negocio.com.' : '';
+      er.textContent = msg; er.hidden = !msg; if (msg) return;
+      if (!cf.dataset.email) { note.textContent = 'Gracias. El envío se activará muy pronto, cuando publiquemos el correo de ventas.'; note.hidden = false; return; }
+      location.href = `mailto:${cf.dataset.email}?subject=${encodeURIComponent(`Publicidad: ${v('negocio')}`)}&body=${encodeURIComponent([`Nombre: ${v('nombre')}`, `Negocio: ${v('negocio')}`, `Correo: ${v('correo')}`, `Teléfono: ${v('telefono')}`, '', v('mensaje')].join('\n'))}`;
+      note.textContent = 'Se abrió tu correo con el mensaje listo. Solo tienes que enviarlo.'; note.hidden = false;
+    });
+
+    // ---- Step-by-step guide ----
+    type Fmt = { id: string; name: string; price: number; per: string; art: number[][]; cpm: number };
+    type Cfg = { formats: Fmt[]; audience: { all: number; island: number; diaspora: number; perRegion: number }; launch: { pct: number; months: number };
+      duration: Array<{ months: number; pct: number }>; other: Array<{ id: string; pct: number }>; max: number; rewards: Array<{ at: number; gift: string }>;
+      volume: Array<{ from: number; pct: number }>; design: number; designFree: number; upload: { maxMB: number; types: string[] };
+      pay: { stripeLink: string; athMovilToken: string }; regions: Array<{ id: string; name: string }>; tkCpm: number };
+    const wf = document.querySelector<HTMLFormElement>('[data-wiz]')!;
+    const cfg: Cfg = JSON.parse(wf.dataset.cfg!);
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => wf.querySelector<T>(s)!;
+    const val = (k: string) => String(new FormData(wf).get(k) ?? '').trim();
+    const picked = () => cfg.formats.filter((f) => new FormData(wf).getAll('fmt').includes(f.id));
+    const timeLabel = () => (wf.querySelector<HTMLInputElement>('[name="months"]:checked')!.nextElementSibling as HTMLElement).textContent!.replace(/\s*−\d+%/, '');
+    const viewsPicked = () => (picked().some((f) => f.cpm > 0) ? Number(new FormData(wf).get('views')) || 10000 : 0);
+    // What the client bought: views for display ads, time for sponsorship, days for the takeover
+    // Takeover: by days, or by views (it owns every ad space until they're delivered)
+    const tkViews = () => (picked().some((f) => f.id === 'takeover') && new FormData(wf).get('tkmode') === 'vistas' ? Number(new FormData(wf).get('tkviews')) || 50000 : 0);
+    const tkLabel = () => { if (!picked().some((f) => f.id === 'takeover')) return ''; const v = tkViews(), n = Number(new FormData(wf).get('days')) || 1; return v ? `toma de portada hasta ${v.toLocaleString('en-US')} vistas` : `${n} día${n > 1 ? 's' : ''} de toma de portada`; };
+    const durLabel = () => [viewsPicked() ? `${viewsPicked().toLocaleString('en-US')} vistas` : '', picked().some((f) => f.id === 'patrocinio') ? timeLabel() : '', tkLabel()].filter(Boolean).join(' + ') || timeLabel();
+    const regs = new Set<string>();
+    let step = 1;
+    let files: ArtFile[] = [];
+    let logo: HTMLImageElement | null = null; let logoData = '';
+
+    const start = $<HTMLInputElement>('[data-start]');
+    start.valueAsDate = new Date(Date.now() + 2 * 864e5);
+    start.min = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+
+    // Regions
+    const setRegion = (id: string) => { regs.has(id) ? regs.delete(id) : regs.add(id); calc(); };
+    wf.querySelectorAll<SVGElement>('.adb-reg').forEach((el) => el.addEventListener('click', () => setRegion(el.dataset.reg!)));
+    wf.querySelectorAll<HTMLButtonElement>('[data-reg-btn]').forEach((b) => b.addEventListener('click', () => setRegion(b.dataset.regBtn!)));
+
+    // ---- Price ----
+    let total = 0, where = '', summary: string[] = [];
+    let lastAud = 'all';
+    function calc() {
+      const d = new FormData(wf);
+      const fmts = picked();
+      const len = Number(d.get('months')) || 30; const months = len / 30; const days = Math.max(1, Math.min(14, Number(d.get('days')) || 1)); // 'months' holds the length in days
+      const aud = String(d.get('aud'));
+      if (aud === 'regions' && lastAud !== 'regions' && !regs.size) regs.add('metro');
+      if (aud !== 'regions') regs.clear();
+      lastAud = aud;
+      $('[data-map-wrap]').hidden = aud !== 'regions';
+      const hasTk = fmts.some((f) => f.per === 'día'), tkByViews = hasTk && d.get('tkmode') === 'vistas';
+      $('[data-days-wrap]').hidden = !hasTk;
+      $('[data-tk-days]').hidden = !hasTk || tkByViews; $('[data-tk-views]').hidden = !tkByViews;
+      $('[data-tk-help]').textContent = tkByViews ? `Tu marca en todos los espacios del sitio desde el día que escojas hasta cumplir las vistas; luego termina sola. $${cfg.tkCpm} por cada 1,000 vistas.` : 'Tu marca en todos los espacios del sitio durante los días que escojas.';
+      // Display ads are bought by views; section sponsorship by time; the takeover by days
+      const byViews = fmts.some((f) => f.cpm > 0), byTime = fmts.some((f) => f.id === 'patrocinio');
+      $('[data-views-wrap]').hidden = !byViews && fmts.length > 0;
+      $('[data-time-wrap]').hidden = !byTime;
+      const views = byViews ? Number(d.get('views')) || 10000 : 0;
+      wf.querySelectorAll<SVGElement>('.adb-reg').forEach((el) => el.classList.toggle('on', regs.has(el.dataset.reg!)));
+      wf.querySelectorAll<SVGElement>('[data-lbl]').forEach((el) => el.classList.toggle('on', regs.has(el.dataset.lbl!)));
+      wf.querySelectorAll<HTMLButtonElement>('[data-reg-btn]').forEach((b) => b.setAttribute('aria-pressed', String(regs.has(b.dataset.regBtn!))));
+      const factor = aud === 'all' ? cfg.audience.all : aud === 'island' ? cfg.audience.island : aud === 'diaspora' ? cfg.audience.diaspora : Math.min(cfg.audience.island, regs.size * cfg.audience.perRegion);
+      where = aud === 'all' ? 'Puerto Rico y la diáspora' : aud === 'island' ? 'Solo Puerto Rico' : aud === 'diaspora' ? 'Solo la diáspora' : cfg.regions.filter((r) => regs.has(r.id)).map((r) => r.name).join(', ');
+      $('[data-aud-hint]').textContent = `Toca las regiones donde quieres salir. Pagas ${Math.round(factor * 100)}% del precio.`;
+
+      // Price math lives in src/lib/ads.ts (quote), shared with the sales desk
+      const q = quote({ formats: fmts.map((f) => f.id), days: len, takeoverDays: days, takeoverViews: tkByViews ? Number(d.get('tkviews')) || 50000 : 0, views, aud: aud as QuoteInput['aud'], regions: regs.size,
+        who: String(d.get('who') || 'retail') as QuoteInput['who'], prepay: !!d.get('prepay'), founder: !!d.get('founder'), design: d.get('mode') === 'design' });
+      const { lines, off, design } = q;
+      total = q.total;
+      $('[data-design-price]').textContent = months >= cfg.designFree ? `Gratis en tu campaña de ${Math.round(months)} meses` : `${money(cfg.design)} · gratis en campañas de ${cfg.designFree} meses o más`;
+
+      const rows = lines.map(([n, c]) => `<li><span>${n}</span><b>${money(c)}</b></li>`);
+      if (!fmts.length) rows.push('<li class="adb-empty">Escoge al menos un anuncio.</li>');
+      q.discounts.forEach(([n, a]) => rows.push(`<li class="adb-off"><span>${n}</span><b>−${money(a)}</b></li>`));
+      if (q.capped > 0.5) rows.push(`<li class="adb-off"><span>Tope de descuento (${cfg.max}%)</span><b>+${money(q.capped)}</b></li>`);
+      if (design !== null) rows.push(`<li><span>Diseño del anuncio</span><b>${design ? money(design) : 'Gratis'}</b></li>`);
+      rows.push(`<li class="adb-where"><span>${where || '—'} · ${durLabel()} desde el ${val('start') ? new Date(`${val('start')}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'long' }) : '—'}</span></li>`);
+      $('[data-lines]').innerHTML = rows.join('');
+      $('[data-total]').textContent = money(total); $('[data-bar-total]').textContent = money(total);
+      $('[data-month]').textContent = off ? `Ahorras ${money(off)}${views ? ` · ${money(total / (views / 1000))} por cada 1,000 vistas` : months > 1 ? ` · unos ${money(total / months)} al mes` : ''}` : '';
+      const gift = [...cfg.rewards].reverse().find((r) => total >= r.at), next = cfg.rewards.find((r) => total < r.at);
+      const g = $('[data-gift]'); g.hidden = !fmts.length;
+      g.innerHTML = gift ? `🎁 Te ganas: <b>${gift.gift}</b>` : next ? `🎁 Te faltan ${money(next.at - total)} para ganarte ${next.gift.toLowerCase()}.` : '';
+      $<HTMLButtonElement>('[data-pay]').textContent = `Pagar ${money(total)}`;
+      summary = [...lines.map(([n, c]) => `${n}: ${money(c)}`), `Descuentos: −${money(off)}`, design !== null ? `Diseño: ${design ? money(design) : 'gratis'}` : ''].filter(Boolean);
+      // Sizes the client must upload
+      const sizes = [...new Set(fmts.flatMap((f) => f.art.map(([w, h]) => `${w} × ${h}`)))];
+      $('[data-sizes]').innerHTML = sizes.length ? `Tamaños que necesitamos: <b>${sizes.join(', ')}</b> píxeles. Si te falta alguno, lo adaptamos nosotros.` : '';
+      paintThumbs(); drawPreviews();
+    }
+
+    // ---- Upload ----
+    const fitsSize = (w: number, h: number) => picked().flatMap((f) => f.art).some(([aw, ah]) => Math.abs(w / h - aw / ah) / (aw / ah) < 0.08);
+    function paintThumbs() {
+      $('[data-thumbs]').innerHTML = files.map((f, i) => {
+        const ok = fitsSize(f.w, f.h);
+        return `<li><img src="${f.data}" alt="" /><span><b>${f.name.replace(/</g, '&lt;')}</b><small class="${ok ? 'ok' : 'warn'}">${f.w} × ${f.h} ${ok ? '✓ Buen tamaño' : '⚠ Otro tamaño: lo adaptamos'}</small></span><button type="button" data-rm="${i}" aria-label="Quitar">✕</button></li>`;
+      }).join('');
+    }
+    $<HTMLInputElement>('[data-files]').addEventListener('change', async (e) => {
+      const input = e.target as HTMLInputElement; const er = $('[data-err]'); er.hidden = true;
+      for (const file of [...(input.files || [])].slice(0, 6)) {
+        if (!cfg.upload.types.includes(file.type)) { er.textContent = `${file.name}: usa JPG, PNG, GIF o WEBP.`; er.hidden = false; continue; }
+        if (file.size > cfg.upload.maxMB * 1048576) { er.textContent = `${file.name} pesa más de ${cfg.upload.maxMB} MB.`; er.hidden = false; continue; }
+        const img = await loadImage(file);
+        files.push({ name: file.name, w: img.naturalWidth, h: img.naturalHeight, data: shrink(img, 800, file.type === 'image/png' ? 'image/png' : 'image/jpeg') });
+      }
+      input.value = ''; paintThumbs();
+    });
+    $('[data-thumbs]').addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-rm]'); if (b) { files.splice(Number(b.dataset.rm), 1); paintThumbs(); } });
+
+    // ---- We create it: logo + text → live preview ----
+    $<HTMLInputElement>('[data-logo]').addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
+      if (!cfg.upload.types.includes(file.type) || file.size > cfg.upload.maxMB * 1048576) { $('[data-logo-label]').textContent = `Usa una imagen de hasta ${cfg.upload.maxMB} MB`; return; }
+      logo = await loadImage(file); logoData = shrink(logo, 500);
+      $('[data-logo-label]').textContent = `Logo: ${file.name} ✓ (toca para cambiarlo)`; drawPreviews();
+    });
+    wf.querySelectorAll<HTMLButtonElement>('[data-cta]').forEach((b) => b.addEventListener('click', () => { $<HTMLInputElement>('[name="cta"]').value = b.dataset.cta!; drawPreviews(); }));
+    function drawPreviews() {
+      if (val('mode') !== 'design') return;
+      ['title', 'msg', 'cta'].forEach((k) => { const el = $<HTMLInputElement>(`[name="${k}"]`); $(`[data-count="${k}"]`).textContent = `${el.value.length}/${el.maxLength}`; });
+      const sizes = [...new Map(picked().flatMap((f) => f.art).map((s) => [s.join('x'), s])).values()].slice(0, 3);
+      const theme = THEMES.find((t) => t.id === val('theme')) ?? THEMES[0];
+      const box = $('[data-previews]');
+      box.innerHTML = sizes.map(([w, h]) => `<figure><canvas data-w="${w}" data-h="${h}" style="aspect-ratio:${w}/${h};max-width:${w}px"></canvas><figcaption>${w} × ${h}</figcaption></figure>`).join('') || '<p class="wiz-help">Escoge un anuncio en el paso 1.</p>';
+      box.querySelectorAll<HTMLCanvasElement>('canvas').forEach((c) => drawAd(c, Number(c.dataset.w), Number(c.dataset.h), { title: val('title'), msg: val('msg'), cta: val('cta'), business: val('negocio') }, theme, logo));
+    }
+
+    // ---- Steps ----
+    function check(n: number): string {
+      if (n === 1 && !picked().length) return 'Escoge al menos un anuncio.';
+      if (n === 2 && val('aud') === 'regions' && !regs.size) return 'Toca al menos una región en el mapa.';
+      if (n === 2 && !val('start')) return 'Escoge la fecha en que empieza.';
+      if (n === 3 && val('mode') === 'upload' && !files.length) return 'Sube tu anuncio, o escoge “Créenlo por mí”.';
+      if (n === 3 && val('mode') === 'design' && !val('title')) return 'Escribe el título de tu anuncio.';
+      if (n === 3 && val('link') && !/^https?:\/\/\S+\.\S+/.test(val('link'))) return 'El enlace debe empezar con https:// (o déjalo vacío).';
+      if (n === 4 && (!val('nombre') || !val('negocio'))) return 'Escribe tu nombre y el de tu negocio.';
+      if (n === 4 && !emailOk(val('correo'))) return 'Escribe un correo válido, por ejemplo nombre@negocio.com.';
+      return '';
+    }
+    const err = (m: string) => { const e = $('[data-err]'); e.textContent = m; e.hidden = !m; return !!m; };
+    function go(n: number) {
+      step = n;
+      wf.querySelectorAll<HTMLElement>('[data-step]').forEach((s) => (s.hidden = Number(s.dataset.step) !== n));
+      document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((b) => { const k = Number(b.dataset.goto); if (k === n) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('done', k < n); });
+      $('[data-back]').hidden = n === 1; $('[data-next]').hidden = n === 4; $('[data-pay]').hidden = n !== 4; $('[data-pay-terms]').hidden = n !== 4;
+      err('');
+      calc();
+    }
+    const top = () => document.getElementById('campana')!.scrollIntoView({ behavior: 'smooth' });
+    $('[data-next]').addEventListener('click', () => { if (!err(check(step))) { go(step + 1); top(); } });
+    $('[data-back]').addEventListener('click', () => { go(step - 1); top(); });
+    document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((b) => b.addEventListener('click', () => {
+      const k = Number(b.dataset.goto);
+      for (let i = 1; i < k; i++) if (err(check(i))) { go(i); err(check(i)); return; } // finish earlier steps first
+      go(k);
+    }));
+    wf.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.name === 'mode') wf.querySelectorAll<HTMLElement>('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== t.value));
+      calc();
+    });
+    wf.addEventListener('input', (e) => { if ((e.target as HTMLElement).closest('.wiz-design')) drawPreviews(); else calc(); });
+
+    // ---- Pay ----
+    // Stripe: a Payment Link where the client types the amount (static sites can't set it); it should send the
+    // client back to this page with ?pagado=1. ATH Móvil: the official web button, confirmed right here.
+    // Until the request database is connected, the client emails us the artwork as a last step.
+    const canPay = !!(cfg.pay.stripeLink || cfg.pay.athMovilToken);
+    const salesEmail = wf.dataset.email || '';
+    type Pending = { id: string; email: string; business: string; mode: string; amount: number; body: string };
+    let pending: Pending | null = null;
+    const amountOf = (n: number) => Math.round(n * 100) / 100;
+    const show = (part: 'steps' | 'pay' | 'done') => {
+      wf.querySelectorAll<HTMLElement>('[data-step]').forEach((s) => (s.hidden = part !== 'steps' || Number(s.dataset.step) !== step));
+      $('[data-bar]').hidden = part !== 'steps'; document.querySelector<HTMLElement>('.wiz-prog')!.hidden = part !== 'steps';
+      $('[data-paybox]').hidden = part !== 'pay'; $('[data-done]').hidden = part !== 'done';
+      top();
+    };
+    function done(p: Pending, how: string) {
+      void markPaid(p.id);
+      try { localStorage.removeItem('nc-ad-pending'); } catch { /* storage blocked */ }
+      $('[data-done-ref]').textContent = `${how} · Solicitud ${p.id}`;
+      $('[data-done-email]').textContent = p.email;
+      $('[data-done-design]').hidden = p.mode !== 'design';
+      if (salesEmail) {
+        $('[data-send]').hidden = false;
+        $('[data-send-text]').textContent = p.mode === 'design' ? 'envíanos tu logo por correo (si tienes uno). Ya incluimos lo que escribiste.' : 'envíanos por correo las imágenes de tu anuncio.';
+        $<HTMLAnchorElement>('[data-send-link]').href = `mailto:${salesEmail}?subject=${encodeURIComponent(`Mi anuncio ${p.id}: ${p.business}`)}&body=${encodeURIComponent(p.body)}`;
+      } else {
+        $('[data-send]').hidden = false;
+        $('[data-send-text]').textContent = 'te escribiremos a tu correo para recibir tu anuncio.';
+        $('[data-send-link]').hidden = true;
+      }
+      show('done');
+    }
+    function payErr(m: string) { const e = $('[data-pay-err]'); e.textContent = m; e.hidden = !m; }
+
+    // ATH Móvil web button (loaded once, only when set up)
+    let athLoaded = false;
+    function setupATH(p: Pending) {
+      if (!cfg.pay.athMovilToken) return;
+      const w = window as any;
+      const ok = p.amount >= 1 && p.amount <= 1500;
+      wf.querySelector<HTMLElement>('#ATHMovil_Checkout_Button_payment')!.hidden = !ok;
+      $('[data-ath-note]').textContent = ok ? 'Se abre ATH Móvil para confirmar el pago.' : 'ATH Móvil acepta pagos de $1 a $1,500. Usa tarjeta para esta cantidad.';
+      w.ATHM_Checkout = { env: 'production', publicToken: cfg.pay.athMovilToken, timeout: 600, theme: 'btn', lang: 'es',
+        total: p.amount, subtotal: p.amount, tax: 0, metadata1: p.id.slice(0, 40), metadata2: p.business.slice(0, 40),
+        items: [{ name: 'Anuncio en NotiCel', description: p.id, quantity: '1', price: String(p.amount), tax: '0', metadata: p.business.slice(0, 40) }], phoneNumber: '' };
+      w.authorizationATHM = async () => {
+        try {
+          const r = await w.authorization(); const d = r?.data ?? r;
+          if (d?.ecommerceStatus === 'COMPLETED') done(p, `Pagado con ATH Móvil${d.referenceNumber ? ` · referencia ${d.referenceNumber}` : ''}`);
+          else payErr('No pudimos confirmar el pago de ATH Móvil. Si se cobró, escríbenos y lo resolvemos.');
+        } catch { payErr('No pudimos confirmar el pago de ATH Móvil. Si se cobró, escríbenos y lo resolvemos.'); }
+      };
+      w.cancelATHM = async () => payErr('Cancelaste el pago de ATH Móvil. Puedes intentarlo otra vez.');
+      w.expiredATHM = async () => payErr('Se acabó el tiempo para pagar con ATH Móvil. Intenta otra vez.');
+      if (!athLoaded) { athLoaded = true; const sc = document.createElement('script'); sc.src = 'https://payments.athmovil.com/api/modal/js/athmovil_base.js'; document.body.append(sc); }
+    }
+
+    wf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      for (let i = 1; i <= 4; i++) if (check(i)) { go(i); err(check(i)); return; }
+      const mode = val('mode') as 'upload' | 'design';
+      const id = `NC-${Date.now().toString(36).toUpperCase()}`;
+      const designFiles: ArtFile[] = [];
+      if (mode === 'design') wf.querySelectorAll<HTMLCanvasElement>('[data-previews] canvas').forEach((c) => designFiles.push({ name: `${c.dataset.w}x${c.dataset.h}.png`, w: Number(c.dataset.w), h: Number(c.dataset.h), data: c.toDataURL('image/png') }));
+      const go4 = wf.querySelector<HTMLButtonElement>('button[type="submit"]'); if (go4) go4.disabled = true;
+      const sent = await saveRequest({
+        id, created: new Date().toISOString(), status: mode === 'design' ? 'disenar' : 'revisar', paid: false,
+        client: { name: val('nombre'), business: val('negocio'), email: val('correo'), phone: val('telefono'), who: val('who') },
+        formats: picked().map((f) => f.id), where, start: val('start'), duration: durLabel(), views: viewsPicked() || undefined, takeoverViews: tkViews() || undefined, total: Math.round(total), lines: summary,
+        art: mode === 'upload' ? { mode, files } : { mode, files: designFiles, logo: logoData, title: val('title'), msg: val('msg'), cta: val('cta'), theme: val('theme'), notes: val('notes') },
+        link: val('link'),
+      });
+      if (go4) go4.disabled = false;
+      if (sent !== true) { err(sent || 'No pudimos enviar tu solicitud. Revisa tu conexión e intenta otra vez (las imágenes de hasta 5 MB).'); return; }
+      const amount = amountOf(total);
+      const body = [`Solicitud: ${id}`, `Nombre: ${val('nombre')}`, `Negocio: ${val('negocio')}`, `Correo: ${val('correo')}`, `Teléfono: ${val('telefono')}`, '',
+        ...summary, `Dónde: ${where}`, `Empieza: ${val('start')} · ${durLabel()}`, `Total pagado: $${amount.toFixed(2)}`, `Enlace: ${val('link') || '—'}`, '',
+        mode === 'design' ? `Créenlo por mí:
+Título: ${val('title')}
+Mensaje: ${val('msg')}
+Botón: ${val('cta')}
+Colores: ${val('theme')}
+Notas: ${val('notes')}
+
+(Adjunto mi logo si tengo uno.)` : '(Adjunto las imágenes de mi anuncio.)'].join('\n');
+      pending = { id, email: val('correo'), business: val('negocio'), mode, amount, body };
+      if (!canPay && sharedRequests()) {
+        // Online payments aren't set up yet, but the request reached the team: they contact the client to pay
+        show('done');
+        $('[data-done-h]').textContent = '¡Recibimos tu solicitud!';
+        $('[data-done-ref]').textContent = `Solicitud ${id}`; $('[data-done-email]').textContent = val('correo'); $('[data-done-design]').hidden = mode !== 'design';
+        const n = $('[data-done-note]'); n.hidden = false;
+        n.textContent = 'Nuestro equipo de ventas la revisará y te escribirá en 1 día laborable para coordinar el pago y la fecha de salida. No se ha cobrado nada todavía.';
+        return;
+      }
+      if (!canPay) {
+        // Preview: nothing is charged or sent
+        show('done');
+        $('[data-done-h]').textContent = 'Así funcionará (vista previa)';
+        $('[data-done-ref]').textContent = ''; $('[data-done-email]').textContent = val('correo'); $('[data-done-design]').hidden = mode !== 'design';
+        const n = $('[data-done-note]'); n.hidden = false;
+        n.textContent = 'Los pagos en línea se activan muy pronto: no se cobró nada ni se envió tu anuncio. Para anunciarte hoy, usa “Prefiero hablar con alguien” más abajo.';
+        return;
+      }
+      try { localStorage.setItem('nc-ad-pending', JSON.stringify(pending)); } catch { /* storage blocked */ }
+      $('[data-pay-total]').textContent = `$${amount.toFixed(2)}`;
+      const t2 = wf.querySelector('[data-pay-total2]'); if (t2) t2.textContent = `$${amount.toFixed(2)}`;
+      const sl = wf.querySelector<HTMLAnchorElement>('[data-stripe]');
+      if (sl) sl.href = `${cfg.pay.stripeLink}?prefilled_email=${encodeURIComponent(val('correo'))}&client_reference_id=${id}`;
+      payErr(''); setupATH(pending); show('pay');
+    });
+    wf.querySelector('[data-stripe]')?.addEventListener('click', () => { navigator.clipboard?.writeText(pending ? pending.amount.toFixed(2) : '').catch(() => {}); });
+    $('[data-pay-back]').addEventListener('click', () => { go(4); show('steps'); });
+    $('[data-again]').addEventListener('click', () => { files = []; paintThumbs(); go(1); show('steps'); });
+
+    go(1);
+    // Back from Stripe's payment page (the Payment Link redirects to ?pagado=1)
+    if (new URLSearchParams(location.search).has('pagado')) {
+      let p: Pending | null = null;
+      try { p = JSON.parse(localStorage.getItem('nc-ad-pending') || 'null'); } catch { /* storage blocked */ }
+      if (p) { pending = p; done(p, 'Pagado con tarjeta'); }
+    }
+
+  </script>
+</Base>

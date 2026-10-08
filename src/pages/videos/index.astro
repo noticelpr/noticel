@@ -1,0 +1,32 @@
+---
+// Videos: NotiCel's latest upload playing up top (always the newest, straight from YouTube),
+// then NotiCel and BSN videos, each credited to its official channel.
+import Base from '../../layouts/Base.astro';
+import VideoCard from '../../components/VideoCard.astro';
+import { SITE, VIDEOS, VIDEO_SOURCES, url } from '../../lib/site';
+const groups = (Object.keys(VIDEO_SOURCES) as Array<keyof typeof VIDEO_SOURCES>).map((k) => ({ k, s: VIDEO_SOURCES[k], list: VIDEOS.filter((v) => v.src === k) }));
+---
+<Base title="Videos" active="videos">
+  <main class="wrap" id="main">
+    <div class="sec-h" style="margin-top:0"><h1 style="font-size:32px;margin:0;color:var(--purple)">Videos</h1></div>
+    {SITE.features.videos ? (
+      <>
+        <section class="vx-latest">
+          <div class="lg-video-frame">
+            <iframe src={`https://www.youtube-nocookie.com/embed/videoseries?list=UU${VIDEO_SOURCES.noticel.channel.slice(2)}&autoplay=1&mute=1&rel=0&playsinline=1`} title="Lo más reciente de NotiCel en YouTube" loading="lazy"
+              referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          </div>
+          <p class="vsrc">Lo más reciente del canal de <a href={VIDEO_SOURCES.noticel.url} rel="noopener" target="_blank">NotiCel en YouTube</a>.</p>
+        </section>
+        {groups.map((g) => g.list.length > 0 && (
+          <section>
+            <div class="sec-h"><h2>{g.s.short}</h2><a href={g.s.url} rel="noopener" target="_blank">Canal en YouTube ↗</a></div>
+            <div class="autogrid">{g.list.map((v) => <VideoCard video={v} />)}</div>
+          </section>
+        ))}
+      </>
+    ) : (
+      <div class="empty"><p>Muy pronto tendremos videos.</p><a class="btn" href={url()}>Ir a la portada</a></div>
+    )}
+  </main>
+</Base>

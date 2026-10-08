@@ -1,0 +1,376 @@
+---
+// Foro NotiCel: readers' topics, Reddit style. The list sorts by "Lo más caliente", "Populares" or "Recientes"; each topic has
+// its own page (/foro?t=<id>, a link to share) with ▲▼ votes on every reply and replies to replies, which fold.
+// With reader accounts (Supabase) everything is shared by everyone (forum_* tables, supabase/connect-all.sql and
+// supabase/reddit.sql); without them it's a preview kept in this browser ('nc-foro') with EJEMPLO topics.
+import Base from '../layouts/Base.astro';
+import AdSlot from '../components/AdSlot.astro';
+import { url , sectionUrl } from '../lib/site';
+import SAMPLES from '../data/foro.json';
+const CATS = ['Puerto Rico', 'Gobierno', 'Economía', 'Deportes', 'Educación', 'Fe y familia', 'Entretenimiento'];
+---
+<Base title="Foro NotiCel" active="opinion" description="El foro de los lectores de NotiCel: temas, respuestas y votos.">
+  <main class="wrap" id="main">
+    <div class="fo-head">
+      <div>
+        <h1><a href={url('foro')} data-fo-home>Foro <span>NotiCel</span></a> <span class="sp-demo" data-fo-demo>DEMO</span></h1>
+        <p data-fo-intro>Los lectores proponen temas, responden y votan. Vista previa: lo que publiques se guarda solo en este dispositivo.</p>
+      </div>
+      <a class="fo-back" href={sectionUrl('opiniones')}>← Opinión</a>
+    </div>
+    <div class="fo-grid">
+      <div>
+        {/* List of topics */}
+        <div data-fo-listview>
+          <form class="fo-new" data-fo-new novalidate>
+            <h2>Nuevo tema</h2>
+            <label class="sr" for="fo-title">Título</label>
+            <input id="fo-title" maxlength="120" placeholder="Título del tema" />
+            <label class="sr" for="fo-body">Texto</label>
+            <textarea id="fo-body" rows="3" maxlength="1500" placeholder="¿Qué quieres conversar?"></textarea>
+            <div class="fo-row">
+              <label class="sr" for="fo-cat">Categoría</label>
+              <select id="fo-cat">{CATS.map((c) => <option>{c}</option>)}</select>
+              <span class="cm-err" data-fo-err hidden></span>
+              <button type="submit" class="jg-btn" style="margin:0 0 0 auto">Publicar tema</button>
+            </div>
+          </form>
+          <div class="fo-sort" role="group" aria-label="Ordenar temas">
+            <button type="button" data-sort="hot" aria-pressed="true">🔥 Lo más caliente</button>
+            <button type="button" data-sort="top" aria-pressed="false">Populares</button>
+            <button type="button" data-sort="new" aria-pressed="false">Recientes</button>
+            <span class="fo-catnow" data-fo-catnow hidden></span>
+          </div>
+          <ul class="fo-list" data-fo-list><li class="fo-empty">Cargando…</li></ul>
+        </div>
+        {/* One topic and its conversation */}
+        <div class="fo-thread" data-fo-threadview hidden>
+          <a class="fo-up" href={url('foro')} data-fo-home>← Todos los temas</a>
+          <div data-fo-topic></div>
+          <form class="fo-answer" data-fo-answer novalidate>
+            <label class="sr" for="fo-answer-text">Tu respuesta</label>
+            <textarea id="fo-answer-text" rows="2" maxlength="1000" placeholder="Escribe una respuesta…"></textarea>
+            <div class="fo-row"><span class="cm-err" data-fo-answer-err hidden></span><button type="submit" class="jg-btn" style="margin:0 0 0 auto">Responder</button></div>
+          </form>
+          <div class="fo-sort" role="group" aria-label="Ordenar respuestas">
+            <button type="button" data-rsort="best" aria-pressed="true">Mejores</button>
+            <button type="button" data-rsort="new" aria-pressed="false">Recientes</button>
+            <button type="button" data-rsort="old" aria-pressed="false">Antiguas</button>
+          </div>
+          <ul class="rt" data-fo-replies></ul>
+        </div>
+        <p class="sp-note">Normas: respeto, sin insultos ni datos personales de otras personas. Los temas que rompan las normas se eliminan.</p>
+      </div>
+      <aside class="fo-side">
+        <section class="tb-box">
+          <h2>Categorías</h2>
+          <ul class="fo-cats">{CATS.map((c) => <li><button type="button" data-cat={c}>{c}</button></li>)}</ul>
+          <button type="button" class="fo-all" data-cat="">Ver todas</button>
+        </section>
+        <AdSlot size="rectangle" />
+      </aside>
+    </div>
+  </main>
+  <script define:vars={{ SAMPLES }}>
+    window.__FORO_SAMPLES = SAMPLES;
+  </script>
+  <script>
+    import { accountsOn, loggedIn, askLogin, api, myId } from '../lib/account';
+    import { assess, serverSays } from '../lib/moderation';
+    import { ask } from '../lib/dialogs';
+    import { hot, parseAgo, ago, tree, voteBox, foldable, type Sort } from '../lib/threads';
+
+    // ---------- Where topics come from: Supabase, or this browser (preview) ----------
+    type Th = { id: string; cat: string; title: string; body: string; votes: number; replies: number; at: number; by: string; mine: boolean; sample?: boolean };
+    type Rp = { id: string; parent: string | null; body: string; votes: number; at: number; by: string; mine: boolean; deleted?: boolean; sample?: boolean };
+    type Source = {
+      live: boolean;
+      threads(): Promise<Th[]>;
+      replies(id: string): Promise<Rp[]>;
+      votes(): Promise<Record<string, number>>;
+      vote(kind: 'thread' | 'reply', id: string, v: number): Promise<boolean>;
+      post(cat: string, title: string, body: string): Promise<string>; // '' when it worked, otherwise the reason
+      reply(thread: string, parent: string | null, body: string): Promise<string>;
+      remove(kind: 'thread' | 'reply', id: string): Promise<boolean>;
+    };
+
+    function supabaseSource(): Source {
+      const who = (a: { username: string } | null) => `@${a?.username ?? 'lector'}`;
+      return {
+        live: true,
+        async threads() {
+          const r = await api('forum_threads?select=id,cat,title,body,votes,replies,created_at,user_id,author:profiles!forum_threads_user_id_fkey(username)&status=eq.visible&order=created_at.desc&limit=300', {}, false);
+          const rows: any[] = r?.ok ? await r.json() : [];
+          return rows.map((t) => ({ id: t.id, cat: t.cat, title: t.title, body: t.body, votes: t.votes, replies: t.replies, at: Date.parse(t.created_at), by: who(t.author), mine: t.user_id === myId() }));
+        },
+        async replies(id) {
+          const q = (cols: string) => api(`forum_replies?thread=eq.${id}&status=eq.visible&select=id,body,votes,created_at,user_id,${cols}author:profiles!forum_replies_user_id_fkey(username)&order=created_at.asc&limit=1000`, {}, false);
+          let r = await q('parent,deleted,');
+          if (r && !r.ok) r = await q(''); // before supabase/reddit.sql runs: no replies to replies yet
+          const rows: any[] = r?.ok ? await r.json() : [];
+          return rows.map((x) => ({ id: x.id, parent: x.parent ?? null, body: x.body, votes: x.votes, at: Date.parse(x.created_at), by: who(x.author), mine: x.user_id === myId(), deleted: !!x.deleted }));
+        },
+        async votes() {
+          if (!loggedIn()) return {};
+          const v = await api(`forum_votes?user_id=eq.${myId()}&select=target,value`);
+          const out: Record<string, number> = {};
+          if (v?.ok) (await v.json()).forEach((x: { target: string; value: number }) => (out[x.target] = x.value));
+          return out;
+        },
+        async vote(kind, id, v) {
+          const r = v === 0
+            ? await api(`forum_votes?target=eq.${id}&user_id=eq.${myId()}`, { method: 'DELETE' })
+            : await api('forum_votes', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify({ target: id, kind, value: v }) });
+          return !!r?.ok;
+        },
+        async post(cat, title, body) {
+          const r = await api('forum_threads', { method: 'POST', body: JSON.stringify({ cat, title, body }) });
+          return r?.ok ? '' : await serverSays(r, 'No se pudo publicar. Intenta otra vez.');
+        },
+        async reply(thread, parent, body) {
+          const r = await api('forum_replies', { method: 'POST', body: JSON.stringify(parent ? { thread, parent, body } : { thread, body }) }); // parent needs supabase/reddit.sql
+          return r?.ok ? '' : await serverSays(r, 'No se pudo publicar. Intenta otra vez.');
+        },
+        async remove(kind, id) {
+          const r = kind === 'thread' ? await api(`forum_threads?id=eq.${id}`, { method: 'DELETE' }) : await api('rpc/remove_forum_reply', { method: 'POST', body: JSON.stringify({ rid: id }) });
+          return !!r?.ok;
+        },
+      };
+    }
+
+    function previewSource(): Source {
+      type SR = { id?: string; parent?: string; by: string; text: string; votes: number; ago?: string; at?: number; mine?: boolean };
+      type ST = { id: string; cat: string; title: string; body: string; by: string; votes: number; ago?: string; at?: number; replies: SR[]; mine?: boolean };
+      type Saved = { threads: ST[]; replies: Record<string, SR[]>; votes: Record<string, number> };
+      const get = (): Saved => { try { return { threads: [], replies: {}, votes: {}, ...JSON.parse(localStorage.getItem('nc-foro') || '{}') }; } catch { return { threads: [], replies: {}, votes: {} }; } };
+      const put = (d: Saved) => { try { localStorage.setItem('nc-foro', JSON.stringify(d)); } catch { /* storage blocked */ } };
+      const samples = (window as any).__FORO_SAMPLES as ST[];
+      let me = 'Tú'; try { me = JSON.parse(localStorage.getItem('nc-profile') || '{}').name || 'Tú'; } catch { /* storage blocked */ }
+      const all = () => { const d = get(); return [...d.threads.map((t) => ({ t, sample: false })), ...samples.map((t) => ({ t, sample: true }))]; };
+      const repliesOf = (t: ST, d: Saved): Rp[] => [...t.replies, ...(d.replies[t.id] ?? [])].map((r, i) => ({
+        id: r.id ?? `${t.id}-x${i}`, parent: r.parent ?? null, body: r.text, votes: r.votes + (d.votes[r.id ?? ''] ?? 0), at: r.at ?? parseAgo(r.ago), by: r.mine ? me : `@${r.by}`, mine: !!r.mine, sample: !r.mine,
+      }));
+      return {
+        live: false,
+        async threads() {
+          const d = get();
+          return all().map(({ t, sample }) => ({ id: t.id, cat: t.cat, title: t.title, body: t.body, votes: t.votes + (d.votes[t.id] ?? 0), replies: repliesOf(t, d).length,
+            at: t.at ?? parseAgo(t.ago), by: t.mine ? me : `@${t.by}`, mine: !!t.mine, sample }));
+        },
+        async replies(id) { const d = get(); const t = all().find((x) => x.t.id === id)?.t; return t ? repliesOf(t, d) : []; },
+        async votes() { return get().votes; },
+        async vote(_k, id, v) { const d = get(); d.votes[id] = v; put(d); return true; },
+        async post(cat, title, body) { const d = get(); d.threads.unshift({ id: `t${Date.now()}`, cat, title, body, by: me, votes: 1, at: Date.now(), replies: [], mine: true }); put(d); return ''; },
+        async reply(thread, parent, text) { const d = get(); (d.replies[thread] ??= []).push({ id: `r${Date.now()}`, parent: parent ?? undefined, by: me, text, votes: 1, at: Date.now(), mine: true }); put(d); return ''; },
+        async remove(kind, id) {
+          const d = get();
+          if (kind === 'thread') d.threads = d.threads.filter((x) => x.id !== id);
+          else Object.keys(d.replies).forEach((k) => (d.replies[k] = d.replies[k].filter((x) => x.id !== id)));
+          put(d); return true;
+        },
+      };
+    }
+
+    // ---------- The page ----------
+    const src = accountsOn() ? supabaseSource() : previewSource();
+    if (src.live) {
+      document.querySelector('[data-fo-demo]')?.remove();
+      document.querySelector('[data-fo-intro]')!.textContent = 'Los lectores proponen temas, responden y votan. Para participar, entra con tu cuenta.';
+    }
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector<T>(s)!;
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+    const need = (why: string) => { if (!src.live || loggedIn()) return true; askLogin(why); return false; };
+    const bad = (t: string) => { const a = assess(t); return a.verdict === 'block' ? a.reasons.join(', ').toLowerCase() : ''; };
+    const toast = (msg: string) => dispatchEvent(new CustomEvent('nc-toast', { detail: msg }));
+    const base = location.pathname;
+    const linkTo = (id: string) => `${base}?t=${encodeURIComponent(id)}`;
+    const plural = (n: number) => `${n} ${n === 1 ? 'respuesta' : 'respuestas'}`;
+
+    let threads: Th[] = [], votes: Record<string, number> = {}, sort: 'hot' | 'top' | 'new' = 'hot', cat = '';
+    let current: Th | null = null, replies: Rp[] = [], rsort: Sort = 'best', replyingTo = '';
+    const folded = new Set<string>();
+    const rlist = $<HTMLUListElement>('[data-fo-replies]');
+    const applyFold = foldable(rlist, folded);
+
+    async function vote(kind: 'thread' | 'reply', it: { id: string; votes: number }, v: number, paint: () => void) {
+      if (!need('Entra para votar.')) return;
+      const cur = votes[it.id] ?? 0, next = cur === v ? 0 : v;
+      it.votes += next - cur; votes[it.id] = next; paint(); // right away; the server keeps the real total
+      if (!(await src.vote(kind, it.id, next))) { toast('No se pudo guardar tu voto.'); void route(); }
+    }
+    async function share(t: Th) {
+      const link = new URL(linkTo(t.id), location.href).href;
+      if (navigator.share) { try { await navigator.share({ title: t.title, url: link }); return; } catch { /* closed */ } }
+      try { await navigator.clipboard.writeText(link); toast('Enlace copiado ✓'); } catch { prompt('Copia el enlace:', link); }
+    }
+    function topicCard(t: Th, full: boolean): HTMLElement {
+      const box = el(full ? 'article' : 'li', 'fo-item');
+      const vb = voteBox(t.votes, votes[t.id] ?? 0, 'fo-vote');
+      vb.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-vote]'); if (b) void vote('thread', t, Number(b.dataset.vote), full ? paintTopic : renderList); });
+      const body = el('div', 'fo-body');
+      const meta = el('p', 'fo-meta'); meta.append(el('span', 'fo-cat', t.cat), document.createTextNode(` · ${t.by} · ${ago(t.at)}`));
+      if (t.sample) meta.append(' ', el('span', 'sp-demo', 'EJEMPLO'));
+      const h = el(full ? 'h2' : 'h3', full ? 'fo-title' : '');
+      if (full) h.textContent = t.title; else { const a = el('a', '', t.title); a.href = linkTo(t.id); a.dataset.go = t.id; h.append(a); }
+      const p = el('p', full ? 'fo-text' : 'fo-text clip', t.body);
+      const actions = el('div', 'fo-actions');
+      const talk = el('a', '', `💬 ${plural(t.replies)}`); talk.href = linkTo(t.id); talk.dataset.go = t.id;
+      const sh = el('button', '', '↗ Compartir'); sh.type = 'button'; sh.addEventListener('click', () => void share(t));
+      actions.append(talk, sh);
+      if (t.mine) {
+        const del = el('button', '', 'Borrar'); del.type = 'button';
+        del.addEventListener('click', async () => {
+          if (!(await ask('¿Borrar tu tema y todas sus respuestas?', { ok: 'Borrar', danger: true }))) return;
+          if (await src.remove('thread', t.id)) { threads = threads.filter((x) => x.id !== t.id); go(''); } else toast('No se pudo borrar.');
+        });
+        actions.append(del);
+      }
+      body.append(meta, h, p, actions);
+      box.append(vb, body);
+      return box;
+    }
+
+    // ----- The list -----
+    function renderList() {
+      const list = $<HTMLUListElement>('[data-fo-list]');
+      let items = threads.filter((t) => !cat || t.cat === cat);
+      items = [...items].sort(sort === 'top' ? (a, b) => b.votes - a.votes || b.at - a.at : sort === 'new' ? (a, b) => b.at - a.at : (a, b) => hot(b.votes, b.at) - hot(a.votes, a.at));
+      list.replaceChildren(...items.map((t) => topicCard(t, false)));
+      if (!items.length) list.append(el('li', 'fo-empty', cat ? 'Todavía no hay temas en esta categoría.' : 'Sé la primera persona en proponer un tema.'));
+      const cn = $('[data-fo-catnow]'); cn.hidden = !cat; cn.textContent = cat ? `Categoría: ${cat}` : '';
+    }
+
+    // ----- One topic -----
+    function paintTopic() { if (current) $('[data-fo-topic]').replaceChildren(topicCard(current, true)); }
+    function renderReplies() {
+      const rows = tree(replies.map((r) => ({ ...r, score: r.votes })), rsort);
+      rlist.replaceChildren(...rows.map(({ item: r, depth, kids }) => {
+        const li = el('li', `rt-item${r.mine ? ' mine' : ''}`); li.dataset.id = r.id; li.dataset.depth = String(depth);
+        li.style.setProperty('--d', String(Math.min(depth, 6)));
+        const line = el('button', 'rt-line'); (line as HTMLButtonElement).type = 'button'; line.dataset.fold = ''; line.setAttribute('aria-label', 'Ocultar o mostrar esta conversación');
+        const main = el('div', 'rt-main');
+        const head = el('p', 'rt-head');
+        const fold = el('button', 'rt-fold', '−'); (fold as HTMLButtonElement).type = 'button'; fold.dataset.fold = ''; fold.dataset.foldLabel = ''; fold.setAttribute('aria-label', 'Ocultar o mostrar respuestas');
+        head.append(fold, el('b', '', r.deleted ? '[eliminado]' : r.by), document.createTextNode(` · ${ago(r.at)}`));
+        if (r.sample) head.append(' ', el('span', 'sp-demo', 'EJEMPLO'));
+        if (kids) head.append(el('span', 'rt-kids', ` · +${plural(kids)}`));
+        const text = el('p', `rt-text${r.deleted ? ' gone' : ''}`, r.deleted ? 'Este mensaje fue eliminado.' : r.body);
+        const acts = el('div', 'rt-acts');
+        acts.append(voteBox(r.votes, votes[r.id] ?? 0));
+        if (!r.deleted) { const rb = el('button', '', 'Responder'); (rb as HTMLButtonElement).type = 'button'; rb.dataset.answer = ''; acts.append(rb); }
+        if (r.mine && !r.deleted) { const db = el('button', '', 'Borrar'); (db as HTMLButtonElement).type = 'button'; db.dataset.del = ''; acts.append(db); }
+        main.append(head, text, acts);
+        if (replyingTo === r.id) main.append(inlineForm(r));
+        li.append(line, main);
+        return li;
+      }));
+      if (!rows.length) rlist.append(el('li', 'fo-empty', 'Nadie ha respondido todavía. ¡Sé la primera persona!'));
+      applyFold();
+    }
+    function inlineForm(r: Rp): HTMLFormElement {
+      const f = el('form', 'rt-form') as HTMLFormElement;
+      const ta = el('textarea') as HTMLTextAreaElement; ta.rows = 2; ta.maxLength = 1000; ta.placeholder = `Responder a ${r.by}…`; ta.setAttribute('aria-label', `Responder a ${r.by}`);
+      const row = el('div', 'fo-row'); const er = el('span', 'cm-err'); er.hidden = true;
+      const cancel = el('button', 'rt-cancel', 'Cancelar'); (cancel as HTMLButtonElement).type = 'button'; cancel.addEventListener('click', () => { replyingTo = ''; renderReplies(); });
+      const send = el('button', 'jg-btn', 'Responder'); (send as HTMLButtonElement).type = 'submit'; send.style.margin = '0';
+      row.append(er, cancel, send); f.append(ta, row);
+      f.addEventListener('submit', async (e) => { e.preventDefault(); await sendReply(ta.value, r.id, er); });
+      setTimeout(() => ta.focus(), 0);
+      return f;
+    }
+    async function sendReply(raw: string, parent: string | null, er: HTMLElement) {
+      if (!current || !need('Entra para responder.')) return;
+      const text = raw.trim(), why = bad(text);
+      if (!text) { er.textContent = 'Escribe algo primero.'; er.hidden = false; return; }
+      if (why) { er.textContent = `No se puede publicar: ${why}.`; er.hidden = false; return; }
+      const fail = await src.reply(current.id, parent, text);
+      if (fail) { er.textContent = fail; er.hidden = false; return; }
+      replyingTo = ''; if (parent) folded.delete(parent);
+      current.replies++; await openThread(current.id, false);
+      toast('Publicado ✓');
+    }
+    rlist.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement; const li = t.closest<HTMLElement>('.rt-item'); if (!li) return;
+      const r = replies.find((x) => x.id === li.dataset.id); if (!r) return;
+      const vb = t.closest<HTMLElement>('[data-vote]');
+      if (vb) return void vote('reply', r, Number(vb.dataset.vote), renderReplies);
+      if (t.closest('[data-answer]')) { if (!need('Entra para responder.')) return; replyingTo = replyingTo === r.id ? '' : r.id; renderReplies(); return; }
+      if (t.closest('[data-del]')) {
+        if (!(await ask('¿Borrar tu respuesta? Si otras personas ya te respondieron, sus respuestas se quedan.', { ok: 'Borrar', danger: true }))) return;
+        if (await src.remove('reply', r.id)) await openThread(current!.id, false); else toast('No se pudo borrar.');
+      }
+    });
+    async function openThread(id: string, top = true) {
+      const t = threads.find((x) => x.id === id);
+      if (!t) { $('[data-fo-topic]').replaceChildren(el('p', 'fo-empty', 'Este tema ya no existe o fue eliminado.')); rlist.replaceChildren(); current = null; return; }
+      current = t;
+      replies = await src.replies(id);
+      t.replies = replies.length;
+      document.title = `${t.title} · Foro NotiCel`;
+      paintTopic(); renderReplies();
+      if (top) scrollTo({ top: 0 });
+    }
+
+    // ----- Which view: the list, or one topic (?t=id) -----
+    async function route() {
+      const id = new URLSearchParams(location.search).get('t');
+      $('[data-fo-listview]').hidden = !!id; $('[data-fo-threadview]').hidden = !id;
+      if (id) await openThread(id); else { document.title = 'Foro NotiCel · NotiCel'; current = null; renderList(); }
+    }
+    function go(id: string) { history.pushState({}, '', id ? linkTo(id) : base); void route(); }
+    document.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('[data-go],[data-fo-home]');
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault(); go(a.dataset.go ?? '');
+    });
+    addEventListener('popstate', () => void route());
+
+    document.querySelectorAll<HTMLButtonElement>('[data-sort]').forEach((b) => b.addEventListener('click', () => {
+      sort = b.dataset.sort as typeof sort;
+      document.querySelectorAll('[data-sort]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      renderList();
+    }));
+    document.querySelectorAll<HTMLButtonElement>('[data-rsort]').forEach((b) => b.addEventListener('click', () => {
+      rsort = b.dataset.rsort as Sort;
+      document.querySelectorAll('[data-rsort]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      renderReplies();
+    }));
+    document.querySelectorAll<HTMLButtonElement>('[data-cat]').forEach((b) => b.addEventListener('click', () => {
+      cat = b.dataset.cat || '';
+      if (current) go(''); else renderList();
+    }));
+
+    // New topic
+    const form = $<HTMLFormElement>('[data-fo-new]'), err = $('[data-fo-err]');
+    form.querySelectorAll('input,textarea').forEach((x) => x.addEventListener('focus', () => { if (src.live && !loggedIn()) { (x as HTMLElement).blur(); askLogin('Entra para proponer un tema.'); } }));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!need('Entra para proponer un tema.')) return;
+      const title = $<HTMLInputElement>('#fo-title').value.trim(), body = $<HTMLTextAreaElement>('#fo-body').value.trim(), c = $<HTMLSelectElement>('#fo-cat').value;
+      if (title.length < 5) { err.textContent = 'Escribe un título más largo.'; err.hidden = false; return; }
+      const why = bad(`${title} ${body}`); if (why) { err.textContent = `No se puede publicar: ${why}.`; err.hidden = false; return; }
+      err.hidden = true;
+      const fail = await src.post(c, title, body);
+      if (fail) { err.textContent = fail; err.hidden = false; return; }
+      form.reset(); sort = 'new';
+      document.querySelectorAll('[data-sort]').forEach((x) => x.setAttribute('aria-pressed', String((x as HTMLElement).dataset.sort === 'new')));
+      await load(); toast('Tema publicado ✓');
+    });
+    // Answer the topic itself
+    const answer = $<HTMLFormElement>('[data-fo-answer]'), answerTa = answer.querySelector('textarea')!, answerErr = $('[data-fo-answer-err]');
+    answerTa.addEventListener('focus', () => { if (src.live && !loggedIn()) { answerTa.blur(); askLogin('Entra para responder.'); } });
+    answerTa.addEventListener('input', () => (answerErr.hidden = true));
+    answer.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await sendReply(answerTa.value, null, answerErr);
+      if (answerErr.hidden) answerTa.value = '';
+    });
+
+    async function load() {
+      [threads, votes] = await Promise.all([src.threads(), src.votes()]);
+      await route();
+    }
+    addEventListener('nc-account', () => void load());
+    void load();
+  </script>
+</Base>

@@ -1,0 +1,335 @@
+---
+// DEMO: advertiser panel with made-up numbers, to show clients what they'll get.
+// Built for small-business owners first (plain words, "how is my ad doing?" up top, quick actions), with what agencies
+// need too (switch between client businesses, team roles). Accounts: one NotiCel login for everyone; a person
+// can also belong to one or more business accounts (owner / can edit / can only view), like Facebook + Meta Business.
+// The real version needs accounts and ad statistics from outside services (see src/lib/ads.ts) and should replace
+// this page's data, not its look. Settings and demo actions are saved only on this device.
+import Base from '../../layouts/Base.astro';
+import { SITE, url } from '../../lib/site';
+import { REWARDS } from '../../lib/ads';
+const GLOSSARY = [
+  ['Veces que se vio', 'Cada vez que tu anuncio apareció en la pantalla de alguien (en inglés, “impresiones”).'],
+  ['Personas alcanzadas', 'Cuántas personas distintas vieron tu anuncio. Una misma persona puede verlo varias veces.'],
+  ['Toques', 'Las veces que alguien tocó o hizo clic en tu anuncio para ir a tu página, WhatsApp o tienda.'],
+  ['% de toques', 'De cada 100 veces que se vio tu anuncio, cuántas veces lo tocaron. En sitios de noticias, más de 0.5% es bueno.'],
+  ['Costo por toque', 'Lo que pagaste dividido entre los toques que recibiste.'],
+  ['Valla digital', 'Tu anuncio rota con otros cada 8 segundos en el mismo espacio, como una valla en la carretera.'],
+];
+---
+<Base title="Panel de anunciante" noindex description="Ejemplo del panel de anunciante de NotiCel: cómo le va a tu anuncio, tus campañas, facturas, premios e informes por correo.">
+  <main class="wrap apn" id="main" data-apn data-rewards={JSON.stringify(REWARDS)}>
+    <p class="pf-demo"><span class="sp-demo">DEMO</span> Panel de ejemplo con datos ficticios. Así verán sus estadísticas nuestros anunciantes.</p>
+
+    <header class="apn-hero">
+      <span class="apn-av" data-av aria-hidden="true">PE</span>
+      <div class="apn-hello">
+        <p class="apn-greet" data-greet>¡Hola!</p>
+        <label class="apn-switch">
+          <span class="sr">Cuenta de negocio</span>
+          <select data-biz>
+            <option value="panaderia">Panadería La Esquina</option>
+            <option value="ferreteria">Ferretería Díaz (cliente de agencia)</option>
+          </select>
+        </label>
+        <p class="apn-sub" data-role>Eres dueño de esta cuenta · Negocio local</p>
+      </div>
+      <div class="apn-actions">
+        <a class="adp-btn red" href={`${url('publicidad')}#campana`}>+ Nueva campaña</a>
+        <a class="adp-btn ghost-dark" href={url('perfil')}>Mi perfil de lector</a>
+      </div>
+    </header>
+
+    <nav class="apn-tabs" role="tablist" aria-label="Secciones del panel">
+      <button type="button" role="tab" aria-selected="true" data-tab="inicio">Inicio</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="campanas">Mis anuncios</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="pagos">Pagos y premios</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="ayuda">Ayuda y ajustes</button>
+    </nav>
+
+    <!-- ===== Inicio ===== -->
+    <section data-panel="inicio">
+      <div class="apn-range-row">
+        <h2 class="apn-h">¿Cómo le va a tu publicidad?</h2>
+        <div class="cx-tabs apn-range" role="tablist" aria-label="Período">
+          <button type="button" role="tab" aria-selected="true" data-range="7">Esta semana</button>
+          <button type="button" role="tab" aria-selected="false" data-range="30">30 días</button>
+          <button type="button" role="tab" aria-selected="false" data-range="90">3 meses</button>
+        </div>
+      </div>
+      <div class="apn-story" data-story aria-live="polite"></div>
+      <section class="apn-kpis" data-kpis></section>
+
+      <div class="apn-grid">
+        <section class="apn-card apn-wide">
+          <h3>Veces que se vio, por día</h3>
+          <div class="apn-chart" data-chart></div>
+          <p class="apn-read" data-read></p>
+        </section>
+        <section class="apn-card">
+          <h3>Pendientes</h3>
+          <ul class="apn-todo" data-todo></ul>
+        </section>
+        <section class="apn-card">
+          <h3>💡 Consejos para ti</h3>
+          <ul class="apn-tips" data-tips></ul>
+        </section>
+        <section class="apn-card"><h3>¿Dónde te vieron?</h3><ul class="apn-bars" data-regions></ul></section>
+        <section class="apn-card"><h3>¿En qué parte del sitio?</h3><ul class="apn-bars" data-sections></ul></section>
+      </div>
+    </section>
+
+    <!-- ===== Mis anuncios ===== -->
+    <section data-panel="campanas" hidden>
+      <h2 class="apn-h">Mis anuncios</h2>
+      <div class="apn-camps" data-camps></div>
+    </section>
+
+    <!-- ===== Pagos y premios ===== -->
+    <section data-panel="pagos" hidden>
+      <h2 class="apn-h">Pagos y premios</h2>
+      <div class="apn-grid">
+        <section class="apn-card">
+          <h3>🎁 Premios</h3>
+          <p class="apn-spent">Has invertido <b data-spent></b></p>
+          <div class="cx-bar apn-prog"><span data-prog></span></div>
+          <p class="apn-small" data-next></p>
+          <ul class="apn-gifts" data-gifts></ul>
+        </section>
+        <section class="apn-card">
+          <h3>Facturas</h3>
+          <ul class="apn-inv" data-invoices></ul>
+          <p class="apn-small">Forma de pago: tarjeta terminada en •••• (se configura con tu representante).</p>
+        </section>
+      </div>
+    </section>
+
+    <!-- ===== Ayuda y ajustes ===== -->
+    <section data-panel="ayuda" hidden>
+      <h2 class="apn-h">Ayuda y ajustes</h2>
+      <div class="apn-grid">
+        <section class="apn-card">
+          <h3>📧 Informe por correo</h3>
+          <p class="apn-small">Te enviamos tus números automáticamente, en palabras sencillas.</p>
+          <form class="apn-mail" data-mail>
+            <label>¿Cada cuánto?
+              <select name="freq"><option value="weekly">Cada lunes</option><option value="monthly">El día 1 de cada mes</option><option value="off">No enviar</option></select>
+            </label>
+            <label>¿A qué correo?<input name="to" type="email" value="ventas@panaderialaesquina.com" /></label>
+            <label class="adb-check"><input type="checkbox" name="alerts" checked /> Avísame cuando una campaña esté por terminar</label>
+            <button type="submit" class="adp-btn">Guardar</button>
+            <p class="adp-note" data-mail-note hidden></p>
+          </form>
+        </section>
+        <section class="apn-card">
+          <h3>👥 Tu equipo</h3>
+          <p class="apn-small">Quién puede entrar a esta cuenta de negocio con su propio usuario.</p>
+          <ul class="apn-team" data-team></ul>
+          <button type="button" class="adp-btn ghost-dark" data-demo-act="Invitar a alguien">+ Invitar a alguien</button>
+        </section>
+        <section class="apn-card apn-wide">
+          <h3>¿Qué significa cada número?</h3>
+          <div class="apn-gloss">
+            {GLOSSARY.map(([t, d]) => <details><summary>{t}</summary><p>{d}</p></details>)}
+          </div>
+        </section>
+        <section class="apn-card apn-wide apn-help">
+          <div><h3>¿Necesitas ayuda?</h3><p class="apn-small">Tu representante te ayuda con el arte, las fechas o cualquier duda.</p></div>
+          <a class="adp-btn red" href={SITE.email ? `mailto:${SITE.email}?subject=${encodeURIComponent('Ayuda con mi panel de anunciante')}` : `${url('publicidad')}#contacto`}>Escríbenos</a>
+        </section>
+      </div>
+    </section>
+
+    <div class="apn-toast" data-toast role="status" hidden></div>
+  </main>
+  <script>
+    const page = document.querySelector<HTMLElement>('[data-apn]')!;
+    const $ = (s: string) => page.querySelector<HTMLElement>(s)!;
+    const n = (v: number) => Math.round(v).toLocaleString('es-PR');
+    const money = (v: number) => `$${v.toLocaleString('en-US', { maximumFractionDigits: v < 10 ? 2 : 0, minimumFractionDigits: v < 10 ? 2 : 0 })}`;
+    const SITE_CTR = 0.9; // site-wide average % of taps (demo)
+
+    // ---- Two demo business accounts: a local business (owner) and an agency client (editor) ----
+    type Camp = { name: string; fmt: string; from: string; to: string; daysLeft: number; imp: number; clk: number; budget: number; used: number; st: 'Activa' | 'En revisión' | 'Pausada' | 'Terminó'; bg: string; line: string };
+    type Biz = { name: string; initials: string; role: string; base: number; spentAll: number; inv: Array<[string, number, string]>; team: Array<[string, string]>; camps: Camp[]; top: string; color: string; regions: Array<[string, number]> };
+    const BIZ: Record<string, Biz> = {
+      panaderia: { name: 'Panadería La Esquina', initials: 'PE', role: 'Eres dueño de esta cuenta · Negocio local', base: 420, spentAll: 171, color: '#B45309', top: 'Metro',
+        regions: [['Metro', 0.34], ['Norte', 0.16], ['Este', 0.13], ['Centro', 0.12], ['Sur', 0.11], ['Oeste', 0.09], ['Diáspora', 0.05]],
+        inv: [['Octubre 2026', 58, 'Pagada'], ['Septiembre 2026', 64, 'Pagada'], ['Agosto 2026', 49, 'Pagada']],
+        team: [['Tú', 'Dueño'], ['Carmen (gerente)', 'Puede editar'], ['Contable', 'Solo puede ver']],
+        camps: [
+          { name: 'Pan sobao de otoño', fmt: 'Rectángulo · Toda la isla', from: '15 sep', to: '15 oct', daysLeft: 13, imp: 9210, clk: 116, budget: 49, used: 28, st: 'Activa', bg: 'linear-gradient(135deg,#B45309,#F59E0B)', line: 'Pan sobao calientito' },
+          { name: 'Quesitos 2×1', fmt: 'Valla digital · Metro', from: '20 sep', to: '20 oct', daysLeft: 18, imp: 12480, clk: 141, budget: 29, used: 12, st: 'Activa', bg: 'linear-gradient(135deg,#D7263D,#F28C28)', line: 'Quesitos 2×1 hoy' },
+          { name: 'Café y desayuno', fmt: 'Entre noticias', from: '1 nov', to: '30 nov', daysLeft: 0, imp: 0, clk: 0, budget: 49, used: 0, st: 'En revisión', bg: 'linear-gradient(135deg,#5B3A1E,#A16207)', line: 'Desayuno criollo $5.99' },
+          { name: 'Gran apertura Caguas', fmt: 'Rectángulo · Centro', from: '10 ago', to: '31 ago', daysLeft: 0, imp: 9840, clk: 157, budget: 25, used: 25, st: 'Terminó', bg: 'linear-gradient(135deg,#2B1185,#1F90DA)', line: '¡Abrimos en Caguas!' },
+        ] },
+      ferreteria: { name: 'Ferretería Díaz', initials: 'FD', role: 'Puedes editar · Cuenta manejada por tu agencia', base: 900, spentAll: 1430, color: '#0E7490', top: 'Oeste',
+        regions: [['Oeste', 0.52], ['Sur', 0.48]],
+        inv: [['Octubre 2026', 320, 'Pendiente'], ['Septiembre 2026', 345, 'Pagada'], ['Agosto 2026', 305, 'Pagada']],
+        team: [['Agencia Creativa PR', 'Administra'], ['Sr. Díaz', 'Dueño'], ['Tú', 'Puede editar']],
+        camps: [
+          { name: 'Temporada de huracanes', fmt: 'Media página · Oeste y Sur', from: '1 sep', to: '30 nov', daysLeft: 59, imp: 41200, clk: 455, budget: 297, used: 105, st: 'Activa', bg: 'linear-gradient(135deg,#0E7490,#22D3EE)', line: 'Generadores y plantas' },
+          { name: 'Toma de portada: Black Friday', fmt: 'Toma de portada · 1 día', from: '28 nov', to: '28 nov', daysLeft: 0, imp: 0, clk: 0, budget: 99, used: 0, st: 'Pausada', bg: 'linear-gradient(135deg,#111827,#4B5563)', line: 'Black Friday −40%' },
+        ] },
+    };
+    let biz = BIZ.panaderia;
+
+    // Made-up but steady numbers (same every visit)
+    const today = new Date(); today.setHours(12, 0, 0, 0);
+    const series = (b: Biz) => {
+      let seed = b.base; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      return Array.from({ length: 180 }, (_, i) => {
+        const d = new Date(today.valueOf() - (179 - i) * 864e5); const wk = d.getDay() === 0 || d.getDay() === 6 ? 1.25 : 1;
+        const imp = Math.round((b.base + i * 2.4 + rnd() * b.base * 0.35) * wk); return { d, imp, clk: Math.round(imp * (0.009 + rnd() * 0.007)) };
+      });
+    };
+    let daily = series(biz);
+    const SEC: Array<[string, number]> = [['Portada', 0.31], ['Deportes', 0.22], ['Puerto Rico', 0.17], ['Juegos NotiCel', 0.14], ['Clima', 0.09], ['Entretenimiento', 0.07]];
+
+    const toast = (msg: string) => { const t = $('[data-toast]'); t.textContent = msg; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3500); };
+    const bars = (sel: string, rows: Array<[string, number]>, total: number) => {
+      const max = Math.max(...rows.map((r) => r[1]));
+      $(sel).innerHTML = rows.map(([name, s]) => `<li><span class="apn-b-name">${name}</span><span class="apn-b-track"><i style="width:${(s / max) * 100}%"></i></span><b>${n(total * s)}</b></li>`).join('');
+    };
+    const fmtD = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString('es-PR', o);
+
+    let range = 7;
+    function renderHome() {
+      const cur = daily.slice(-range), prev = daily.slice(-range * 2, -range);
+      const sum = (a: typeof daily, k: 'imp' | 'clk') => a.reduce((t, x) => t + x[k], 0);
+      const imp = sum(cur, 'imp'), clk = sum(cur, 'clk'), pClk = sum(prev, 'clk');
+      const reach = Math.round(imp / (1.6 + range / 60)); // people see an ad a few times
+      const ctr = (clk / imp) * 100;
+      const spend = (biz.spentAll / 90) * range;
+      const best = cur.reduce((a, b) => (b.imp > a.imp ? b : a));
+      const when = range === 7 ? 'Esta semana' : range === 30 ? 'En los últimos 30 días' : 'En los últimos 3 meses';
+      const trend = pClk ? Math.round(((clk - pClk) / pClk) * 100) : 0;
+      const good = ctr >= SITE_CTR;
+      $('[data-story]').innerHTML = `<span class="apn-mood" aria-hidden="true">${good ? '😄' : '🙂'}</span><p><b>${when}, ${n(reach)} personas vieron tu anuncio y ${n(clk)} lo tocaron</b> para ir a tu negocio. ${good ? `Eso es <b>mejor que el promedio</b> del sitio (${SITE_CTR}%).` : `Eso está cerca del promedio del sitio (${SITE_CTR}%).`} ${trend >= 0 ? `Tuviste ${trend}% más toques que en el período anterior.` : `Tuviste ${Math.abs(trend)}% menos toques que en el período anterior.`}</p>`;
+      const tile = (icon: string, k: string, v: string, help: string) => `<div><span class="apn-k-h"><i aria-hidden="true">${icon}</i>${k}</span><b>${v}</b><small>${help}</small></div>`;
+      $('[data-kpis]').innerHTML = [
+        tile('👀', 'Personas alcanzadas', n(reach), `vieron tu anuncio ${n(imp)} veces`),
+        tile('👆', 'Toques', n(clk), `${ctr.toFixed(2)}% de las veces`),
+        tile('💵', 'Invertido', money(Math.round(spend)), 'en este período'),
+        tile('🎯', 'Costo por toque', money(spend / clk), 'por cada cliente que llegó'),
+      ].join('');
+      // Line chart with hover/touch readout
+      const box = $('[data-chart]');
+      const W = Math.max(600, Math.min(1100, box.clientWidth || 720)), H = 230, L = 64, R = 14, T = 14, B = 30;
+      const max = Math.ceil(Math.max(...cur.map((x) => x.imp)) / 200) * 200;
+      const x = (i: number) => L + (i * (W - L - R)) / Math.max(1, cur.length - 1);
+      const y = (v: number) => T + (H - T - B) * (1 - v / max);
+      const grid = [0, 0.5, 1].map((f) => `<line x1="${L}" x2="${W - R}" y1="${y(max * f)}" y2="${y(max * f)}" class="apn-grid-l"/><text x="${L - 8}" y="${y(max * f) + 4}" class="apn-ax" text-anchor="end">${n(max * f)}</text>`).join('');
+      const step = Math.ceil(cur.length / 6);
+      const xl = cur.map((p, i) => (i % step === 0 ? `<text x="${x(i)}" y="${H - 8}" class="apn-ax" text-anchor="middle">${range === 7 ? fmtD(p.d, { weekday: 'short' }) : fmtD(p.d, { day: 'numeric', month: 'short' })}</text>` : '')).join('');
+      const pts = cur.map((p, i) => `${x(i)},${y(p.imp)}`).join(' ');
+      box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Veces que se vio tu anuncio por día">${grid}${xl}<polygon points="${L},${y(0)} ${pts} ${x(cur.length - 1)},${y(0)}" class="apn-area"/><polyline points="${pts}" class="apn-line"/><line class="apn-cur" data-cur y1="${T}" y2="${y(0)}" hidden/><circle r="5" class="apn-dot" data-dot hidden/><rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" data-hit/></svg>`;
+      const svg = box.querySelector('svg')!;
+      const read = (i: number) => {
+        const p = cur[i];
+        $('[data-read]').innerHTML = `<b>${fmtD(p.d, { weekday: 'long', day: 'numeric', month: 'long' })}:</b> se vio ${n(p.imp)} veces · ${n(p.clk)} toques`;
+        const c = svg.querySelector('[data-cur]')!, dot = svg.querySelector('[data-dot]')!;
+        c.removeAttribute('hidden'); dot.removeAttribute('hidden');
+        c.setAttribute('x1', String(x(i))); c.setAttribute('x2', String(x(i))); dot.setAttribute('cx', String(x(i))); dot.setAttribute('cy', String(y(p.imp)));
+      };
+      svg.querySelector('[data-hit]')!.addEventListener('pointermove', (e) => {
+        const r = svg.getBoundingClientRect(); const vx = ((e as PointerEvent).clientX - r.left) * (W / r.width);
+        read(Math.max(0, Math.min(cur.length - 1, Math.round(((vx - L) / (W - L - R)) * (cur.length - 1)))));
+      });
+      read(cur.length - 1);
+      bars('[data-regions]', biz.regions, imp);
+      bars('[data-sections]', SEC, imp);
+      // Tips in plain words, from the numbers
+      $('[data-tips]').innerHTML = [
+        `Tu mejor día fue el <b>${fmtD(best.d, { weekday: 'long' })}</b>. Ese día es buen momento para una oferta.`,
+        `La región que más te vio fue <b>${biz.top}</b>. Si casi todos tus clientes son de ahí, anunciarte solo en esa región te sale más barato.`,
+        'Los anuncios con <b>precio o descuento</b> en el arte reciben más toques. Sube una segunda versión para que roten.',
+      ].map((t) => `<li>${t}</li>`).join('');
+    }
+
+    function renderTodo() {
+      const items: string[] = [];
+      biz.camps.forEach((c) => {
+        if (c.st === 'Activa' && c.daysLeft <= 14) items.push(`<li class="warn"><span>⏳ <b>${c.name}</b> termina en ${c.daysLeft} días.</span><button type="button" data-demo-act="Extender ${c.name}">Extender</button></li>`);
+        if (c.st === 'En revisión') items.push(`<li><span>🕑 El arte de <b>${c.name}</b> está en revisión. Te avisamos al aprobarlo (casi siempre en 1 día).</span></li>`);
+        if (c.st === 'Pausada') items.push(`<li><span>⏸️ <b>${c.name}</b> está en pausa.</span><button type="button" data-demo-act="Reanudar ${c.name}">Reanudar</button></li>`);
+      });
+      biz.inv.filter((i) => i[2] === 'Pendiente').forEach((i) => items.push(`<li class="warn"><span>💳 Factura de ${i[0]} pendiente: <b>${money(i[1])}</b>.</span><button type="button" data-demo-act="Pagar factura">Pagar</button></li>`));
+      if (!items.length) items.push('<li><span>✅ Todo al día. ¡Nada pendiente!</span></li>');
+      $('[data-todo]').innerHTML = items.join('');
+    }
+
+    function renderCamps() {
+      const groups: Array<[string, Camp[]]> = [['Activas', biz.camps.filter((c) => c.st === 'Activa')], ['Próximas y en pausa', biz.camps.filter((c) => c.st === 'En revisión' || c.st === 'Pausada')], ['Anteriores', biz.camps.filter((c) => c.st === 'Terminó')]];
+      $('[data-camps]').innerHTML = groups.filter(([, l]) => l.length).map(([g, l]) => `<h3 class="apn-group">${g}</h3>` + l.map((c) => {
+        const ctr = c.imp ? ((c.clk / c.imp) * 100).toFixed(2) + '%' : '—';
+        const pct = Math.round((c.used / c.budget) * 100);
+        const acts = c.st === 'Activa' ? ['Pausar', 'Extender', 'Cambiar arte'] : c.st === 'Pausada' ? ['Reanudar', 'Cambiar fechas'] : c.st === 'En revisión' ? ['Cambiar arte'] : ['Repetir esta campaña'];
+        return `<article class="apn-camp">
+          <div class="apn-prev" style="background:${c.bg}"><b>${c.line}</b><span>${biz.name}</span></div>
+          <div class="apn-camp-body">
+            <div class="apn-camp-top"><h4>${c.name}</h4><span class="apn-st ${c.st === 'Activa' ? 'on' : c.st === 'Terminó' ? '' : 'wait'}">${c.st}</span></div>
+            <p class="apn-small">${c.fmt} · ${c.from} – ${c.to}${c.st === 'Activa' ? ` · quedan ${c.daysLeft} días` : ''}</p>
+            <dl class="apn-camp-k"><div><dt>Se vio</dt><dd>${c.imp ? n(c.imp) : '—'}</dd></div><div><dt>Toques</dt><dd>${c.clk ? n(c.clk) : '—'}</dd></div><div><dt>% toques</dt><dd>${ctr}</dd></div></dl>
+            <div class="apn-budget"><span>Presupuesto usado: ${money(c.used)} de ${money(c.budget)}</span><span class="cx-bar"><span style="width:${pct}%"></span></span></div>
+            <div class="apn-camp-acts">${acts.map((a) => `<button type="button" data-demo-act="${a}: ${c.name}">${a}</button>`).join('')}</div>
+          </div></article>`;
+      }).join('')).join('');
+    }
+
+    function renderPay() {
+      const rewards: Array<{ at: number; gift: string }> = JSON.parse(page.dataset.rewards!);
+      const next = rewards.find((r) => biz.spentAll < r.at);
+      $('[data-spent]').textContent = money(biz.spentAll);
+      $('[data-prog]').style.width = `${next ? (biz.spentAll / next.at) * 100 : 100}%`;
+      $('[data-next]').textContent = next ? `Te faltan ${money(next.at - biz.spentAll)} para ganarte ${next.gift.toLowerCase()}.` : '¡Ganaste todos los premios!';
+      $('[data-gifts]').innerHTML = rewards.map((r) => `<li class="${biz.spentAll >= r.at ? 'won' : ''}"><b>${money(r.at)}</b> ${r.gift}${biz.spentAll >= r.at ? ' ✓ ganado' : ''}</li>`).join('');
+      $('[data-invoices]').innerHTML = biz.inv.map(([m, a, s]) => `<li><span>${m}</span><b>${money(a)}</b><span class="apn-st ${s === 'Pagada' ? 'on' : 'wait'}">${s}</span><button type="button" class="apn-dl" data-demo-act="Descargar factura de ${m}" aria-label="Descargar factura de ${m}">PDF</button></li>`).join('');
+      $('[data-team]').innerHTML = biz.team.map(([who, role]) => `<li><span class="apn-av sm" aria-hidden="true">${who.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ ]/g, '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</span><span>${who}</span><span class="apn-st">${role}</span></li>`).join('');
+    }
+
+    function renderAll() {
+      const h = new Date().getHours();
+      $('[data-greet]').textContent = `${h < 12 ? '¡Buenos días' : h < 19 ? '¡Buenas tardes' : '¡Buenas noches'}! 👋`;
+      $('[data-av]').textContent = biz.initials; $('[data-av]').style.background = biz.color;
+      $('[data-role]').textContent = biz.role;
+      renderHome(); renderTodo(); renderCamps(); renderPay();
+    }
+
+    // Business switcher (agencies, and people with more than one business)
+    const sel = page.querySelector<HTMLSelectElement>('[data-biz]')!;
+    sel.addEventListener('change', () => { biz = BIZ[sel.value]; daily = series(biz); renderAll(); });
+    // Tabs
+    page.querySelectorAll<HTMLButtonElement>('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+      page.querySelectorAll('[data-tab]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      page.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => (p.hidden = p.dataset.panel !== b.dataset.tab));
+      if (b.dataset.tab === 'inicio') renderHome(); // the chart's width depends on the visible box
+    }));
+    page.querySelectorAll<HTMLButtonElement>('[data-range]').forEach((b) => b.addEventListener('click', () => {
+      page.querySelectorAll('[data-range]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      range = Number(b.dataset.range); renderHome();
+    }));
+    // Demo actions explain what the real button will do
+    page.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-demo-act]');
+      if (b) toast(`Ejemplo: “${b.dataset.demoAct}” funcionará cuando abramos las cuentas de anunciante.`);
+    });
+
+    // Email report settings (demo: saved on this device only)
+    const mf = document.querySelector<HTMLFormElement>('[data-mail]')!;
+    try { const s = JSON.parse(localStorage.getItem('nc-adpanel') || 'null'); if (s) { (mf.elements.namedItem('freq') as HTMLSelectElement).value = s.freq; (mf.elements.namedItem('to') as HTMLInputElement).value = s.to; } } catch { /* storage blocked */ }
+    mf.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const d = new FormData(mf);
+      try { localStorage.setItem('nc-adpanel', JSON.stringify({ freq: d.get('freq'), to: d.get('to') })); } catch { /* storage blocked */ }
+      const note = $('[data-mail-note]');
+      note.textContent = d.get('freq') === 'off' ? 'Listo: no te enviaremos informes.' : `Listo: recibirás tu informe ${d.get('freq') === 'weekly' ? 'cada lunes' : 'el día 1 de cada mes'}. (Ejemplo: no se envía nada todavía.)`;
+      note.hidden = false;
+    });
+
+    renderAll();
+    // Redraw the chart when the screen size changes (rotating a phone, resizing a window)
+    let rt = 0, lastW = innerWidth;
+    addEventListener('resize', () => { if (innerWidth === lastW) return; lastW = innerWidth; clearTimeout(rt); rt = window.setTimeout(() => { if (!$('[data-panel="inicio"]').hidden) renderHome(); }, 200); });
+  </script>
+</Base>

@@ -1,0 +1,294 @@
+---
+// Home page card strip (portal style): Tendencia, Para ti, Marcador destacado, a season countdown,
+// Mercados (rotating prices), Juegos NotiCel (Dominó + every game) and Horóscopo. (Weather lives in the right column: WeatherBox.)
+// Computers (1000px+): all cards fit in one row, and hovering (or tabbing to) a card opens a panel
+// with more. Phones: the row swipes and tapping a card opens its page.
+import Ph from './Ph.astro';
+import Time from './Time.astro';
+import LeagueBadge from './deportes/LeagueBadge.astro';
+import TeamLogo from './deportes/TeamLogo.astro';
+import { getStories, mostRead, section, url , storyUrl , sectionUrl } from '../lib/site';
+import { getBreaking } from '../lib/breaking';
+import { scores } from '../lib/scores';
+import { team } from '../lib/teams';
+import { LEAGUES, league } from '../lib/leagues';
+import { SIGNS, signOfTheDay, horoscope } from '../lib/daily';
+
+const stories = await getStories();
+const trend = await getBreaking();
+const trendStory = trend ? stories.find((s) => s.id === trend.id) : undefined;
+const moreTrending = mostRead(stories, 8).filter((s) => s.id !== trend?.id).slice(0, 5);
+// Without a trending headline, the first card is "Lo último": the newest story, and the next five in its panel
+const latest = trend ? undefined : stories.find((s) => s.data.section !== 'opiniones');
+const moreLatest = latest ? stories.filter((s) => s.id !== latest.id && s.data.section !== 'opiniones').slice(0, 5) : [];
+
+// Featured game: a live local game first, then the next upcoming, then the latest final
+const allGames = scores();
+const g = allGames.find((x) => league(x.league)?.local && x.status === 'en-vivo') ?? allGames.find((x) => league(x.league)?.local);
+const shortTime = (d: string) =>
+  new Date(d).toLocaleString('es-PR', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'America/Puerto_Rico' }).replace(',', '');
+const gStatus = (x: NonNullable<typeof g>) => (x.status === 'en-vivo' ? x.note ?? 'En vivo' : x.status === 'final' ? 'Final' : shortTime(x.date));
+const otherGames = allGames.filter((x) => x !== g).slice(0, 5);
+
+const signIndex = SIGNS.findIndex((s) => s.id === signOfTheDay().id);
+const sign = SIGNS[signIndex];
+const signText = horoscope(signIndex);
+
+// "Para ti": default is the newest story outside the trending one; the browser swaps it for
+// one from the reader's most-read section (stored only in their own browser).
+const forYou = stories.find((s) => s.id !== trendStory?.id && s.id !== latest?.id && s.data.section !== 'opiniones') ?? stories[0];
+const forYouMore = forYou ? stories.filter((s) => s.data.section === forYou.data.section && s.id !== forYou.id).slice(0, 3) : [];
+
+const today = new Date().toLocaleDateString('es-PR', { day: 'numeric', month: 'long', timeZone: 'America/Puerto_Rico' });
+
+// Every upcoming season opener (soonest first); the card rotates through them
+const upcoming = LEAGUES.map((l) => ({ l, start: 'starts' in l ? new Date(l.starts as string) : undefined }))
+  .filter((x) => x.start && x.start.valueOf() > Date.now())
+  .sort((a, b) => a.start!.valueOf() - b.start!.valueOf())
+  .map((x) => ({ ...x, days: Math.ceil((x.start!.valueOf() - Date.now()) / 864e5) }));
+const daysText = (n: number) => (n === 1 ? 'Falta 1 día' : `Faltan ${n} días`);
+const startText = (d: Date) => d.toLocaleDateString('es-PR', { day: 'numeric', month: 'long', timeZone: 'America/Puerto_Rico' });
+const chev = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+import { GAMES } from '../lib/games';
+import { getMarkets, fmtPrice, curOf, pctOf } from '../lib/markets';
+// Mercados card: a short list that matters most to readers here
+const MKT_KEYS = ['BPOP', 'FBP', 'EVTC', 'GSPC', 'CL', 'BTC'];
+const mktAll = (await getMarkets()).list;
+const mkt = MKT_KEYS.map((k) => mktAll.find((q) => q.key === k)).filter((q): q is NonNullable<typeof q> => !!q);
+---
+<div class="hs-band"><div class="wrap"><div class="sc hs" data-sc>
+  <div class="sc-rail">
+    <button type="button" class="sc-arrow prev" aria-label="Ver tarjetas anteriores" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+    </button>
+    <div class="sc-track">
+
+      {trend && (
+        <div class="hs-item">
+          <a class="hs-card" href={trend.href}>
+            <div class="hs-text"><span class="hs-label hs-hot">{trend.label === 'TENDENCIA' ? 'Tendencia' : trend.label === 'ÚLTIMA HORA' ? 'Última hora' : 'Lo último'}</span><strong>{trend.text}</strong></div>
+            {trendStory && <span class="hs-thumb"><Ph sectionId={trendStory.data.section} image={trendStory.data.image} league={trendStory.data.league} sizes="120px" /></span>}
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Más noticias destacadas</p>
+            <ol class="hs-pop-list">{moreTrending.map((s, i) => <li><b>{i + 1}</b><a href={storyUrl(s)}>{s.data.title}</a></li>)}</ol>
+          </div>
+        </div>
+      )}
+
+      {latest && (
+        <div class="hs-item">
+          <a class="hs-card" href={storyUrl(latest)}>
+            <div class="hs-text"><span class="hs-label">Lo último · <em>{section(latest.data.section).name}</em></span><strong>{latest.data.title}</strong></div>
+            <span class="hs-thumb"><Ph sectionId={latest.data.section} image={latest.data.image} league={latest.data.league} sizes="120px" /></span>
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Lo último</p>
+            <ul class="hs-pop-list plain">{moreLatest.map((s) => <li><a href={storyUrl(s)}>{s.data.title}</a></li>)}</ul>
+            <a class="hs-pop-more" href={sectionUrl('noticias')}>Todas las noticias <Fragment set:html={chev} /></a>
+          </div>
+        </div>
+      )}
+
+      {forYou && (
+        <div class="hs-item" data-foryou={url('search-index.json')}>
+          <a class="hs-card" href={storyUrl(forYou)}>
+            <div class="hs-text"><span class="hs-label">Para ti · <em data-fy-section>{section(forYou.data.section).name}</em></span><strong data-fy-title>{forYou.data.title}</strong></div>
+            <span class="hs-thumb" data-fy-thumb><Ph sectionId={forYou.data.section} image={forYou.data.image} league={forYou.data.league} sizes="120px" /></span>
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Más de <span data-fy-section2>{section(forYou.data.section).name}</span></p>
+            <ul class="hs-pop-list plain" data-fy-more>
+              {forYouMore.length ? forYouMore.map((s) => <li><a href={storyUrl(s)}>{s.data.title}</a></li>) : <li><a href={sectionUrl(forYou.data.section)}>Ver la sección</a></li>}
+            </ul>
+            <p class="hs-pop-foot">Elegido según las secciones que más lees. Se guarda solo en tu navegador.</p>
+          </div>
+        </div>
+      )}
+
+      {g && (
+        <div class="hs-item">
+          <a class="hs-card hs-game" href={url(g.id ? `deportes/juego/${g.id}` : `deportes/${g.league}`)}>
+            <div class="hs-text">
+              <span class="hs-label"><em class:list={{ live: g.status === 'en-vivo' }}>{gStatus(g)}</em>{g.demo && <i class="sp-demo">DEMO</i>}</span>
+              {[[g.away, g.awayScore], [g.home, g.homeScore]].map(([name, score]) => (
+                <span class="hs-team notranslate" translate="no"><TeamLogo league={g.league} name={name as string} size={18} />{name}{g.status !== 'programado' && <b>{score}</b>}</span>
+              ))}
+            </div>
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Marcadores{allGames.some((x) => x.demo) && <span class="sp-demo">DEMO</span>}</p>
+            <ul class="hs-scores">
+              {otherGames.map((x) => (
+                <li>
+                  <a href={url(x.id ? `deportes/juego/${x.id}` : `deportes/${x.league}`)}>
+                    <span class="hs-sc-lg">{league(x.league)?.name}</span>
+                    <span class="hs-sc-t notranslate" translate="no"><TeamLogo league={x.league} name={x.away} size={18} /><span>{x.away}</span>{x.status !== 'programado' && <b>{x.awayScore}</b>}</span>
+                    <span class="hs-sc-t notranslate" translate="no"><TeamLogo league={x.league} name={x.home} size={18} /><span>{x.home}</span>{x.status !== 'programado' && <b>{x.homeScore}</b>}</span>
+                    <span class:list={['hs-sc-st', { live: x.status === 'en-vivo' }]}>{gStatus(x)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <a class="hs-pop-more" href={sectionUrl('deportes')}>NotiCel Deportes <Fragment set:html={chev} /></a>
+          </div>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div class="hs-item">
+          <a class="hs-card hs-count" href={url(`ligas/${upcoming[0].l.id}`)} data-rotate>
+            <div class="hs-slides">
+              {upcoming.map((u, k) => (
+                <div class:list={['hs-slide', { on: k === 0 }]} data-href={url(`ligas/${u.l.id}`)} aria-hidden={k === 0 ? undefined : 'true'}>
+                  <div class="hs-text"><span class="hs-label">Cuenta regresiva</span><strong>{daysText(u.days)}</strong><small>para {u.l.name}</small></div>
+                  <LeagueBadge id={u.l.id} size="md" />
+                </div>
+              ))}
+            </div>
+            {upcoming.length > 1 && <span class="hs-dots" aria-hidden="true">{upcoming.map((_, k) => <i class:list={{ on: k === 0 }} />)}</span>}
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Próximas temporadas</p>
+            <ul class="hs-pop-list plain">
+              {upcoming.map((u) => <li><a href={url(`ligas/${u.l.id}`)}><b>{daysText(u.days)}</b> · {u.l.full} arranca el {startText(u.start!)}</a></li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Mercados: rotates through key prices; the panel lists the main ones (data: src/lib/markets.ts) */}
+      {mkt.length > 0 && (
+        <div class="hs-item">
+          <a class="hs-card hs-mkt" href={`${sectionUrl('economia')}#mercados`} data-rotate>
+            <div class="hs-slides">
+              {mkt.map((q, k) => { const p = pctOf(q); return (
+                <div class:list={['hs-slide', { on: k === 0 }]} data-href={`${sectionUrl('economia')}#m-${q.key}`} aria-hidden={k === 0 ? undefined : 'true'}>
+                  <div class="hs-text">
+                    <span class="hs-label">Mercados</span>
+                    <strong class="notranslate" translate="no">{q.name.replace(/ \(.*/, '')}</strong>
+                    <small class="hs-mkt-n"><b>{curOf(q)}{fmtPrice(q)}{q.suf}</b> <em class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</em></small>
+                  </div>
+                </div>
+              ); })}
+            </div>
+            <span class="hs-mkt-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Mercados hoy</p>
+            <ul class="hs-mkt-list">
+              {mkt.map((q) => { const p = pctOf(q); return (
+                <li><a href={`${sectionUrl('economia')}#m-${q.key}`}><span class="notranslate" translate="no">{q.name}</span><b>{curOf(q)}{fmtPrice(q)}{q.suf}</b><em class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</em></a></li>
+              ); })}
+            </ul>
+            <a class="hs-pop-more" href={`${sectionUrl('economia')}#mercados`}>Ver todos los mercados <Fragment set:html={chev} /></a>
+          </div>
+        </div>
+      )}
+
+      {/* Juegos NotiCel: promotes Dominó; the panel lists every other game with its drawn cover */}
+      <div class="hs-item">
+        <a class="hs-card hs-domino" href={url('juegos/domino')}>
+          <div class="hs-text"><span class="hs-label">Juegos NotiCel</span><strong>Dominó</strong><small>y {GAMES.length - 1} juegos más</small></div>
+          <img class="hs-dm-img" src={url('images/juegos/domino.svg')} alt="" />
+        </a>
+        <div class="hs-pop hs-pop-games">
+          <p class="hs-pop-h">Juegos NotiCel · gratis</p>
+          <a class="hs-feat" href={url('juegos/domino')}>
+            <img src={url('images/juegos/domino.svg')} alt="" />
+            <span><b>Dominó</b><small>¿Echamos una mano? Mano a mano o en parejas; gana quien llegue a 100.</small></span>
+          </a>
+          <ul class="hs-glist">
+            {GAMES.filter((x) => x.id !== 'domino').map((x) => (
+              <li><a href={url(`juegos/${x.id}`)}><img src={url(`images/juegos/${x.id}.svg`)} alt="" loading="lazy" /><span>{x.name}</span></a></li>
+            ))}
+          </ul>
+          <a class="hs-pop-btn" href={url('juegos')}>Ver todos los juegos</a>
+        </div>
+      </div>
+
+      {/* Horóscopo sits last, at the right end of the row */}
+      <div class="hs-item">
+        <a class="hs-card" href={url('horoscopo')}>
+          <span class="hs-sign hs-zodiac" aria-hidden="true">{sign.symbol}{'︎'}</span>
+          <div class="hs-text"><span class="hs-label">Horóscopo · {sign.name}</span><strong>{signText}</strong></div>
+        </a>
+        <div class="hs-pop">
+          <p class="hs-pop-h"><span class="hs-zodiac">{sign.symbol}{'︎'}</span> {sign.name} · {sign.dates}</p>
+          <p class="hs-quote">{signText}</p>
+          <div class="hs-signs">{SIGNS.map((s) => <a href={url(`horoscopo#${s.id}`)}><span class="hs-zodiac">{s.symbol}{'︎'}</span>{s.name}</a>)}</div>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="sc-arrow next" aria-label="Ver más tarjetas" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+    </button>
+  </div>
+</div></div></div>
+
+<script>
+  // Cuenta regresiva: show each upcoming season in turn (pauses while hovered or focused)
+  document.querySelectorAll<HTMLAnchorElement>('[data-rotate]').forEach((card) => {
+    const slides = [...card.querySelectorAll<HTMLElement>('.hs-slide')];
+    const dots = [...card.querySelectorAll<HTMLElement>('.hs-dots i')];
+    if (slides.length < 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let i = 0;
+    let paused = false;
+    const item = card.closest('.hs-item')!;
+    item.addEventListener('mouseenter', () => (paused = true));
+    item.addEventListener('mouseleave', () => (paused = false));
+    card.addEventListener('focus', () => (paused = true));
+    card.addEventListener('blur', () => (paused = false));
+    setInterval(() => {
+      if (paused || document.hidden) return;
+      slides[i].classList.remove('on'); slides[i].setAttribute('aria-hidden', 'true'); dots[i]?.classList.remove('on');
+      i = (i + 1) % slides.length;
+      slides[i].classList.add('on'); slides[i].removeAttribute('aria-hidden'); dots[i]?.classList.add('on');
+      card.href = slides[i].dataset.href!;
+    }, 4000);
+  });
+
+  // Phones/tablets: arrows + faded edges (on computers all cards fit, so these stay hidden)
+  document.querySelectorAll<HTMLElement>('.hs[data-sc]').forEach((sc) => {
+    const track = sc.querySelector<HTMLElement>('.sc-track')!;
+    const prev = sc.querySelector<HTMLButtonElement>('.sc-arrow.prev')!;
+    const next = sc.querySelector<HTMLButtonElement>('.sc-arrow.next')!;
+    const update = () => {
+      const start = track.scrollLeft <= 2;
+      const end = track.scrollLeft + track.clientWidth >= track.scrollWidth - 2;
+      prev.hidden = start; next.hidden = end;
+      track.classList.toggle('fade-l', !start); track.classList.toggle('fade-r', !end);
+    };
+    const step = () => Math.max(track.clientWidth * 0.8, 240);
+    prev.addEventListener('click', () => track.scrollBy({ left: -step(), behavior: 'smooth' }));
+    next.addEventListener('click', () => track.scrollBy({ left: step(), behavior: 'smooth' }));
+    track.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  });
+
+  // Para ti: newest stories from the section this reader opens most (kept only in this browser)
+  document.querySelectorAll<HTMLElement>('[data-foryou]').forEach(async (box) => {
+    try {
+      const counts = JSON.parse(localStorage.getItem('nc-reads') || '{}') as Record<string, number>;
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (!top) return;
+      const seen = JSON.parse(localStorage.getItem('nc-seen') || '[]') as string[];
+      const items = (await (await fetch(box.dataset.foryou!)).json()) as Array<{ url: string; title: string; section: string }>;
+      const inTop = items.filter((i) => i.section === top);
+      const pick = inTop.find((i) => !seen.includes(i.url)) ?? inTop[0];
+      if (!pick) return;
+      const card = box.querySelector<HTMLAnchorElement>('.hs-card')!;
+      card.href = pick.url;
+      box.querySelector('[data-fy-title]')!.textContent = pick.title;
+      box.querySelectorAll('[data-fy-section],[data-fy-section2]').forEach((e) => (e.textContent = top));
+      box.querySelector('[data-fy-thumb]')?.remove();
+      const more = inTop.filter((i) => i !== pick).slice(0, 3);
+      const list = box.querySelector('[data-fy-more]');
+      if (list && more.length) {
+        list.innerHTML = '';
+        more.forEach((i) => { const li = document.createElement('li'); const a = document.createElement('a'); a.href = i.url; a.textContent = i.title; li.append(a); list.append(li); });
+      }
+    } catch { /* keep the default story */ }
+  });
+</script>

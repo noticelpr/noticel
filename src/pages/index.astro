@@ -1,138 +1,140 @@
 ---
-// Home page. Same blocks and rules as the 2026 WordPress theme's front-page.php:
-// top stories (is_post_top_stories), Lo último, Temas, Lo más leído (post_views_count), Destacadas,
-// Última Hora rail, Opiniones and category blocks. A story appears only once on the page.
+// Home page. Main column on the left, right column (Sidebar) for the whole height of the page,
+// so there are no empty gaps. Section blocks only appear for sections that have stories.
+import Markets from '../components/economia/Markets.astro';
 import Base from '../layouts/Base.astro';
+import StoryCard from '../components/StoryCard.astro';
+import VideoCard from '../components/VideoCard.astro';
+import SectionBlock from '../components/SectionBlock.astro';
+import Sidebar from '../components/Sidebar.astro';
 import Ph from '../components/Ph.astro';
-import Kicker from '../components/Kicker.astro';
-import Meta from '../components/Meta.astro';
-import Card from '../components/Card.astro';
-import Latest from '../components/Latest.astro';
-import Section from '../components/Section.astro';
+import Label from '../components/Label.astro';
+import HomeStrip from '../components/HomeStrip.astro';
 import AdSlot from '../components/AdSlot.astro';
-import { allStories, mostRead, inCategory, categoryUrl, url, shortDate, CATEGORIES, type Story } from '../lib/site';
+import LocalScores from '../components/deportes/LocalScores.astro';
+import GamesTeaser from '../components/GamesTeaser.astro';
+import { getStories, topOrder, pinTop, url, SITE, SECTIONS, VIDEOS, VIDEO_SOURCES , storyUrl , sectionUrl } from '../lib/site';
 
-const all = await allStories();
-const used = new Set<string>();
-const take = (list: Story[], n: number) => {
-  const out = list.filter((s) => !used.has(s.id)).slice(0, n);
-  out.forEach((s) => used.add(s.id));
-  return out;
-};
-const DAY = 864e5;
-const MAX_BLOCKS = 12; // section blocks at the bottom of the page (2 per row)
-
-const tops = all.filter((s) => s.data.topStory);
-const [lead] = take(tops.length ? tops : all, 1);
-const subs = take(tops, 3);
-const feat = take(tops, 6);
-const latest = all.slice(0, 7);
-
-// Topics: the most used tags in the last week of stories
-const newest = all[0]?.data.date.valueOf() ?? 0;
-const tagCount = new Map<string, number>();
-all.filter((s) => s.data.date.valueOf() > newest - 7 * DAY).forEach((s) => s.data.tags.forEach((t) => tagCount.set(t, (tagCount.get(t) ?? 0) + 1)));
-const topics = [...tagCount].filter(([t]) => t !== 'Puerto Rico' && t.length > 3).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) => t);
-
-const top5 = mostRead(all, 5);
-
-const breaking = all.find((s) => inCategory(s, 'ultima-hora')) ?? null;
-const ultima = take(all.filter((s) => inCategory(s, 'ultima-hora')), 8);
-const opinions = all.filter((s) => inCategory(s, 'opiniones')).slice(0, 4);
-const initials = (name: string) => name.replace(/^Lcd[oa]\.?\s*/u, '').split(' ').slice(0, 2).map((w) => w.charAt(0)).join('');
-// Section blocks: the most-read sections first (total views of their stories), so the page fills with what readers
-// read most. Noticias, Última Hora and Opiniones have their own places above. A section needs 2+ stories not shown yet.
-const BROAD = ['noticias', 'ultima-hora', 'opiniones', 'uncategorized'];
-const viewsBy = new Map<string, number>();
-all.forEach((s) => s.data.categories.forEach((c) => viewsBy.set(c, (viewsBy.get(c) ?? 0) + s.data.views)));
-const ranked = [...viewsBy].filter(([c]) => !BROAD.includes(c) && CATEGORIES[c]).sort((a, b) => b[1] - a[1]).map(([c]) => c);
-const blocks: Array<{ slug: string; stories: Story[] }> = [];
-for (const slug of ranked) {
-  if (blocks.length >= MAX_BLOCKS) break;
-  const fresh = all.filter((s) => inCategory(s, slug) && !used.has(s.id)).slice(0, 3);
-  if (fresh.length < 2) continue;
-  fresh.forEach((s) => used.add(s.id));
-  blocks.push({ slug, stories: fresh });
+const stories = await getStories();
+const F = SITE.features;
+// Top spots: Puerto Rico first, unless a U.S. or world story is trending (src/lib/site.ts topOrder)
+const ordered = pinTop(topOrder(stories)); // a pinned story (📌) keeps the main spot; the editor's pick comes next
+const lead = ordered[0];
+// Each story appears once in the top area. Spots are filled in order of importance: the headlines under the main
+// story (the editor's related stories, or else the next stories in line), the left column, the row of cards, the
+// block, then two more under the main story. Editors' picks ("Principal") are first in line after the main story.
+const related = (lead?.data.related ?? []).map((id) => stories.find((s) => s.id === id)).filter((s) => s !== undefined && s.id !== lead?.id);
+const inLine = ordered.filter((s) => s.id !== lead?.id && !related.includes(s));
+const take = (n: number) => inLine.splice(0, n);
+const leadRelated = related.length ? related : take(3);
+const left = take(3);
+const row = take(3);
+const more = take(5);
+const extra = take(2);
+// Section boxes further down skip what's already in the top area
+const topIds = new Set([lead, ...leadRelated, ...left, ...row, ...more, ...extra].filter(Boolean).map((s) => s!.id));
+const restStories = stories.filter((s) => !topIds.has(s.id));
+// Section blocks, most-read sections first (total views of their stories; NotiCel's request), Opiniones last.
+// Only sections with stories appear (Noticias is already up top).
+const viewsOf = (id: string) => stories.filter((s) => s.data.section === id).reduce((n, s) => n + s.data.views, 0);
+const sectionIds = SECTIONS.map((s) => s.id)
+  .filter((id) => id !== 'noticias' && restStories.some((s) => s.data.section === id))
+  .sort((a, b) => Number(a === 'opiniones') - Number(b === 'opiniones') || viewsOf(b) - viewsOf(a)) as Array<(typeof SECTIONS)[number]['id']>;
+// Section boxes sit side by side in pairs. To avoid blank space under a shorter box, each section is
+// paired with the next one (in priority order) that shows the same number of stories (a box shows up to 4).
+// A section with no match gets a full-width row of its own.
+const shown = (id: string) => Math.min(4, restStories.filter((s) => s.data.section === id).length);
+const rows: Array<typeof sectionIds> = [];
+const queue = [...sectionIds];
+while (queue.length) {
+  const a = queue.shift()!;
+  const j = queue.findIndex((b) => shown(b) === shown(a));
+  rows.push(j >= 0 ? [a, queue.splice(j, 1)[0]] : [a]);
 }
-const pairs = Array.from({ length: Math.ceil(blocks.length / 2) }, (_, i) => blocks.slice(i * 2, i * 2 + 2));
 ---
-<Base breaking={breaking}>
-  <main id="main" class="wrap" tabindex="-1">
-    {lead && (
-      <div class="hero">
-        <div>
-          <a class="lead" href={url(lead.data.path)}>
-            <Ph src={lead.data.image} eager />
-            <div class="cap">
-              <Kicker story={lead} link={false} />
-              <h1 class="hl">{lead.data.title}</h1>
-              {lead.data.description && <p>{lead.data.description}</p>}
-            </div>
-          </a>
-          <div class="subleads">
-            {subs.map((s) => (
-              <article class="sublead"><Kicker story={s} /><a href={url(s.data.path)}><h3 class="hl">{s.data.title}</h3></a><Meta story={s} /></article>
-            ))}
-          </div>
+<Base active="home">
+  <HomeStrip />
+  <div class="wrap home-grid" id="main">
+    <main class="home-main">
+      {!lead && <div class="empty"><p>Muy pronto publicaremos las primeras noticias.</p></div>}
+      {lead && (
+        <div class="home-hero">
+          <article class="lead">
+            {/* Headline sits on the photo so it is visible without scrolling */}
+            <a class="lead-media" href={storyUrl(lead)}>
+              <Ph sectionId={lead.data.section} image={lead.data.image} place={lead.data.place} league={lead.data.league} sizes="(max-width:760px) 100vw, 640px" priority />
+              <div class="lead-over"><Label story={lead} /><h1>{lead.data.title}</h1></div>
+            </a>
+            <p class="dek">{lead.data.description}</p>
+            <ul class="related">{leadRelated.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}</ul>
+            {/* Fills the space under the main story (the left column is taller): two more headlines and an ad */}
+            {extra.length > 0 && (
+              <div class="lead-extra">
+                <h2 class="lead-extra-h">Más titulares</h2>
+                <div class="lead-extra-grid">{extra.map((s) => <StoryCard story={s} variant="item" />)}</div>
+              </div>
+            )}
+            <AdSlot size="infeed" class="lead-ad" />
+          </article>
+          <div class="stack left">{left.map((s) => <StoryCard story={s} variant="mini" />)}</div>
         </div>
-        <aside><Latest stories={latest} /><AdSlot style="height:250px;aspect-ratio:auto" /></aside>
-      </div>
-    )}
+      )}
 
-    {topics.length > 0 && (
-      <div class="topics"><span>Temas</span>{topics.map((t) => <a href={url(`buscar?q=${encodeURIComponent(t)}`)}>{t}</a>)}</div>
-    )}
+      {row.length > 0 && <div class="home-row">{row.map((s) => <StoryCard story={s} />)}</div>}
 
-    {top5.length > 0 && (
-      <>
-        <div class="sec-h"><h2>Lo más leído</h2></div>
-        <div class="mostread">{top5.map((s, i) => <a href={url(s.data.path)}><b>{i + 1}</b><span class="hl">{s.data.title}</span></a>)}</div>
-      </>
-    )}
+      {more.length > 0 && (
+        <section>
+          <div class="sec-h"><h2>Más noticias</h2><a href={sectionUrl('noticias')}>Ver todas</a></div>
+          <div class="block">
+            <StoryCard story={more[0]} variant="big" />
+            <div class="list">{more.slice(1).map((s) => <StoryCard story={s} variant="item" />)}</div>
+          </div>
+        </section>
+      )}
 
-    {feat.length > 0 && (
-      <>
-        <div class="sec-h"><h2>Destacadas</h2></div>
-        <div class="grid3">{feat.map((s) => <Card story={s} />)}</div>
-      </>
-    )}
-  </main>
+      <AdSlot size="infeed" />
 
-  {ultima.length > 0 && (
-    <section class="vband"><div class="wrap">
-      <div class="sec-h"><h2 style="color:#fff">Última Hora</h2><a href={categoryUrl('ultima-hora')}>Ver todo →</a></div>
-      <div class="rail">
-        {ultima.map((s) => (
-          <article class="vcard"><a href={url(s.data.path)}><Ph src={s.data.image} /><h3 class="hl" style="color:#fff">{s.data.title}</h3></a><div class="time">{shortDate(s.data.date)}</div></article>
+      {/* BSN, Doble A and La Pro scores: live first, then recent results */}
+      <LocalScores />
+
+      {F.videos && (
+        <section>
+          <div class="sec-h"><h2>Videos</h2><a href={url('videos')}>Ver todos</a></div>
+          {/* NotiCel's newest upload (always current, straight from YouTube) next to the latest NotiCel videos */}
+          <div class="vx-home">
+            <div class="vx-player">
+              <div class="lg-video-frame">
+                <iframe data-src={`https://www.youtube-nocookie.com/embed/videoseries?list=UU${VIDEO_SOURCES.noticel.channel.slice(2)}&autoplay=1&mute=1&rel=0&playsinline=1`} title="Lo más reciente de NotiCel en YouTube" loading="lazy"
+                  referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+              </div>
+              <p class="vsrc">Lo más reciente de <a href={VIDEO_SOURCES.noticel.url} rel="noopener" target="_blank">NotiCel en YouTube</a></p>
+            </div>
+            <div class="vx-list">{VIDEOS.filter((v) => v.src === 'noticel').slice(0, 4).map((v) => <VideoCard video={v} />)}</div>
+          </div>
+        </section>
+      )}
+
+      <Markets strip />
+
+      <div class="home-sections">
+        {rows.map((row, i) => (
+          <>
+            {row.map((id) => <div class:list={{ 'sec-wide': row.length === 1 }}><SectionBlock sectionId={id} stories={restStories} /></div>)}
+            {i === 1 && i < rows.length - 1 && <AdSlot size="infeed" class="ad-span" />}
+            {i === 3 && i < rows.length - 1 && <div class="ad-span"><GamesTeaser /></div>}
+          </>
         ))}
       </div>
-    </div></section>
-  )}
 
-  <div class="wrap" style="padding-bottom:48px">
-    {opinions.length > 0 && (
-      <>
-        <div class="sec-h"><h2>Opiniones</h2><a href={categoryUrl('opiniones')}>Todas las opiniones →</a></div>
-        <div class="opinion">
-          {opinions.map((s) => (
-            <a class="col" href={url(s.data.path)}>
-              <div class="who"><span class="avatar">{initials(s.data.author)}</span><div><b>{s.data.author}</b><span>{shortDate(s.data.date)}</span></div></div>
-              <h3 class="hl">{s.data.title}</h3>
-            </a>
-          ))}
+      {F.app && <section class="promo">
+        <img src={url('icon-192.png')} alt="" />
+        <div><h2>Descarga la app de NotiCel</h2><p>Recibe alertas de última hora y mira la transmisión en vivo desde tu celular.</p></div>
+        <div class="stores">
+          <button class="store" type="button" data-app><small>Descárgala en</small>App Store</button>
+          <button class="store" type="button" data-app><small>Disponible en</small>Google Play</button>
         </div>
-      </>
-    )}
-    {pairs.map((pair, i) => (
-      <>
-        <div class="split">{pair.map((b) => <Section slug={b.slug} stories={b.stories} />)}</div>
-        {i % 2 === 0 && i < pairs.length - 1 && <AdSlot style="aspect-ratio:auto;height:120px;margin-top:40px" />}
-      </>
-    ))}
+      </section>}
+    </main>
+    <Sidebar foro extras />
   </div>
-  <script>
-    // Old WordPress searches (noticel.com/?s=palabra) open the new search page
-    const s = new URLSearchParams(location.search).get('s');
-    if (s) location.replace(`${document.body.dataset.base}buscar/?q=${encodeURIComponent(s)}`);
-  </script>
 </Base>

@@ -1,0 +1,54 @@
+---
+// Playoff bracket (rounds left to right). Used on league pages and, with `home`, on the home page.
+import { bracket, isDemoTable } from '../../lib/scores';
+import { league as leagueInfo } from '../../lib/leagues';
+import { url } from '../../lib/site';
+import TeamLogo from './TeamLogo.astro';
+interface Props { league: string; home?: boolean }
+const { league, home = false } = Astro.props;
+const b = bracket(league);
+const demo = !!b && isDemoTable('brackets', league);
+const l = leagueInfo(league);
+// "Por definir" and "Campeón ..." are placeholders, not teams: no logo for them
+const isTeam = (name: string) => !/^(Por definir|Campeón )/.test(name);
+---
+{(!home || b?.rounds?.length) && (
+  <section class:list={['sp-panel', { 'br-home': home }]}>
+    <h2>
+      {b?.name ?? 'Postemporada'}{demo && <span class="sp-demo">DEMO</span>}
+      {home && l && <a class="br-more" href={url(`ligas/${l.id}`)}>{l.name} ›</a>}
+    </h2>
+    {!b?.rounds?.length ? (
+      <p class="sp-note">Las llaves se publicarán cuando comience la postemporada.</p>
+    ) : (
+      <>
+        <div class="sp-bracket">
+          {b.rounds.map((r) => (
+            <div class="sp-round">
+              <h3>{r.name}</h3>
+              <div class="sp-round-s">
+              {r.series.map((s) => {
+                const started = s.aWins !== undefined || s.bWins !== undefined;
+                const aWin = (s.aWins ?? 0) > (s.bWins ?? 0);
+                const bWin = (s.bWins ?? 0) > (s.aWins ?? 0);
+                return (
+                  <div class="sp-series notranslate" translate="no">
+                    {[[s.a, s.aWins, aWin], [s.b, s.bWins, bWin]].map(([name, wins, win]) => (
+                      <div class:list={{ win, tbd: !isTeam(name as string) }}>
+                        <span class="br-team">{isTeam(name as string) && <TeamLogo league={league} name={name as string} size={20} />}<span>{name}</span></span>
+                        {started && <strong>{wins ?? 0}</strong>}
+                      </div>
+                    ))}
+                    {s.note && <p translate="yes">{s.note}</p>}
+                  </div>
+                );
+              })}
+              </div>
+            </div>
+          ))}
+        </div>
+        {b.updated && <p class="sp-note br-upd">Actualizado: {b.updated}</p>}
+      </>
+    )}
+  </section>
+)}

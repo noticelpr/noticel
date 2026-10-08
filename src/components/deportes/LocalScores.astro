@@ -1,0 +1,75 @@
+---
+// Home page "Marcadores": the local leagues first (BSN, Doble A, La Pro), then MLB, NBA and NFL, one tab each. Live games first, then the
+// most recent results (upcoming games only when a league has nothing else). Each tab links to its league.
+import TeamLogo from './TeamLogo.astro';
+import LeagueBadge from './LeagueBadge.astro';
+import { scores, gameTime, type Game } from '../../lib/scores';
+import { league } from '../../lib/leagues';
+import { url } from '../../lib/site';
+const IDS = ['bsn', 'doble-a', 'invernal', 'mlb', 'nba', 'nfl'] as const;
+const tabs = IDS.map((id) => {
+  const all = scores(id, 40);
+  const live = all.filter((g) => g.status === 'en-vivo');
+  const done = all.filter((g) => g.status === 'final');
+  const next = all.filter((g) => g.status === 'programado');
+  const list = [...live, ...done].slice(0, 6);
+  return { id, l: league(id)!, games: list.length ? list : next.slice(0, 6), live: live.length };
+}).filter((t) => t.games.length);
+const first = tabs.findIndex((t) => t.live) >= 0 ? tabs.findIndex((t) => t.live) : 0;
+// "Final", or the game's note when it already says so ("Final · Juego 2")
+const status = (g: Game) => g.status === 'en-vivo' ? (g.note ?? 'En vivo') : g.status === 'final' ? (g.note ? (/^final/i.test(g.note) ? g.note : `Final · ${g.note}`) : 'Final') : gameTime(g.date);
+const day = (g: Game) => new Date(g.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', timeZone: 'America/Puerto_Rico' });
+---
+{tabs.length > 0 && (
+  <section class="ls" data-ls aria-labelledby="ls-h">
+    <div class="ls-head">
+      <h2 id="ls-h">Marcadores</h2>
+      <div class="ls-tabs" role="tablist" aria-label="Ligas">
+        {tabs.map((t, i) => (
+          <button type="button" role="tab" id={`ls-tab-${t.id}`} aria-controls={`ls-panel-${t.id}`} aria-selected={String(i === first)} data-ls-tab={t.id}>
+            <LeagueBadge id={t.id} size="sm" />{t.l.name}{t.live > 0 && <i class="ls-live-dot" aria-label="en vivo" />}
+          </button>
+        ))}
+      </div>
+    </div>
+    {tabs.map((t, i) => (
+      <div class="ls-panel" role="tabpanel" id={`ls-panel-${t.id}`} aria-labelledby={`ls-tab-${t.id}`} hidden={i !== first}>
+        <div class="ls-grid">
+          {t.games.map((g) => {
+            const aWin = g.status === 'final' && (g.awayScore ?? 0) > (g.homeScore ?? 0);
+            const hWin = g.status === 'final' && (g.homeScore ?? 0) > (g.awayScore ?? 0);
+            return (
+              <a class:list={['ls-game', { live: g.status === 'en-vivo' }]} href={url(g.id ? `deportes/juego/${g.id}` : `deportes/${g.league}`)}>
+                <span class="ls-meta">
+                  <span class:list={['ls-st', { live: g.status === 'en-vivo' }]}>{g.status === 'en-vivo' && <i class="sc-dot" />}{status(g)}</span>
+                  <span>{g.demo ? <i class="sp-demo">DEMO</i> : day(g)}</span>
+                </span>
+                {[[g.away, g.awayScore, aWin, hWin], [g.home, g.homeScore, hWin, aWin]].map(([n, sc, win, lose]) => (
+                  <span class:list={['ls-team notranslate', { win, lose }]} translate="no">
+                    <TeamLogo league={g.league} name={n as string} size={24} />
+                    <span>{(n as string).split(' de ')[0]}</span>
+                    {g.status !== 'programado' && <b>{sc}</b>}
+                  </span>
+                ))}
+              </a>
+            );
+          })}
+        </div>
+        <a class="ls-more" href={url(`ligas/${t.id}`)}>Todo sobre {t.l.full} ›</a>
+      </div>
+    ))}
+  </section>
+)}
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-ls]').forEach((box) => {
+    const tabs = [...box.querySelectorAll<HTMLButtonElement>('[data-ls-tab]')];
+    tabs.forEach((t) => t.addEventListener('click', () => {
+      tabs.forEach((x) => {
+        const on = x === t;
+        x.setAttribute('aria-selected', String(on));
+        box.querySelector<HTMLElement>(`#ls-panel-${x.dataset.lsTab}`)!.hidden = !on;
+      });
+    }));
+  });
+</script>

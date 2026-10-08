@@ -1,6 +1,7 @@
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
+import { LEAGUE_IDS } from './lib/leagues';
 
 // Each story is a Markdown file in src/content/noticias/ (body is the story's HTML).
 // scripts/import-wp.mjs writes this same shape from the WordPress export; keep both in sync.
@@ -24,7 +25,7 @@ const noticias = defineCollection({
     pdfTitle: z.string().optional(),
     draft: z.boolean().default(false),
     // Written by the staff panel (same fields as Noticias Xtra). Imported WordPress stories leave them at the defaults.
-    place: z.string().optional(), // dateline, e.g. "San Juan"
+    place: z.string().default(''), // dateline, e.g. "San Juan" (imported WordPress stories have none)
     imageCredit: z.string().optional(),
     imageCreditUrl: z.string().optional(),
     gallery: z.array(z.object({ src: z.string(), caption: z.string().default(''), credit: z.string().default(''), creditUrl: z.string().optional() })).default([]),
@@ -38,6 +39,8 @@ const noticias = defineCollection({
     sources: z.array(z.object({ name: z.string(), url: z.string().optional() })).default([]),
     related: z.array(z.string()).default([]), // ids of related stories
     correction: z.string().optional(),
+    trending: z.boolean().default(false), // editor's "tendencia": a U.S. or world story big enough to lead
+    league: z.enum(LEAGUE_IDS).optional(), // sports stories only: bsn, doble-a, invernal... (src/lib/leagues.ts)
   }),
 });
 

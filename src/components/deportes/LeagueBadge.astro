@@ -1,0 +1,17 @@
+---
+// League badge: the official logo if one has been added to public/logos/<id>.png|.svg|.webp,
+// otherwise a colored badge with the league's initials.
+import fs from 'node:fs';
+import path from 'node:path';
+import { league } from '../../lib/leagues';
+import { url } from '../../lib/site';
+interface Props { id: string; size?: 'sm' | 'md' | 'lg' }
+const { id, size = 'md' } = Astro.props;
+const l = league(id);
+const has = (f: string) => fs.existsSync(path.join(process.cwd(), 'public', f));
+// A light copy from scripts/optimize-images.mjs (logos/opt/) when the original is heavy
+const file = [`logos/opt/${id}.webp`, ...['svg', 'png', 'webp'].map((ext) => `logos/${id}.${ext}`)].find(has);
+---
+{l && (file
+  ? <span class={`sp-badge sp-badge-${size} has-logo${'logoShape' in l && l.logoShape ? ` logo-${l.logoShape}` : ''}`} style={'logoBg' in l && l.logoBg ? `background:${l.logoBg}` : undefined}><img src={url(file)} alt="" /></span>
+  : <span class={`sp-badge sp-badge-${size}`} style={`--lc:${l.color}`} aria-hidden="true"><b data-len={l.abbr.length}>{l.abbr}</b></span>)}

@@ -1,20 +1,20 @@
 ---
-// Category (section) page at the same address WordPress uses: /category/deportes/, /category/deportes/beisbol/,
+// Category (section) pages at the same address WordPress uses: /category/deportes/, /category/deportes/beisbol/,
 // /category/deportes/page/2/. Like WordPress, a category also lists its subcategories' stories.
-// Layout: the 2026 theme's look with Noticias Xtra's section structure (big story, list, "Más de...", sidebar).
-import Base from '../../layouts/Base.astro';
-import Ph from '../../components/Ph.astro';
-import Kicker from '../../components/Kicker.astro';
-import Meta from '../../components/Meta.astro';
-import Card from '../../components/Card.astro';
-import Row from '../../components/Row.astro';
-import Sidebar from '../../components/Sidebar.astro';
-import AdSlot from '../../components/AdSlot.astro';
-import { allStories, CATEGORY_PAGE_SIZE, CATEGORY_INFO, CATEGORIES, withChildren, childrenOf, parentOf, categoryUrl, url, SITE, type Story } from '../../lib/site';
+// Design: Noticias Xtra's section pages. Deportes, Entretenimiento, El Tiempo, Economía and Opiniones have their own
+// special page (src/components/sections/); every other category, subcategory and page 2+ uses Generic.astro.
+import Generic from '../../components/sections/Generic.astro';
+import Deportes from '../../components/sections/Deportes.astro';
+import Entretenimiento from '../../components/sections/Entretenimiento.astro';
+import Clima from '../../components/sections/Clima.astro';
+import Economia from '../../components/sections/Economia.astro';
+import Opinion from '../../components/sections/Opinion.astro';
+import { getStories, CATEGORY_INFO, CATEGORY_PAGE_SIZE, SECTIONS, withChildren, childrenOf, parentOf, sectionOf } from '../../lib/site';
 
+const SPECIAL = { deportes: Deportes, entretenimiento: Entretenimiento, 'el-tiempo': Clima, economia: Economia, opiniones: Opinion } as const;
 
 export async function getStaticPaths() {
-  const all = await allStories();
+  const all = await getStories();
   return Object.keys(CATEGORY_INFO).flatMap((slug) => {
     const slugs = withChildren(slug);
     const list = all.filter((s) => s.data.categories.some((c) => slugs.includes(c)));
@@ -26,59 +26,10 @@ export async function getStaticPaths() {
   });
 }
 
-interface Props { slug: string; page: number; pages: number; list: Story[] }
 const { slug, page, pages, list } = Astro.props;
-const name = CATEGORIES[slug];
-const parent = parentOf(slug);
-const subs = childrenOf(slug);
-const [lead, ...rest] = page === 1 ? list : [undefined, ...list];
-const rows = page === 1 ? rest.slice(0, 4) : [];
-const grid = page === 1 ? rest.slice(4) : (rest as Story[]);
-const pageUrl = (n: number) => (n === 1 ? categoryUrl(slug) : url(`category/${CATEGORY_INFO[slug].path}/page/${n}`));
+const Special = page === 1 ? SPECIAL[slug as keyof typeof SPECIAL] : undefined;
+// The menu item to light up: the category itself if it's in the menu, else its section
+const inMenu = SECTIONS.some((s) => s.id === slug);
+const active = inMenu ? slug : sectionOf([slug, parentOf(slug) ?? slug]);
 ---
-<Base title={page > 1 ? `${name} (página ${page})` : name} description={`Noticias de ${name} en ${SITE.name}.`} current={slug}>
-  <main id="main" class="wrap" tabindex="-1">
-    <div class="crumbs"><a href={url()}>Portada</a>{parent && <> / <a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a></>}</div>
-    <h1 class="page-h">{name}</h1>
-    {subs.length > 0 ? (
-      <nav class="subcats" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>
-    ) : <div style="height:20px"></div>}
-
-    <div class="art-grid">
-      <div>
-        {list.length === 0 && (
-          <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>
-        )}
-        {lead && (
-          <article class="sec-lead">
-            <a href={url(lead.data.path)} tabindex="-1" aria-hidden="true"><Ph src={lead.data.image} eager /></a>
-            <div>
-              <Kicker story={lead} />
-              <a href={url(lead.data.path)}><h2 class="hl">{lead.data.title}</h2></a>
-              {lead.data.description && <p>{lead.data.description}</p>}
-              <Meta story={lead} />
-            </div>
-          </article>
-        )}
-        {rows.length > 0 && <div class="stack">{rows.map((s) => <Row story={s} />)}</div>}
-        {page === 1 && list.length > 0 && <AdSlot style="aspect-ratio:auto;height:120px;margin-top:28px" />}
-        {grid.length > 0 && (
-          <>
-            <div class="sec-h"><h2>{page === 1 ? `Más de ${name}` : `${name}: página ${page}`}</h2></div>
-            <div class="grid3" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">{grid.map((s) => <Card story={s} />)}</div>
-          </>
-        )}
-        {pages > 1 && (
-          <nav class="pager" aria-label="Páginas">
-            {page > 1 && <a class="page-numbers" href={pageUrl(page - 1)} aria-label="Página anterior">←</a>}
-            {Array.from({ length: pages }, (_, i) => i + 1).map((n) => n === page
-              ? <span class="page-numbers current" aria-current="page">{n}</span>
-              : <a class="page-numbers" href={pageUrl(n)}>{n}</a>)}
-            {page < pages && <a class="page-numbers" href={pageUrl(page + 1)} aria-label="Página siguiente">→</a>}
-          </nav>
-        )}
-      </div>
-      <Sidebar />
-    </div>
-  </main>
-</Base>
+{Special ? <Special /> : <Generic slug={slug} list={list} page={page} pages={pages} subs={childrenOf(slug)} active={active} />}

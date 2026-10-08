@@ -1,0 +1,45 @@
+---
+// One story, in different sizes: mini (left column), card (grid), item (list row), big (section lead)
+import Ph from './Ph.astro';
+import Time from './Time.astro';
+import Label from './Label.astro';
+import { url, type Story , storyUrl } from '../lib/site';
+
+interface Props { story: Story; variant?: 'mini' | 'card' | 'item' | 'big'; priority?: boolean }
+const { story, variant = 'card', priority = false } = Astro.props;
+const href = storyUrl(story);
+const d = story.data;
+---
+{variant === 'mini' && (
+  <article class="mini">
+    <a href={href}><Ph sectionId={d.section} image={d.image} place={d.place} league={d.league} sizes="(max-width:760px) 100vw, 300px" /><h3 class="hl">{d.title}</h3></a>
+    <Time date={d.date} />
+  </article>
+)}
+{variant === 'card' && (
+  <article class="card">
+    <a href={href} tabindex="-1" aria-hidden="true"><Ph sectionId={d.section} image={d.image} place={d.place} league={d.league} sizes="(max-width:760px) 100vw, 360px" /></a>
+    <div style="margin-top:10px"><Label story={story} /></div>
+    <a href={href}><h3 class="hl" style="margin-top:0">{d.title}</h3></a>
+    <Time date={d.date} />
+  </article>
+)}
+{variant === 'item' && (
+  <article class="item">
+    <a href={href} tabindex="-1" aria-hidden="true"><Ph sectionId={d.section} image={d.image} place={d.place} league={d.league} sizes="(max-width:760px) 45vw, 240px" /></a>
+    <div>
+      <Label story={story} />
+      <a href={href}><h3 class="hl">{d.title}</h3></a>
+      <Time date={d.date} />
+    </div>
+  </article>
+)}
+{variant === 'big' && (
+  <article class="big">
+    <a href={href} tabindex="-1" aria-hidden="true"><Ph sectionId={d.section} image={d.image} place={d.place} league={d.league} sizes="(max-width:760px) 100vw, 760px" priority={priority} /></a>
+    <div style="margin-top:12px"><Label story={story} /></div>
+    <a href={href}><h3 class="hl" style="margin-top:0">{d.title}</h3></a>
+    <p>{d.description}</p>
+    <Time date={d.date} />
+  </article>
+)}

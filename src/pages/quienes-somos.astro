@@ -1,0 +1,24 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE, url , sectionUrl } from '../lib/site';
+---
+<Base title="Quiénes somos" description="NotiCel es un medio digital de Puerto Rico con noticias locales, de Estados Unidos y del mundo.">
+  <main class="wrap" id="main">
+    <div class="page">
+      <h1>Quiénes somos</h1>
+      <p class="pg-draft"><span class="sp-demo">BORRADOR</span> Texto provisional del sitio de prueba. La redacción de NotiCel escribirá esta página.</p>
+      <p>NotiCel es un medio digital de Puerto Rico: <strong>La verdad como es</strong>. Publicamos noticias de Puerto Rico, de Estados Unidos y del mundo.</p>
+      <p>En las noticias nos limitamos a los hechos. Separamos claramente la información de la opinión, que va en la sección de <a href={sectionUrl('opiniones')}>Opiniones</a>, para que el lector siempre sepa qué está leyendo.</p>
+
+      <h2>Nuestras normas</h2>
+      <p>Lee nuestras <a href={url('normas-editoriales')}>normas editoriales y política de correcciones</a> y nuestra <a href={url('privacidad')}>política de privacidad</a>.</p>
+
+      <h2>Contacto</h2>
+      {SITE.email ? (
+        <p>Escríbenos a <a href={`mailto:${SITE.email}`}>{SITE.email}</a>. Si tienes una denuncia, usa la página <a href={url('contacto')}>Envía tu denuncia</a>.</p>
+      ) : (
+        <p>Muy pronto publicaremos nuestro correo de contacto.</p>
+      )}
+    </div>
+  </main>
+</Base>

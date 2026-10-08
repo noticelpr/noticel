@@ -1,0 +1,221 @@
+---
+// Crucigrama del día: a crossword built in the browser from Puerto Rico words and clues.
+// A new puzzle every day (the same for everyone), 8 words. Tap a square, type; tap again to switch
+// between across and down. Progress is kept only on this device.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+---
+<Base title="Crucigrama del día" description="Un crucigrama boricua nuevo cada día: comida, música, pueblos e historia de Puerto Rico.">
+  <main class="wrap" id="main">
+    <GameLayout id="crucigrama">
+      <div class="jg-game cw" data-cw>
+        <p class="jg-stats"><span>Tiempo: <b data-time>0:00</b></span><span>Palabras: <b data-done>0</b>/<b data-total>0</b></span></p>
+        <p class="cw-clue" data-clue aria-live="polite">Toca una casilla para empezar.</p>
+        <div class="cw-board" data-board role="grid" aria-label="Crucigrama"></div>
+        <div class="cw-actions">
+          <button type="button" class="tool" data-check>Revisar</button>
+          <button type="button" class="tool" data-reveal-word>Ver palabra</button>
+          <button type="button" class="tool" data-reset>Borrar todo</button>
+        </div>
+        <p class="jg-msg" aria-live="polite" data-msg></p>
+        <div class="cw-clues">
+          <section><h2>Horizontales</h2><ol data-across></ol></section>
+          <section><h2>Verticales</h2><ol data-down></ol></section>
+        </div>
+        <input class="cw-input" data-input autocomplete="off" autocapitalize="characters" aria-label="Escribe una letra" />
+      </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { ask } from '../../lib/dialogs';
+    import { award } from '../../lib/points';
+    // Words without accents (the game ignores accents) and their clues
+    const BANK: Array<[string, string]> = [
+      ['COQUI', 'Ranita que canta de noche; símbolo de Puerto Rico'], ['MOFONGO', 'Plátano majado con ajo y chicharrón'],
+      ['YUNQUE', 'Bosque lluvioso del este de la isla'], ['PLENA', 'Música de panderos nacida en Ponce'],
+      ['BOMBA', 'Baile afropuertorriqueño de tambores'], ['SALSA', 'Ritmo del Gran Combo y de Héctor Lavoe'],
+      ['MORRO', 'Fortaleza a la entrada de la bahía de San Juan'], ['PONCE', 'La Perla del Sur'],
+      ['ARECIBO', 'Pueblo del famoso radiotelescopio'], ['TAINO', 'Pueblo indígena de la isla'],
+      ['CEMI', 'Figura sagrada de los taínos'], ['GUIRO', 'Instrumento de calabaza que se raspa'],
+      ['CUATRO', 'Instrumento nacional de diez cuerdas'], ['PASTEL', 'Se envuelve en hoja de plátano en Navidad'],
+      ['LECHON', 'Cerdo asado a la varita'], ['TOSTONES', 'Plátano verde frito dos veces'],
+      ['ARROZ', '___ con gandules'], ['GANDULES', 'Arroz con ___'], ['COQUITO', 'Bebida navideña de coco'],
+      ['PARRANDA', 'Asalto navideño con música'], ['CULEBRA', 'Isla municipio famosa por la playa Flamenco'],
+      ['VIEQUES', 'La Isla Nena'], ['FLAMBOYAN', 'Árbol de flores rojas del verano'], ['CEIBA', 'Árbol gigante que da nombre a un pueblo'],
+      ['MANGO', 'Fruta del verano en Mayagüez'], ['CAFE', 'Grano famoso de Yauco'], ['COTORRA', 'Ave verde puertorriqueña en peligro'],
+      ['HURACAN', 'Tormenta del Caribe; palabra taína'], ['BATEY', 'Plaza ceremonial taína'], ['CLEMENTE', 'Roberto, astro del béisbol'],
+      ['BEISBOL', 'Deporte de La Pro y la Doble A'], ['VOLEIBOL', 'Deporte de las Cangrejeras y los Cafeteros'],
+      ['BORINQUEN', 'Nombre taíno de la isla'], ['ISLA', 'Puerto Rico es una'], ['CARIBE', 'Mar que baña el sur de la isla'],
+      ['FAJARDO', 'Pueblo del este con faro y marinas'], ['LUQUILLO', 'Playa famosa por sus kioscos'], ['RINCON', 'Pueblo surfero del oeste'],
+      ['JIBARO', 'Campesino puertorriqueño'], ['PILON', 'Mortero para hacer mofongo'], ['SOFRITO', 'Base de cebolla, ají y recao'],
+      ['RECAO', 'Hierba del sofrito'], ['QUENEPA', 'Fruta de cáscara verde y pulpa rosada'], ['PIRAGUA', 'Hielo raspado con sirope'],
+      ['TEMBLEQUE', 'Postre navideño de coco'], ['BACALAITO', 'Fritura de bacalao'], ['ALCAPURRIA', 'Fritura de guineo con carne'],
+      ['GUAYAMA', 'Pueblo de los brujos'], ['CAGUAS', 'Ciudad criolla'], ['MAYAGUEZ', 'La Sultana del Oeste'],
+    ];
+    const box = document.querySelector<HTMLElement>('[data-cw]')!;
+    const $ = (s: string) => box.querySelector<HTMLElement>(s)!;
+    const day = Math.floor((Date.now() - 4 * 3600e3) / 86400e3); // Puerto Rico day
+    let seed = day * 7919 + 17;
+    const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+
+    // Build a criss-cross puzzle: each new word crosses a letter already on the board
+    type P = { word: string; clue: string; r: number; c: number; dir: 'A' | 'D'; num?: number };
+    function build(): P[] {
+      const bank = [...BANK].sort(() => rnd() - 0.5);
+      const grid = new Map<string, string>();
+      const placed: P[] = [];
+      const at = (r: number, c: number) => grid.get(`${r},${c}`);
+      const fits = (w: string, r: number, c: number, dir: 'A' | 'D') => {
+        const dr = dir === 'D' ? 1 : 0, dc = dir === 'A' ? 1 : 0;
+        if (at(r - dr, c - dc) || at(r + dr * w.length, c + dc * w.length)) return -1;
+        let cross = 0;
+        for (let i = 0; i < w.length; i++) {
+          const rr = r + dr * i, cc = c + dc * i, cur = at(rr, cc);
+          if (cur) { if (cur !== w[i]) return -1; cross++; continue; }
+          if (at(rr + dc, cc + dr) || at(rr - dc, cc - dr)) return -1; // no touching side by side
+        }
+        return cross;
+      };
+      const put = (p: P) => { placed.push(p); for (let i = 0; i < p.word.length; i++) grid.set(`${p.r + (p.dir === 'D' ? i : 0)},${p.c + (p.dir === 'A' ? i : 0)}`, p.word[i]); };
+      const [w0, c0] = bank.find(([w]) => w.length >= 6 && w.length <= 8)!;
+      put({ word: w0, clue: c0, r: 0, c: 0, dir: 'A' });
+      for (const [w, clue] of bank) {
+        if (placed.length >= 8) break;
+        if (placed.some((p) => p.word === w) || w.length > 9) continue;
+        const opts: P[] = [];
+        for (const [key, ch] of grid) {
+          const [r, c] = key.split(',').map(Number);
+          for (let i = 0; i < w.length; i++) {
+            if (w[i] !== ch) continue;
+            for (const dir of ['A', 'D'] as const) {
+              const sr = dir === 'D' ? r - i : r, sc = dir === 'A' ? c - i : c;
+              if (fits(w, sr, sc, dir) > 0) opts.push({ word: w, clue, r: sr, c: sc, dir });
+            }
+          }
+        }
+        // Keep the board compact: no more than 11 squares wide or tall
+        const ok = opts.filter((o) => {
+          const cells = [...grid.keys()].map((k) => k.split(',').map(Number));
+          for (let i = 0; i < o.word.length; i++) cells.push([o.r + (o.dir === 'D' ? i : 0), o.c + (o.dir === 'A' ? i : 0)]);
+          const rs = cells.map((x) => x[0]), cs = cells.map((x) => x[1]);
+          return Math.max(...rs) - Math.min(...rs) < 11 && Math.max(...cs) - Math.min(...cs) < 11;
+        });
+        if (ok.length) put(ok[Math.floor(rnd() * ok.length)]);
+      }
+      // Move to (0,0) and number the starting squares
+      const minR = Math.min(...placed.map((p) => p.r)), minC = Math.min(...placed.map((p) => p.c));
+      placed.forEach((p) => { p.r -= minR; p.c -= minC; });
+      const starts = [...new Set(placed.map((p) => `${p.r},${p.c}`))].map((k) => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      placed.forEach((p) => { p.num = starts.findIndex(([r, c]) => r === p.r && c === p.c) + 1; });
+      return placed;
+    }
+    const words = build();
+    const H = Math.max(...words.map((p) => p.r + (p.dir === 'D' ? p.word.length : 1)));
+    const W = Math.max(...words.map((p) => p.c + (p.dir === 'A' ? p.word.length : 1)));
+    const answer = new Map<string, string>();
+    words.forEach((p) => { for (let i = 0; i < p.word.length; i++) answer.set(`${p.r + (p.dir === 'D' ? i : 0)},${p.c + (p.dir === 'A' ? i : 0)}`, p.word[i]); });
+    const cellsOf = (p: P) => [...p.word].map((_, i) => `${p.r + (p.dir === 'D' ? i : 0)},${p.c + (p.dir === 'A' ? i : 0)}`);
+
+    // Saved progress for today
+    const key = `nc-crucigrama-${day}`;
+    let typed: Record<string, string> = {};
+    let secs = 0;
+    try { const s = JSON.parse(localStorage.getItem(key) || ''); typed = s.typed || {}; secs = s.secs || 0; } catch { /* nothing saved */ }
+    const save = () => { try { localStorage.setItem(key, JSON.stringify({ typed, secs })); } catch { /* storage blocked */ } };
+
+    // Board
+    const board = $('[data-board]');
+    board.style.gridTemplateColumns = `repeat(${W}, 1fr)`;
+    const cellEl = new Map<string, HTMLButtonElement>();
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const k = `${r},${c}`;
+      if (!answer.has(k)) { const s = document.createElement('span'); s.className = 'cw-block'; board.append(s); continue; }
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'cw-cell'; b.dataset.k = k;
+      const n = words.find((p) => p.r === r && p.c === c)?.num;
+      b.innerHTML = `${n ? `<small>${n}</small>` : ''}<span></span>`;
+      b.addEventListener('click', () => select(k, true));
+      board.append(b); cellEl.set(k, b);
+    }
+    // Clue lists
+    const across = words.filter((p) => p.dir === 'A').sort((a, b) => a.num! - b.num!);
+    const down = words.filter((p) => p.dir === 'D').sort((a, b) => a.num! - b.num!);
+    const clueLi = new Map<P, HTMLLIElement>();
+    for (const [list, sel] of [[across, '[data-across]'], [down, '[data-down]']] as const) {
+      list.forEach((p) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<b>${p.num}</b> ${p.clue} <small>(${p.word.length})</small>`;
+        li.addEventListener('click', () => { cur = p; select(cellsOf(p).find((k) => !typed[k]) ?? cellsOf(p)[0], false); });
+        $(sel).append(li); clueLi.set(p, li);
+      });
+    }
+    $('[data-total]').textContent = String(words.length);
+
+    let curKey = '', cur: P | null = null, finished = false;
+    const input = box.querySelector<HTMLInputElement>('[data-input]')!;
+    function select(k: string, toggle: boolean) {
+      const here = words.filter((p) => cellsOf(p).includes(k));
+      if (toggle && k === curKey && here.length > 1) cur = here.find((p) => p !== cur) ?? here[0];
+      else if (!cur || !cellsOf(cur).includes(k)) cur = here[0];
+      curKey = k; paint();
+      input.focus({ preventScroll: true });
+    }
+    function paint() {
+      const active = cur ? cellsOf(cur) : [];
+      cellEl.forEach((b, k) => {
+        b.querySelector('span')!.textContent = typed[k] || '';
+        b.classList.toggle('word', active.includes(k));
+        b.classList.toggle('sel', k === curKey);
+      });
+      clueLi.forEach((li, p) => { li.classList.toggle('on', p === cur); li.classList.toggle('solved', cellsOf(p).every((k) => typed[k] === answer.get(k))); });
+      if (cur) $('[data-clue]').innerHTML = `<b>${cur.num} ${cur.dir === 'A' ? 'Horizontal' : 'Vertical'}:</b> ${cur.clue}`;
+      const done = words.filter((p) => cellsOf(p).every((k) => typed[k] === answer.get(k))).length;
+      $('[data-done]').textContent = String(done);
+      if (done === words.length && !finished) {
+        finished = true;
+        $('[data-msg]').textContent = `¡Completaste el crucigrama del día en ${$('[data-time]').textContent}! Vuelve mañana por otro.`;
+        award('crucigrama', 100, 'Crucigrama completo', key);
+      }
+    }
+    function move(step: number) {
+      if (!cur) return;
+      const cs = cellsOf(cur), i = cs.indexOf(curKey) + step;
+      if (i >= 0 && i < cs.length) { curKey = cs[i]; paint(); }
+    }
+    function typeLetter(ch: string) {
+      if (!curKey || finished) return;
+      typed[curKey] = ch; save(); move(1); paint();
+    }
+    input.addEventListener('input', () => {
+      const ch = input.value.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().replace(/[^A-ZÑ]/g, '').slice(-1);
+      input.value = '';
+      if (ch) typeLetter(ch === 'Ñ' ? 'N' : ch);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        // Erase this square; if it's already empty, step back and erase that one
+        if (curKey && !typed[curKey]) move(-1);
+        if (curKey) delete typed[curKey];
+        save(); paint();
+      }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+    });
+    $('[data-check]').addEventListener('click', () => {
+      let wrong = 0;
+      cellEl.forEach((b, k) => { const bad = !!typed[k] && typed[k] !== answer.get(k); b.classList.toggle('bad', bad); if (bad) wrong++; });
+      $('[data-msg]').textContent = wrong ? `Hay ${wrong} ${wrong === 1 ? 'letra incorrecta' : 'letras incorrectas'} (en rojo).` : 'Todo lo que has escrito está correcto. ¡Sigue!';
+      setTimeout(() => cellEl.forEach((b) => b.classList.remove('bad')), 2500);
+    });
+    $('[data-reveal-word]').addEventListener('click', () => { if (!cur) return; cellsOf(cur).forEach((k) => (typed[k] = answer.get(k)!)); save(); paint(); });
+    $('[data-reset]').addEventListener('click', async () => { if (await ask('¿Borrar todas las letras?', { ok: 'Borrar', danger: true })) { typed = {}; finished = false; $('[data-msg]').textContent = ''; save(); paint(); } });
+    // Timer
+    const start = Date.now() - secs * 1000;
+    const tick = () => { if (finished) return; secs = Math.floor((Date.now() - start) / 1000); $('[data-time]').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`; };
+    setInterval(() => { tick(); if (secs % 10 === 0) save(); }, 1000);
+    tick(); paint();
+    finished = words.every((p) => cellsOf(p).every((k) => typed[k] === answer.get(k)));
+    if (finished) $('[data-msg]').textContent = '¡Ya completaste el crucigrama de hoy! Vuelve mañana por otro.';
+  </script>
+</Base>

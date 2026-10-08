@@ -1,0 +1,99 @@
+---
+// Privacy policy: what the site collects and why, where it is kept (Supabase for accounts, comments and ad requests),
+// third-party services, rights (including "Borrar mi cuenta" on /perfil) and contact. Keep it in step with the code:
+// src/lib/account.ts, supabase/*.sql and the services listed below.
+import Base from '../layouts/Base.astro';
+import { SITE, url } from '../lib/site';
+const updated = '4 de octubre de 2026';
+---
+<Base title="Política de privacidad" description="Qué información recoge NotiCel, para qué la usamos, dónde se guarda y cómo puedes borrarla.">
+  <main class="wrap" id="main">
+    <div class="page">
+      <h1>Política de privacidad</h1>
+      <p class="pg-draft"><span class="sp-demo">BORRADOR</span> Texto tomado de Noticias Xtra para el sitio de prueba. NotiCel debe revisarlo y aprobarlo antes del lanzamiento.</p>
+      <p><em>Última actualización: {updated}</em></p>
+
+      <h2>En resumen</h2>
+      <ul>
+        <li>Puedes leer todo NotiCel <strong>sin crear una cuenta</strong>.</li>
+        <li>Si creas una cuenta, guardamos tu correo, tu nombre de usuario y lo que publicas (comentarios, fotos, temas del foro), para que funcione el sitio.</li>
+        <li><strong>No vendemos</strong> tu información a nadie. No la usamos para enviarte publicidad personalizada.</li>
+        <li>Puedes <strong>borrar tu cuenta</strong> y todo lo que publicaste cuando quieras, desde <a href={url('perfil')}>Mi perfil</a>.</li>
+      </ul>
+
+      <h2>Lo que recogemos</h2>
+      <h3>Si solo lees</h3>
+      <p>No te pedimos datos personales. Como cualquier sitio web, los servicios que nos alojan reciben datos técnicos de tu conexión (dirección IP, tipo de navegador y dispositivo) para mostrar las páginas y protegerlas de abusos.</p>
+
+      <h3>Si creas una cuenta</h3>
+      <ul>
+        <li><strong>Correo electrónico y contraseña</strong>, para que puedas entrar. La contraseña se guarda cifrada: nadie en NotiCel puede verla.</li>
+        <li><strong>Nombre de usuario</strong> (público) y, si la subes, tu <strong>foto de perfil</strong> (pública).</li>
+        <li>Si entras con <strong>Google</strong>, Google nos comparte tu correo, tu nombre y tu foto. No recibimos tu contraseña de Google.</li>
+        <li><strong>Lo que publicas</strong>: comentarios, fotos en comentarios, Me gusta, temas y respuestas del Foro NotiCel, y los reportes que envías. Los comentarios, fotos y temas son públicos.</li>
+        <li><strong>Tu actividad en el sitio</strong>: noticias guardadas, puntos y récords de Juegos NotiCel (tu nombre de usuario puede salir en las tablas de líderes), tu reputación de comentarista, tus notificaciones y cómo las configuraste.</li>
+      </ul>
+
+      <h3>Si pides un anuncio</h3>
+      <p>Guardamos los datos del formulario de <a href={url('publicidad')}>Anúnciate</a> (nombre, negocio, correo, teléfono, el anuncio y sus imágenes) para revisarlo, publicarlo, cobrarlo y darte el servicio. Los pagos los procesan <strong>Stripe</strong> (tarjeta) o <strong>ATH Móvil</strong>: los números de tu tarjeta o cuenta nunca pasan por nuestro sitio.</p>
+
+      <h3>Lo que se guarda en tu propio dispositivo</h3>
+      <p>Tu navegador recuerda algunas preferencias para que el sitio funcione mejor: modo oscuro, tamaño de letra, idioma, el pueblo del clima, qué secciones lees más (para la tarjeta <strong>Para ti</strong>), tu sesión si entraste con tu cuenta, y el progreso de los juegos. Se queda en tu dispositivo y puedes borrarlo limpiando los datos del sitio en tu navegador. No usamos cookies de publicidad.{SITE.gaId ? ' Para contar las visitas usamos Google Analytics, que guarda sus propias cookies (más abajo).' : ' Tampoco usamos cookies de rastreo.'}</p>
+
+      <h2>Para qué la usamos</h2>
+      <ul>
+        <li>Para que funcionen tu cuenta, los comentarios, el foro, las notificaciones, las noticias guardadas y los juegos.</li>
+        <li>Para moderar: un filtro automático revisa los comentarios antes de publicarlos, y la redacción revisa los reportes. Podemos quitar contenido o suspender cuentas que incumplan los <a href={url('terminos')}>términos de uso</a>.</li>
+        <li>Para atender anuncios y pagos, y cumplir con obligaciones contables y legales.</li>
+        <li>Para escribirte sobre tu cuenta (por ejemplo, si olvidas tu contraseña). No te enviaremos boletines sin que te suscribas.</li>
+      </ul>
+
+      <h2>Dónde se guarda</h2>
+      <p>Las cuentas, los comentarios, el foro, las noticias guardadas, los puntos y las solicitudes de anuncios se guardan en <strong>Supabase</strong>, en servidores en Estados Unidos (este de EE. UU.). El acceso está protegido: cada persona solo puede cambiar lo suyo, y solo el equipo autorizado de la redacción ve las solicitudes de anuncios y los reportes. Consulta la <a href="https://supabase.com/privacy" rel="noopener" target="_blank">política de privacidad de Supabase</a>.</p>
+
+      <h2>Otros servicios que usa el sitio</h2>
+      <ul>
+        <li><strong>GitHub Pages</strong>, donde está alojado el sitio (<a href="https://docs.github.com/es/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener" target="_blank">privacidad</a>).</li>
+        <li><strong>Google</strong>: los tipos de letra (Google Fonts), la traducción al inglés (Google Translate, solo si la usas) y el inicio de sesión con Google (solo si lo usas) (<a href="https://policies.google.com/privacy?hl=es" rel="noopener" target="_blank">privacidad</a>).</li>
+        <li><strong>YouTube</strong>, para los videos y las transmisiones en vivo. Usamos su versión de privacidad mejorada (youtube-nocookie.com).</li>
+        <li><strong>Servicio Nacional de Meteorología</strong> (weather.gov), para el clima y el radar.</li>
+        <li><strong>cdnjs (Cloudflare)</strong>, para mostrar los documentos PDF dentro de las noticias.</li>
+        <li>Publicaciones de <strong>X, Instagram, Facebook o TikTok</strong> que se muestran dentro de algunas noticias: esos servicios cargan su propio contenido.</li>
+      </ul>
+      {SITE.gaId
+        ? <p><strong>Google Analytics</strong> cuenta las visitas: qué páginas se leen, cuánto tiempo, desde qué tipo de dispositivo y de qué país o región llegan. Lo usamos solo para saber qué noticias le interesan al público y para mostrarle a los anunciantes cuántas personas nos leen. Google no nos dice quién eres y no compartimos esos datos con nadie más. Puedes impedirlo con el <a href="https://tools.google.com/dlpage/gaoptout?hl=es" rel="noopener" target="_blank">complemento de inhabilitación de Google Analytics</a> o con un bloqueador en tu navegador (<a href="https://policies.google.com/technologies/partner-sites?hl=es" rel="noopener" target="_blank">cómo usa Google estos datos</a>).</p>
+        : <p>Cuando añadamos un contador de visitas o publicidad de Google, lo indicaremos aquí antes de activarlo.</p>}
+
+      <h2>Cuánto tiempo la guardamos</h2>
+      <ul>
+        <li><strong>Tu cuenta y lo que publicaste</strong>: hasta que borres tu cuenta. Si la redacción quita un comentario por incumplir las reglas, puede guardarse un registro interno para atender reclamos.</li>
+        <li><strong>Solicitudes de anuncios y pagos</strong>: el tiempo que exija la ley para fines contables y fiscales.</li>
+        <li><strong>Datos técnicos de conexión</strong>: los guardan por poco tiempo los servicios que nos alojan, para seguridad.</li>
+      </ul>
+
+      <h2>Tus derechos y cómo borrar tu cuenta</h2>
+      <ul>
+        <li><strong>Ver y corregir</strong>: en <a href={url('perfil')}>Mi perfil</a> cambias tu nombre de usuario, tu foto y tus notificaciones.</li>
+        <li><strong>Borrar</strong>: en <a href={`${url('perfil')}#ajustes`}>Mi perfil → Ajustes → Borrar mi cuenta</a>. Se borran tu cuenta, tus comentarios, fotos, Me gusta, temas del foro, noticias guardadas, puntos y notificaciones. No se puede deshacer.</li>
+        <li><strong>Pedir una copia</strong> de tus datos o hacer cualquier otra pregunta: escríbenos (abajo) y te contestamos en un máximo de 30 días.</li>
+      </ul>
+
+      <h2>Si nos escribes</h2>
+      <p>La página <a href={url('contacto')}>Envía tu denuncia</a> abre tu aplicación de correo con el mensaje listo; tú decides si lo envías. Usamos tu mensaje y tus datos solo para atender lo que nos planteas y trabajar la noticia. No publicamos tu nombre ni tus datos sin tu permiso.</p>
+
+      <h2>Menores de edad</h2>
+      <p>Para crear una cuenta debes tener al menos <strong>13 años</strong>. No recogemos a sabiendas información de menores de 13 años; si nos enteramos de una cuenta así, la borramos.</p>
+
+      <h2>Cambios</h2>
+      <p>Si cambiamos esta política, lo indicaremos aquí con una nueva fecha. Si el cambio es importante, también te avisaremos en el sitio.</p>
+
+      <h2>Contacto</h2>
+      {SITE.email ? (
+        <p>Preguntas sobre privacidad o para borrar tus datos: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p>
+      ) : (
+        <p>Muy pronto publicaremos un correo para preguntas sobre privacidad. Mientras tanto, puedes borrar tu cuenta tú mismo desde <a href={url('perfil')}>Mi perfil</a>.</p>
+      )}
+      <p>Lee también los <a href={url('terminos')}>términos de uso</a> y los <a href={url('terminos-anunciantes')}>términos para anunciantes</a>.</p>
+    </div>
+  </main>
+</Base>

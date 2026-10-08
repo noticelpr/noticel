@@ -1,49 +1,55 @@
 ---
 // Exact preview of an article from the staff editor (Escribir): the real story page (header, menu, story layout,
-// sidebar, "Sigue leyendo"), filled with the article being written. The editor saves the article to this
+// sidebar, "Te puede interesar"), filled with the article being written. The editor saves the article to this
 // browser ('nc-preview') and shows this page in a frame (computer or phone width); it updates live while typing.
 // Internal: hidden from search engines.
 import Base from '../../layouts/Base.astro';
-import '../../styles/panel.css';
 import Sidebar from '../../components/Sidebar.astro';
-import Card from '../../components/Card.astro';
+import StoryCard from '../../components/StoryCard.astro';
 import DocViewer from '../../components/DocViewer.astro';
-import { getStories, SECTIONS, CATEGORIES, parentOf, url } from '../../lib/site';
+import '../../styles/panel.css';
+import { getStories, CATEGORY_OPTIONS, defaultPhoto, section, sectionOf, url } from '../../lib/site';
 
 const stories = await getStories();
-const more = stories.slice(0, 3);
-// Category names and their parent, for the label and the breadcrumbs
-const secs = Object.fromEntries(SECTIONS.map((s) => { const p = parentOf(s.id); return [s.id, { name: s.short, parent: p ? CATEGORIES[p] : '' }]; }));
+const more = stories.slice(0, 4);
+// NotiCel: the editor's "Sección" is a category. Its label is the category's name; its color and default photo
+// are those of the section it belongs to (Béisbol → Deportes).
+const photos: Record<string, { src: string; caption: string; credit: string }> = {};
+const secs: Record<string, { name: string; color: string }> = {};
+for (const c of CATEGORY_OPTIONS) {
+  const sec = section(sectionOf([c.id]));
+  const p = defaultPhoto(sec.id);
+  photos[c.id] = { src: url(p.src), caption: p.caption, credit: p.credit };
+  secs[c.id] = { name: c.short, color: sec.color };
+}
 ---
 <Base title="Vista previa" description="Vista previa interna de una noticia." noindex>
   <div class="vp-flag" role="note"><span class="sp-demo">VISTA PREVIA</span> Así se verá la noticia en el sitio. Todavía no está publicada.</div>
-  <main class="wrap" id="main" data-vp data-secs={JSON.stringify(secs)} data-base={url()}>
+  <main class="wrap" id="main" data-vp data-photos={JSON.stringify(photos)} data-secs={JSON.stringify(secs)} data-base={url()}>
     <div class="art-grid">
       <article class="art">
-        <div class="crumbs"><a href={url()}>Portada</a><span data-vp-parent></span> / <a href={url()} data-vp-crumb>Sección</a></div>
-        <span class="kicker live" data-vp-live style="display:none">EN VIVO</span>
+        <div class="crumbs"><a href={url()}>Portada</a> / <a href={url()} data-vp-crumb>Sección</a></div>
+        <span class="badge" data-vp-badge></span>
         <h1 data-vp-title>Sin titular</h1>
         <p class="dek" data-vp-dek></p>
         <div class="byline">
           <div class="by-who">
             <strong data-vp-by>Por NotiCel</strong>
-            <span><span data-vp-when></span><span data-vp-place></span> · <span data-vp-min>1</span> min de lectura</span>
+            <span><span data-vp-when></span>, <span class="notranslate" translate="no" data-vp-place>Puerto Rico</span> · <span data-vp-min>1</span> min de lectura</span>
           </div>
           <div class="by-actions" aria-hidden="true">
             <span class="tool"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z" /></svg> Guardar</span>
-            <span class="tool-group"><span class="tool">A−</span><span class="tool">A+</span></span>
+            <span class="tool">A−</span><span class="tool">A+</span>
           </div>
         </div>
-        <figure style="margin:0" data-vp-fig>
-          <div class="ph" style="--c:#006FA6"><img alt="" data-vp-img /></div>
-          <figcaption class="caption" data-vp-cap></figcaption>
-        </figure>
+        <div class="ph" data-vp-ph><img alt="" data-vp-img /><span class="place notranslate" translate="no" data-vp-ph-place></span></div>
+        <p class="caption" data-vp-cap></p>
         <div class="gal-thumbs vp-gal" data-vp-gal hidden></div>
         <div class="body" data-vp-body></div>
         <p class="sources" data-vp-corr hidden></p>
         <p class="sources" data-vp-src hidden></p>
-        <div class="sec-h"><h2>Sigue leyendo</h2></div>
-        <div class="grid3">{more.map((x) => <Card story={x} dek={false} />)}</div>
+        <div class="sec-h"><h2>Te puede interesar</h2></div>
+        <div class="grid2">{more.map((x) => <StoryCard story={x} />)}</div>
       </article>
       <Sidebar />
     </div>
@@ -53,7 +59,8 @@ const secs = Object.fromEntries(SECTIONS.map((s) => { const p = parentOf(s.id); 
     import { embedFor } from '../../lib/embeds.mjs';
     import { docCard } from '../../lib/doccard.mjs';
     const root = document.querySelector<HTMLElement>('[data-vp]')!;
-    const SECS: Record<string, { name: string; parent: string }> = JSON.parse(root.dataset.secs!);
+    const PHOTOS: Record<string, { src: string; caption: string; credit: string }> = JSON.parse(root.dataset.photos!);
+    const SECS: Record<string, { name: string; color: string }> = JSON.parse(root.dataset.secs!);
     const base = root.dataset.base!.replace(/\/$/, '');
     const $ = (s: string) => root.querySelector<HTMLElement>(s)!;
     const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -67,20 +74,21 @@ const secs = Object.fromEntries(SECTIONS.map((s) => { const p = parentOf(s.id); 
       const sec = SECS[a.section] ?? SECS.noticias;
       document.title = `${a.title || 'Sin titular'} | Vista previa`;
       $('[data-vp-crumb]').textContent = sec.name;
-      $('[data-vp-parent]').textContent = sec.parent ? ` / ${sec.parent}` : '';
-      $('[data-vp-live]').style.display = a.live ? '' : 'none'; // .kicker sets display, so `hidden` alone would not hide it
+      const badge = $('[data-vp-badge]'); badge.textContent = a.live ? 'EN VIVO' : sec.name; badge.className = a.live ? 'badge live' : 'badge';
       $('[data-vp-title]').textContent = a.title || 'Sin titular';
       $('[data-vp-dek]').textContent = a.description || '';
       $('[data-vp-by]').textContent = `Por ${a.author || 'NotiCel'}`;
       const d = a.date ? new Date(a.date) : new Date();
-      const when = d.toLocaleString('es-PR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-      $('[data-vp-when]').textContent = when.charAt(0).toUpperCase() + when.slice(1);
-      $('[data-vp-place]').textContent = a.place ? `, ${a.place}` : '';
-      // Photo: the article's own (NotiCel shows no photo block when a story has none)
-      const own = a.image || a.imageUrl || a.gallery?.[0]?.src;
-      $('[data-vp-fig]').hidden = !own;
-      if (own) (root.querySelector('[data-vp-img]') as HTMLImageElement).src = /^(https?:|data:)/.test(own) ? own : `${base}/${own}`;
-      $('[data-vp-cap]').textContent = [a.imageCaption, a.imageCredit].filter(Boolean).join(' ');
+      $('[data-vp-when]').textContent = d.toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric' });
+      $('[data-vp-place]').textContent = a.place || 'Puerto Rico';
+      // Photo: the article's own, or the same default the site would use for its section or league
+      const fallback = PHOTOS[a.section] ?? PHOTOS.noticias;
+      const own = a.image || a.imageUrl;
+      const ph = $('[data-vp-ph]'); ph.style.setProperty('--c', sec.color);
+      // The site's own photos have relative addresses ('images/…')
+      (root.querySelector('[data-vp-img]') as HTMLImageElement).src = own ? (/^(https?:|data:)/.test(own) ? own : `${base}/${own}`) : fallback.src;
+      $('[data-vp-ph-place]').textContent = a.place || '';
+      $('[data-vp-cap]').textContent = own ? `${a.imageCaption || `${a.place || 'Puerto Rico'}. Imagen de referencia.`} ${a.imageCredit || ''}` : `${fallback.caption} Imagen de archivo. ${fallback.credit}`;
       // Gallery: the extra photos (the site shows them as a slideshow with the main one)
       const galBox = $('[data-vp-gal]'); const gal = (a.gallery ?? []) as Array<{ src: string }>;
       galBox.hidden = !gal.length;

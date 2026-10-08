@@ -1,0 +1,143 @@
+---
+// Cuatro Colores: a color-and-number card game against two computer players.
+// Match the color or the number/symbol of the top card. Special cards: Salta (skip), Reversa,
+// +2, Comodín (pick the color) and Comodín +4. First to empty their hand wins.
+// (Our own game and name; "UNO" is a trademark of Mattel.)
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+import { url } from '../../lib/site';
+---
+<Base title="Cuatro Colores" description="Juego de cartas de colores contra la computadora. Combina color o número y quédate sin cartas primero.">
+  <main class="wrap" id="main">
+    <GameLayout id="cuatro-colores">
+    <div class="jg-game cc" data-cc>
+      <p class="tv-kicker"><a href={url('juegos')}>Juegos NotiCel</a> · Juego de cartas</p>
+      <h1>Cuatro Colores</h1>
+      <div class="cc-bots">
+        <div data-bot="1"><span>Jugador A</span><b data-count="1"></b></div>
+        <div data-bot="2"><span>Jugador B</span><b data-count="2"></b></div>
+      </div>
+      <div class="cc-center">
+        <button type="button" class="cc-card back" data-draw aria-label="Robar una carta"><span>Robar</span></button>
+        <div data-top></div>
+        <span class="cc-color" data-color></span>
+      </div>
+      <p class="jg-msg" aria-live="polite" data-msg></p>
+      <div class="cc-pick" data-pick hidden>
+        <span>Escoge el color:</span>
+        <button type="button" data-c="r" aria-label="Rojo"></button><button type="button" data-c="y" aria-label="Amarillo"></button>
+        <button type="button" data-c="g" aria-label="Verde"></button><button type="button" data-c="b" aria-label="Azul"></button>
+      </div>
+      <div class="cc-hand" data-hand aria-label="Tus cartas"></div>
+      <div class="dm-actions">
+        <button type="button" class="tool" data-pass hidden>Pasar</button>
+        <button type="button" class="jg-btn" data-new hidden>Jugar otra vez</button>
+      </div>
+      <p class="jg-help">Juega una carta del mismo color o del mismo número o símbolo. <b>⊘</b> salta al próximo jugador, <b>⇄</b> cambia el sentido, <b>+2</b> y <b>+4</b> hacen robar, y el <b>comodín</b> te deja escoger el color. Si no tienes jugada, roba una carta.</p>
+    </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    type C = { c: 'r' | 'y' | 'g' | 'b' | 'w'; v: string }; // v: '0'-'9', 'S' skip, 'R' reverse, '+2', 'W' wild, '+4'
+    const box = document.querySelector<HTMLElement>('[data-cc]')!;
+    const $ = (s: string) => box.querySelector<HTMLElement>(s)!;
+    const NAMES = { r: 'rojo', y: 'amarillo', g: 'verde', b: 'azul', w: '' } as const;
+    const label = (v: string) => ({ S: '⊘', R: '⇄', W: '★', '+4': '+4' } as Record<string, string>)[v] ?? v;
+    const cardHTML = (k: C) => `<span class="cc-card ${k.c}"><b>${label(k.v)}</b></span>`;
+    let deck: C[] = [], pile: C[] = [], hands: C[][] = [], color: C['c'] = 'r', turn = 0, dir = 1, over = false, drew = false, waitingColor = false;
+
+    function newDeck() {
+      const d: C[] = [];
+      for (const c of ['r', 'y', 'g', 'b'] as const) {
+        d.push({ c, v: '0' });
+        for (const v of ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'S', 'R', '+2']) d.push({ c, v }, { c, v });
+      }
+      for (let i = 0; i < 4; i++) d.push({ c: 'w', v: 'W' }, { c: 'w', v: '+4' });
+      for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+      return d;
+    }
+    const top = () => pile[pile.length - 1];
+    const playable = (k: C) => k.c === 'w' || k.c === color || k.v === top().v;
+    function draw(p: number, n = 1) {
+      for (let i = 0; i < n; i++) {
+        if (!deck.length) { const t = pile.pop()!; deck = pile.map((x) => (x.c === 'w' || x.v === 'W' || x.v === '+4' ? { c: 'w', v: x.v } : x)); pile = [t]; for (let a = deck.length - 1; a > 0; a--) { const j = Math.floor(Math.random() * (a + 1)); [deck[a], deck[j]] = [deck[j], deck[a]]; } }
+        if (deck.length) hands[p].push(deck.pop()!);
+      }
+    }
+    const next = (steps = 1) => (turn = (turn + dir * steps + 3 * 3) % 3);
+    function start() {
+      deck = newDeck(); hands = [[], [], []]; dir = 1; over = false; drew = false; waitingColor = false;
+      for (let p = 0; p < 3; p++) draw(p, 7);
+      let first = deck.pop()!; while (first.c === 'w') { deck.unshift(first); first = deck.pop()!; }
+      pile = [first]; color = first.c; turn = 0;
+      $('[data-new]').hidden = true; say('Te toca. Juega una carta del mismo color o número.'); render();
+    }
+    function say(t: string) { $('[data-msg]').textContent = t; }
+    function render() {
+      $('[data-top]').innerHTML = cardHTML(top());
+      const ci = $('[data-color]'); ci.className = `cc-color ${color}`; ci.textContent = `Color: ${NAMES[color as 'r']}`;
+      [1, 2].forEach((p) => { $(`[data-count="${p}"]`).textContent = `${hands[p].length} ${hands[p].length === 1 ? 'carta' : 'cartas'}`; $(`[data-bot="${p}"]`).classList.toggle('on', turn === p && !over); });
+      const hand = $('[data-hand]'); hand.innerHTML = '';
+      hands[0].forEach((k, i) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'cc-btn'; b.innerHTML = cardHTML(k);
+        b.setAttribute('aria-label', `${label(k.v)} ${NAMES[k.c as 'r'] || 'comodín'}`);
+        b.disabled = turn !== 0 || over || waitingColor || !playable(k);
+        b.addEventListener('click', () => human(i));
+        hand.append(b);
+      });
+      ($('[data-draw]') as HTMLButtonElement).disabled = turn !== 0 || over || drew || waitingColor;
+      $('[data-pass]').hidden = !(turn === 0 && drew && !over);
+      $('[data-pick]').hidden = !waitingColor;
+    }
+    // Apply a card's effect, then move the turn along
+    function resolve(p: number, k: C) {
+      if (!hands[p].length) { over = true; if (p === 0) award('cuatro-colores', 40, 'Cuatro Colores ganado'); say(p === 0 ? '¡Ganaste! 🎉' : `Ganó el Jugador ${p === 1 ? 'A' : 'B'}.`); $('[data-new]').hidden = false; render(); return; }
+      if (hands[p].length === 1) say(`${p === 0 ? '¡Te queda una carta!' : `¡Al Jugador ${p === 1 ? 'A' : 'B'} le queda una carta!`}`);
+      if (k.v === 'R') dir = -dir;
+      if (k.v === 'S') next(2);
+      else if (k.v === '+2') { next(); draw(turn, 2); next(); }
+      else if (k.v === '+4') { next(); draw(turn, 4); next(); }
+      else next();
+      drew = false; render();
+      if (turn !== 0) setTimeout(bot, 900);
+      else if (!over) say(`${$('[data-msg]').textContent ?? ''} Te toca.`.trim());
+    }
+    function human(i: number) {
+      const k = hands[0].splice(i, 1)[0]; pile.push(k);
+      if (k.c === 'w') { waitingColor = true; say('Escoge un color.'); render(); box.dataset.pending = JSON.stringify(k); return; }
+      color = k.c; resolve(0, k);
+    }
+    box.querySelectorAll<HTMLButtonElement>('[data-c]').forEach((b) => b.addEventListener('click', () => {
+      if (!waitingColor) return;
+      waitingColor = false; color = b.dataset.c as C['c'];
+      resolve(0, JSON.parse(box.dataset.pending!));
+    }));
+    $('[data-draw]').addEventListener('click', () => {
+      draw(0); drew = true;
+      say(playable(hands[0][hands[0].length - 1]) ? 'Puedes jugar la carta que robaste, o pasar.' : 'No tienes jugada. Pasa el turno.');
+      render();
+    });
+    $('[data-pass]').addEventListener('click', () => { drew = false; next(); render(); setTimeout(bot, 700); });
+    $('[data-new]').addEventListener('click', start);
+    function bot() {
+      if (over || turn === 0) return;
+      const p = turn, h = hands[p];
+      let i = h.findIndex((k) => k.c !== 'w' && playable(k));
+      if (i < 0) i = h.findIndex((k) => k.c === 'w');
+      if (i < 0) { draw(p); const last = h[h.length - 1]; if (playable(last)) i = h.length - 1; }
+      const who = `Jugador ${p === 1 ? 'A' : 'B'}`;
+      if (i < 0) { say(`${who} robó y pasó.`); next(); render(); if (turn !== 0) setTimeout(bot, 800); else say(`${who} robó y pasó. Te toca.`); return; }
+      const k = h.splice(i, 1)[0]; pile.push(k);
+      if (k.c === 'w') {
+        const counts = { r: 0, y: 0, g: 0, b: 0 } as Record<string, number>;
+        h.forEach((x) => { if (x.c !== 'w') counts[x.c]++; });
+        color = (Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]) as C['c'];
+        say(`${who} jugó ${k.v === '+4' ? 'comodín +4' : 'comodín'} y escogió ${NAMES[color as 'r']}.`);
+      } else { color = k.c; say(`${who} jugó ${label(k.v)} ${NAMES[k.c]}.`); }
+      resolve(p, k);
+    }
+    start();
+  </script>
+</Base>

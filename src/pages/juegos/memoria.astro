@@ -1,0 +1,74 @@
+---
+// Memoria Boricua: flip two cards at a time and find the 8 pairs. Best score kept on this device.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+import { url } from '../../lib/site';
+---
+<Base title="Memoria Boricua" description="Encuentra las parejas en la menor cantidad de jugadas.">
+  <main class="wrap" id="main">
+    <GameLayout id="memoria">
+    <div class="jg-game" data-memoria>
+      <p class="tv-kicker"><a href={url('juegos')}>Juegos NotiCel</a> · Memoria</p>
+      <h1>Memoria Boricua</h1>
+      <p class="jg-help">Toca dos cartas para voltearlas. Si son iguales, se quedan abiertas. Encuentra las 8 parejas.</p>
+      <p class="jg-stats"><span>Jugadas: <b data-moves>0</b></span><span>Parejas: <b data-pairs>0</b>/8</span><span data-best></span></p>
+      <div class="mm-grid"></div>
+      <p class="jg-msg" aria-live="polite"></p>
+      <button type="button" class="jg-btn" data-again hidden>Jugar otra vez</button>
+    </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    // Puerto Rico themed cards (emoji + name for screen readers)
+    const CARDS: Array<[string, string]> = [['🐸', 'Coquí'], ['🌴', 'Palma'], ['🏖️', 'Playa'], ['⚾', 'Béisbol'],
+      ['🥁', 'Bomba'], ['🌺', 'Flor de maga'], ['☕', 'Café'], ['🦜', 'Cotorra']];
+    const box = document.querySelector<HTMLElement>('[data-memoria]')!;
+    const grid = box.querySelector<HTMLElement>('.mm-grid')!;
+    const movesEl = box.querySelector<HTMLElement>('[data-moves]')!;
+    const pairsEl = box.querySelector<HTMLElement>('[data-pairs]')!;
+    const bestEl = box.querySelector<HTMLElement>('[data-best]')!;
+    const msg = box.querySelector<HTMLElement>('.jg-msg')!;
+    const again = box.querySelector<HTMLButtonElement>('[data-again]')!;
+    const getBest = () => { try { return Number(localStorage.getItem('nc-memoria-best')) || 0; } catch { return 0; } };
+    const showBest = () => { const b = getBest(); bestEl.textContent = b ? `Tu mejor marca: ${b} jugadas` : ''; };
+
+    function start() {
+      const deck = [...CARDS, ...CARDS].map((c) => ({ c, k: Math.random() })).sort((a, b) => a.k - b.k).map((x) => x.c);
+      let open: HTMLButtonElement[] = [];
+      let moves = 0, pairs = 0, busy = false;
+      grid.replaceChildren(); msg.textContent = ''; again.hidden = true;
+      movesEl.textContent = '0'; pairsEl.textContent = '0'; showBest();
+      deck.forEach(([emoji, name]) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'mm-card'; b.dataset.v = emoji;
+        b.setAttribute('aria-label', 'Carta boca abajo');
+        b.innerHTML = `<span class="mm-back" aria-hidden="true">X</span><span class="mm-face" aria-hidden="true"><i>${emoji}</i><small>${name}</small></span>`;
+        b.addEventListener('click', () => {
+          if (busy || b.classList.contains('up')) return;
+          b.classList.add('up'); b.setAttribute('aria-label', name); open.push(b);
+          if (open.length < 2) return;
+          moves++; movesEl.textContent = String(moves);
+          const [a, c] = open;
+          if (a.dataset.v === c.dataset.v) {
+            a.classList.add('done'); c.classList.add('done'); a.disabled = c.disabled = true; open = [];
+            pairs++; pairsEl.textContent = String(pairs);
+            if (pairs === CARDS.length) {
+              award('memoria', moves <= 12 ? 80 : moves <= 16 ? 60 : 40, `Memoria en ${moves} jugadas`);
+              const best = getBest();
+              if (!best || moves < best) { try { localStorage.setItem('nc-memoria-best', String(moves)); } catch { /* storage blocked */ } }
+              msg.textContent = !best || moves < best ? `¡Nueva marca! Lo hiciste en ${moves} jugadas.` : `¡Completado en ${moves} jugadas!`;
+              showBest(); again.hidden = false;
+            }
+          } else {
+            busy = true;
+            setTimeout(() => { [a, c].forEach((x) => { x.classList.remove('up'); x.setAttribute('aria-label', 'Carta boca abajo'); }); open = []; busy = false; }, 800);
+          }
+        });
+        grid.append(b);
+      });
+    }
+    again.addEventListener('click', start);
+    start();
+  </script>
+</Base>

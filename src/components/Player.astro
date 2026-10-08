@@ -1,0 +1,40 @@
+---
+// Video player. With `yt`, the first player on the page starts by itself (muted); youtube-nocookie.com keeps
+// YouTube's cookies off until the video plays.
+import { url } from '../lib/site';
+interface Props { live?: boolean; yt?: string; title?: string }
+const { live = false, yt, title = 'Video' } = Astro.props;
+---
+{yt ? (
+  <div class="player yt" data-yt={yt} data-title={title}>
+    <img src={`https://i.ytimg.com/vi/${yt}/hqdefault.jpg`} alt="" />
+    <button type="button" data-yt-play>
+      <span class="circle"><svg width="34" height="34" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span>
+      Reproducir video
+    </button>
+  </div>
+) : (
+  <div class="player">
+    {live && <span class="badge live tag">EN VIVO</span>}
+    <div class="bug"><img src={url('logo.svg')} alt="" /></div>
+    <button type="button" data-play>
+      <span class="circle"><svg width="34" height="34" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span>
+      {live ? 'Ver transmisión' : 'Reproducir video'}
+    </button>
+  </div>
+)}
+<script>
+  // Video pages start playing by themselves (muted, as browsers require); the reader can turn the sound on
+  const start = (box: HTMLElement, muted: boolean) => {
+    const f = document.createElement('iframe');
+    f.src = `https://www.youtube-nocookie.com/embed/${box.dataset.yt}?autoplay=1${muted ? '&mute=1' : ''}&rel=0&playsinline=1`;
+    f.title = box.dataset.title || 'Video';
+    f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    f.allowFullscreen = true;
+    f.referrerPolicy = 'strict-origin-when-cross-origin';
+    box.replaceChildren(f);
+  };
+  const boxes = [...document.querySelectorAll<HTMLElement>('[data-yt]')];
+  boxes.forEach((box) => box.querySelector('[data-yt-play]')?.addEventListener('click', () => start(box, false)));
+  if (boxes[0]) start(boxes[0], true);
+</script>

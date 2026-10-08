@@ -1,0 +1,76 @@
+---
+// Terms for advertisers: ordering and approval, prices by views (src/lib/ads.ts), delivery, refunds, ad rules,
+// editorial independence and reporting. Matches the Anúnciate page, the Anuncios queue and the sales desk.
+// Refund and undelivered-views policies are proposed defaults: the publisher should confirm them.
+import Base from '../layouts/Base.astro';
+import { SITE, url } from '../lib/site';
+const updated = '4 de octubre de 2026';
+---
+<Base title="Términos para anunciantes" description="Cómo funcionan los anuncios en NotiCel: aprobación, precios por vistas, entrega, reembolsos y reglas de contenido.">
+  <main class="wrap" id="main">
+    <div class="page">
+      <h1>Términos para anunciantes</h1>
+      <p class="pg-draft"><span class="sp-demo">BORRADOR</span> Texto tomado de Noticias Xtra para el sitio de prueba. NotiCel debe revisarlo y aprobarlo antes del lanzamiento.</p>
+      <p><em>Última actualización: {updated}</em></p>
+      <p>Estos términos aplican a los anuncios que compras en <a href={url('publicidad')}>Anúnciate</a> o con nuestro equipo de ventas. Al enviar una solicitud o pagar un anuncio, los aceptas.</p>
+
+      <h2>Cómo funciona</h2>
+      <ol>
+        <li>Envías tu solicitud con tu anuncio (o los datos para que lo diseñemos).</li>
+        <li>Nuestro equipo la revisa en <strong>1 día laborable</strong>. Podemos pedirte cambios.</li>
+        <li>Cuando el anuncio está aprobado y pagado, sale en el sitio en la fecha acordada.</li>
+      </ol>
+
+      <h2>Precios y pagos</h2>
+      <ul>
+        <li>Los anuncios de imagen se compran por <strong>vistas</strong> (precio por cada 1,000 vistas), en paquetes. Los paquetes más grandes tienen descuento.</li>
+        <li>La <strong>toma de portada</strong> y el <strong>patrocinio de sección</strong> se compran por tiempo (días o semanas).</li>
+        <li>Los precios están en dólares de EE. UU., más los impuestos que apliquen. Las agencias reciben una comisión del 15 %.</li>
+        <li>Pagas con tarjeta (Stripe) o ATH Móvil, o como acuerdes con ventas. Los datos de tu tarjeta nunca pasan por nuestro sitio.</li>
+      </ul>
+
+      <h2>Entrega de las vistas</h2>
+      <ul>
+        <li>Una <strong>vista</strong> cuenta cuando tu anuncio aparece en la pantalla de un lector. Las contamos con nuestro propio sistema y las ves en tu reporte.</li>
+        <li>Tu campaña <strong>termina sola</strong> cuando se entregan las vistas que compraste.</li>
+        <li>Si en la fecha final acordada no se han entregado todas, <strong>extendemos la campaña sin costo</strong> hasta completarlas, o te <strong>devolvemos la parte no entregada</strong>, lo que prefieras.</li>
+        <li>Los anuncios por tiempo se publican durante los días acordados.</li>
+      </ul>
+
+      <h2>Cancelaciones y reembolsos</h2>
+      <ul>
+        <li>Si <strong>rechazamos</strong> tu anuncio, te devolvemos el <strong>100 %</strong> de lo pagado.</li>
+        <li>Si cancelas <strong>antes de que salga</strong>, te devolvemos lo pagado, menos el diseño si ya lo hicimos.</li>
+        <li>Si cancelas <strong>después de que sale</strong>, te devolvemos la parte no usada (vistas no entregadas o días no publicados).</li>
+        <li>Los reembolsos se hacen por el mismo medio de pago, en un máximo de 10 días laborables.</li>
+      </ul>
+
+      <h2>Reglas del contenido de los anuncios</h2>
+      <p>No aceptamos anuncios que:</p>
+      <ul>
+        <li>Sean ilegales, engañosos o prometan resultados falsos (por ejemplo, curas milagrosas o dinero fácil).</li>
+        <li>Tengan contenido sexual, violento, discriminatorio u ofensivo.</li>
+        <li>Imiten noticias de NotiCel o se hagan pasar por otra persona, marca o el gobierno.</li>
+        <li>Lleven a sitios con virus, estafas o descargas no pedidas.</li>
+        <li>Usen imágenes, marcas o música sin tener los derechos.</li>
+      </ul>
+      <p>Los anuncios de alcohol, tabaco, cannabis medicinal, juegos de azar o productos de salud deben cumplir la ley aplicable y pueden necesitar aprobación adicional. Los <strong>anuncios políticos</strong> deben decir claramente quién los paga.</p>
+
+      <h2>Independencia editorial</h2>
+      <p>La publicidad nunca influye en nuestras noticias. Los anuncios llevan la etiqueta <strong>Publicidad</strong> y los artículos patrocinados, <strong>Patrocinado</strong>. Podemos rechazar o retirar un anuncio en cualquier momento si incumple estas reglas; si lo retiramos por eso después de publicado, no hay reembolso de lo ya entregado.</p>
+
+      <h2>Tu material</h2>
+      <p>Garantizas que tienes los derechos de las imágenes, textos y marcas de tu anuncio. Nos das permiso para mostrarlos, ajustar su tamaño y usarlos en tus reportes. Si diseñamos tu anuncio, puedes usarlo mientras dure tu campaña.</p>
+
+      <h2>Reportes</h2>
+      <p>Te damos las vistas y los clics de tu campaña. Puede haber pequeñas diferencias con las herramientas de medición de otros servicios.</p>
+
+      <h2>Responsabilidad</h2>
+      <p>Nuestra responsabilidad por cualquier reclamo relacionado con una campaña se limita a lo que pagaste por ella. No respondemos por interrupciones del sitio fuera de nuestro control; si afectan tu campaña, la extendemos sin costo.</p>
+
+      <h2>Contacto</h2>
+      {SITE.email ? <p>Ventas y preguntas: <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p> : <p>Muy pronto publicaremos el correo de ventas. Mientras tanto, usa “Prefiero hablar con alguien” en <a href={url('publicidad')}>Anúnciate</a>.</p>}
+      <p>Lee también los <a href={url('terminos')}>términos de uso</a> y la <a href={url('privacidad')}>política de privacidad</a>.</p>
+    </div>
+  </main>
+</Base>

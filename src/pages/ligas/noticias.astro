@@ -1,0 +1,49 @@
+---
+// All sports stories, newest first, with league filters. Linked from "Ver todas" on NotiCel Deportes.
+import Base from '../../layouts/Base.astro';
+import Ph from '../../components/Ph.astro';
+import Time from '../../components/Time.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import LeagueBadge from '../../components/deportes/LeagueBadge.astro';
+import { getStories, url , storyUrl , sectionUrl } from '../../lib/site';
+import { LEAGUES, league } from '../../lib/leagues';
+
+const stories = (await getStories()).filter((s) => s.data.section === 'deportes');
+const used = LEAGUES.filter((l) => stories.some((s) => s.data.league === l.id));
+---
+<Base title="Todas las noticias de Deportes" active="deportes" description="Todas las noticias deportivas de NotiCel, de la más reciente a la más antigua.">
+  <main class="wrap dn" id="main">
+    <p class="lg-crumb"><a href={sectionUrl('deportes')}>NotiCel Deportes</a> <span aria-hidden="true">›</span> Todas las noticias</p>
+    <h1 class="dn-h">Todas las noticias de Deportes <span>{stories.length}</span></h1>
+    <div class="dn-chips" role="group" aria-label="Filtrar por liga">
+      <button type="button" data-lg="" aria-pressed="true">Todas</button>
+      {used.map((l) => <button type="button" data-lg={l.id} aria-pressed="false"><LeagueBadge id={l.id} size="sm" />{l.name}</button>)}
+    </div>
+    <ol class="ys-card dn-list" data-list>
+      {stories.map((s, i) => (
+        <>
+          <li data-league={s.data.league ?? ''}>
+            <a class="ys-mini" href={storyUrl(s)}>
+              <Ph sectionId="deportes" image={s.data.image} league={s.data.league} />
+              <h3 class="hl">{s.data.title}</h3>
+              <span class="ys-by">{league(s.data.league)?.name ?? 'Deportes'} · <Time date={s.data.date} /></span>
+            </a>
+          </li>
+          {i === 9 && <li class="dn-ad" aria-hidden="true"><AdSlot size="infeed" /></li>}
+        </>
+      ))}
+    </ol>
+    <p class="dn-empty" data-empty hidden>No hay noticias de esa liga todavía.</p>
+  </main>
+  <script>
+    const list = document.querySelector<HTMLElement>('[data-list]')!;
+    document.querySelectorAll<HTMLButtonElement>('[data-lg]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-lg]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      const id = b.dataset.lg;
+      let n = 0;
+      list.querySelectorAll<HTMLElement>('li[data-league]').forEach((li) => { const on = !id || li.dataset.league === id; li.hidden = !on; if (on) n++; });
+      list.querySelectorAll<HTMLElement>('.dn-ad').forEach((li) => (li.hidden = !!id));
+      document.querySelector<HTMLElement>('[data-empty]')!.hidden = n > 0;
+    }));
+  </script>
+</Base>

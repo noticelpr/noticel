@@ -1,0 +1,92 @@
+---
+// Leaderboards: "Hoy" (today's points) and "Todos los tiempos", for one game (game pages) or all games (Juegos page).
+// With reader accounts (Supabase) these are the real players (game_leaders(), supabase/connect-all.sql), with the
+// reader highlighted. Without accounts it's a preview: sample usernames with steady made-up scores around the reader.
+interface Props { game?: string; title?: string }
+const { game, title = 'Líderes' } = Astro.props;
+---
+<section class="gb" data-gb={game ?? ''} aria-labelledby={`gb-h-${game ?? 'all'}`}>
+  <div class="gb-h">
+    <h2 id={`gb-h-${game ?? 'all'}`}>🏆 {title}</h2>
+    <span class="sp-demo" data-gb-demo>DEMO</span>
+  </div>
+  <div class="gb-tabs" role="tablist">
+    <button type="button" role="tab" aria-selected="true" data-gb-tab="day">Hoy</button>
+    <button type="button" role="tab" aria-selected="false" data-gb-tab="all">Todos los tiempos</button>
+  </div>
+  <ol class="gb-list" data-gb-list></ol>
+  <p class="gb-note" data-gb-note>Los demás jugadores son de ejemplo hasta que abramos las cuentas. Tus puntos son reales.</p>
+</section>
+<script>
+  import { getPoints, today } from '../lib/points';
+  import { accountsOn, loggedIn, askLogin } from '../lib/account';
+  import { leaders } from '../lib/points-sync';
+  // Sample players (invented usernames)
+  const PLAYERS = ['coqui_veloz', 'la_nena_de_caguas', 'boricua2026', 'don_pancho_ponce', 'mofongo_master', 'jibarita_pr', 'el_profe_de_humacao', 'cangrejera_fan',
+    'abuela_sudoku', 'tito_domino', 'vaquero_bayamon', 'reina_de_trivia', 'pana_de_arecibo', 'isleña_vieques', 'sultana_oeste', 'pitorro_pro', 'gallito_de_manati',
+    'coquito_queen', 'tainos_123', 'flamboyan_88', 'quenepa_dulce', 'playero_luquillo', 'criollo_carolina', 'atenas_manati'];
+  // Typical points per day for a dedicated player (per game) and how scores step
+  const DAILY: Record<string, { max: number; step: number; once?: boolean }> = {
+    crucigrama: { max: 100, step: 100, once: true }, palabra: { max: 100, step: 10, once: true }, sopa: { max: 80, step: 80, once: true },
+    trivia: { max: 30, step: 30, once: true }, sudoku: { max: 315, step: 15 }, memoria: { max: 320, step: 10 }, domino: { max: 300, step: 60 },
+    'cuatro-colores': { max: 200, step: 40 }, ahorcado: { max: 200, step: 20 }, '2048': { max: 260, step: 10 }, 'cuatro-en-linea': { max: 150, step: 30 },
+  };
+  const LAUNCH = new Date('2026-09-01T12:00:00-04:00').valueOf();
+  // Steady pseudo-random number in [0,1) from a text
+  const rnd = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h >>> 0) % 100000) / 100000; };
+  const sampleDay = (p: string, g: string, d: string) => {
+    const r = DAILY[g]; if (!r) return 0;
+    if (rnd(`${p}|${g}|${d}|played`) < 0.35) return 0; // didn't play today
+    const v = r.once ? (g === 'palabra' ? 50 + Math.floor(rnd(`${p}|${d}|pl`) * 6) * 10 : r.max) : Math.max(r.step, Math.round((rnd(`${p}|${g}|${d}`) ** 1.4 * r.max) / r.step) * r.step);
+    return v;
+  };
+  const sampleAll = (p: string, g: string) => {
+    const days = Math.max(1, Math.floor((Date.now() - LAUNCH) / 864e5));
+    const skill = 0.15 + rnd(`${p}|${g}|skill`) * 0.6;
+    return Math.round(days * DAILY[g].max * skill * 0.6);
+  };
+  const games = Object.keys(DAILY);
+  const n = (v: number) => v.toLocaleString('es-PR');
+
+  document.querySelectorAll<HTMLElement>('[data-gb]').forEach((box) => {
+    const game = box.dataset.gb || '';
+    const list = box.querySelector<HTMLElement>('[data-gb-list]')!;
+    let tab: 'day' | 'all' = 'day';
+    const LIVE = accountsOn();
+    if (LIVE) {
+      box.querySelector('[data-gb-demo]')?.remove();
+      const note = box.querySelector<HTMLElement>('[data-gb-note]')!;
+      note.innerHTML = loggedIn() ? 'Tabla real de jugadores de NotiCel.' : 'Tabla real. Para aparecer en ella, <button type="button" class="cm-login">entra con tu cuenta</button>.';
+      note.querySelector('.cm-login')?.addEventListener('click', () => askLogin('Entra para que tus puntos cuenten en la tabla.'));
+    }
+    // Real players (accounts on): the top 10, with the reader highlighted
+    async function paintLive() {
+      const rows = await leaders(game, tab === 'day' ? today() : undefined);
+      let me = ''; try { me = JSON.parse(localStorage.getItem('nc-profile') || '{}').name || ''; } catch { /* storage blocked */ }
+      const mine = loggedIn() ? me : '';
+      list.innerHTML = rows.map((r, i) => `<li class="${r.username === mine ? 'me' : ''}${i < 3 ? ` top${i + 1}` : ''}"><span class="gb-r">${i + 1}</span><span class="gb-n">${r.username === mine ? '⭐ ' : ''}@${r.username.replace(/[<>&"]/g, '')}</span><b>${n(r.points)}</b></li>`).join('')
+        || `<li class="gb-hint">${tab === 'day' ? 'Nadie ha jugado hoy todavía. ¡Sé la primera persona!' : 'Todavía no hay puntos. ¡Juega y sé la primera persona en la tabla!'}</li>`;
+    }
+    function paint() {
+      if (LIVE) { void paintLive(); return; }
+      const d = today(); const s = getPoints();
+      const my = tab === 'day'
+        ? (game ? s.byDay[d]?.[game] ?? 0 : Object.values(s.byDay[d] ?? {}).reduce((a, b) => a + b, 0))
+        : (game ? s.games[game] ?? 0 : s.total);
+      const rows = PLAYERS.map((p) => ({ name: p, pts: (game ? [game] : games).reduce((a, g) => a + (tab === 'day' ? sampleDay(p, g, d) : sampleAll(p, g)), 0), me: false }))
+        .filter((r) => r.pts > 0);
+      rows.push({ name: 'Tú', pts: my, me: true });
+      rows.sort((a, b) => b.pts - a.pts || Number(b.me) - Number(a.me));
+      const myRank = rows.findIndex((r) => r.me) + 1;
+      const top = rows.slice(0, 10);
+      const line = (r: (typeof rows)[number], i: number) => `<li class="${r.me ? 'me' : ''}${i < 3 ? ` top${i + 1}` : ''}"><span class="gb-r">${i + 1}</span><span class="gb-n">${r.me ? '⭐ Tú' : r.name}</span><b>${n(r.pts)}</b></li>`;
+      list.innerHTML = top.map(line).join('') + (myRank > 10 ? `<li class="gb-gap" aria-hidden="true">…</li>${line(rows[myRank - 1], myRank - 1)}` : '')
+        + (my === 0 ? `<li class="gb-hint">${tab === 'day' ? 'Juega hoy para entrar en la tabla.' : 'Juega para sumar tus primeros puntos.'}</li>` : '');
+    }
+    box.querySelectorAll<HTMLButtonElement>('[data-gb-tab]').forEach((b) => b.addEventListener('click', () => {
+      box.querySelectorAll('[data-gb-tab]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      tab = b.dataset.gbTab as 'day' | 'all'; paint();
+    }));
+    paint(); addEventListener('nc-points', paint);
+  });
+</script>

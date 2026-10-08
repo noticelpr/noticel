@@ -1,0 +1,17 @@
+---
+// Video card: YouTube thumbnail with duration, title, and the source (NotiCel or BSN)
+import { url, VIDEO_SOURCES, type Video } from '../lib/site';
+interface Props { video: Video }
+const { video } = Astro.props;
+---
+<article class="vcard">
+  <a href={url(`video/${video.id}`)}>
+    <div class="ph vthumb">
+      <img src={`https://i.ytimg.com/vi/${video.yt}/hqdefault.jpg`} alt="" loading="lazy" decoding="async" />
+      <div class="play"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span></div>
+      <span class="dur">{video.duration}</span>
+    </div>
+    <h3 class="hl">{video.title}</h3>
+  </a>
+  <div class="time">Video: {VIDEO_SOURCES[video.src].short}</div>
+</article>

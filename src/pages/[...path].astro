@@ -1,50 +1,68 @@
 ---
-// Story page, at the story's exact old WordPress address: /noticias/20260930/mi-noticia/,
-// /noticias/la-calle/policiacas/20260808/mi-noticia/, ...
-// Layout from the 2026 theme's single.php; reading tools (save, text size, listen, share, progress bar)
-// work the same as on Noticias Xtra.
+// Story page (same as Noticias Xtra's), at the story's exact old WordPress address: /noticias/20260930/mi-noticia/,
+// /noticias/la-calle/policiacas/20260808/mi-noticia/, ... (any depth).
 import { render } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import Ph from '../components/Ph.astro';
-import Card from '../components/Card.astro';
+import Gallery from '../components/Gallery.astro';
+import Label from '../components/Label.astro';
+import Time from '../components/Time.astro';
+import StoryCard from '../components/StoryCard.astro';
 import Sidebar from '../components/Sidebar.astro';
 import AdSlot from '../components/AdSlot.astro';
-import { allStories, kicker, parentOf, categoryUrl, url, CATEGORIES, SITE, longDate, timeOnly, inCategory, type Story } from '../lib/site';
+import Comments from '../components/Comments.astro';
+import GamesTeaser from '../components/GamesTeaser.astro';
+import DocViewer from '../components/DocViewer.astro';
+import { getStories, section, url, defaultPhoto, type Story , storyUrl , sectionUrl } from '../lib/site';
+import { columnistOf } from '../lib/columnists';
 
 export async function getStaticPaths() {
-  const stories = await allStories();
+  const stories = await getStories();
   return stories.map((story) => ({ params: { path: story.data.path.replace(/^\/|\/$/g, '') }, props: { story, stories } }));
 }
 
 interface Props { story: Story; stories: Story[] }
 const { story, stories } = Astro.props;
 const d = story.data;
+const s = section(d.section);
 const { Content } = await render(story);
-const k = kicker(story);
-const parent = k ? parentOf(k.slug) : undefined;
-const words = (story.body ?? '').replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
+// Documents (PDF cards) are attached at the end of the story, in their own area, wherever the editor put them
+const DOC = /<figure class="doc-card">[\s\S]*?<\/figure>/g;
+const bodyHtml = story.rendered?.html;
+const docs = bodyHtml?.match(DOC) ?? [];
+// Photo caption and credit: the story's own photo, or its section's default photo
+const fallback = defaultPhoto(d.section, d.league);
+const caption = d.image ? d.imageCaption ?? (d.place ? `${d.place}. Imagen de referencia.` : 'Imagen de referencia.') : `${fallback.caption} Imagen de archivo.`;
+const credit = d.image ? d.imageCredit : fallback.credit;
+const creditUrl = d.image ? d.imageCreditUrl : fallback.creditUrl;
+// Reading time: about 200 words a minute
+const words = (story.body ?? '').split(/\s+/).filter(Boolean).length;
 const minutes = Math.max(1, Math.round(words / 200));
-const isOpinion = inCategory(story, 'opiniones');
-// "Sigue leyendo": newest stories from the same category, then any newest
-const more = [...stories.filter((x) => k && inCategory(x, k.slug)), ...stories].filter((x, i, arr) => x.id !== story.id && arr.indexOf(x) === i).slice(0, 3);
-const fecha = `${longDate(d.date)}, ${timeOnly(d.date)}`;
+// Related stories the editor picked (Escribir → Noticias relacionadas), shown at the end of the story
+const related = d.related.map((id) => stories.find((x) => x.id === id)).filter((x): x is Story => !!x && x.id !== story.id).slice(0, 6);
+const more = stories
+  .filter((x) => x.id !== story.id && !related.includes(x))
+  .sort((a, b) => Number(b.data.section === d.section) - Number(a.data.section === d.section))
+  .slice(0, 4);
+// Opinion columns: the byline shows the columnist's picture and links to their profile
+const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
 ---
-<Base title={d.title} description={d.description || d.title} current={k?.slug} image={d.image} article={{ published: d.date, section: k?.name }}>
-  <div class="read-progress" aria-hidden="true"><span data-progress></span></div>
-  <main id="main" class="wrap" tabindex="-1">
+<Base title={d.title} description={d.description} active={d.section} image={d.image ?? fallback.src} article={{ published: d.date, section: s.name }}>
+  <main class="wrap" id="main">
     <div class="art-grid">
-      <article class="art" data-url={url(d.path)} data-title={d.title} data-date={d.date.toISOString()} data-image={d.image ?? ''} data-section={k?.name ?? ''}>
-        <div class="crumbs">
-          <a href={url()}>Portada</a>
-          {parent && <> / <a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a></>}
-          {k && <> / <a href={categoryUrl(k.slug)}>{k.name}</a></>}
-        </div>
+      <div class="read-progress" aria-hidden="true"><span data-progress></span></div>
+      <article class="art" data-read-section={s.name} data-read-url={storyUrl(story)}
+        data-title={d.title} data-date={d.date.toISOString()} data-image={url(d.image ?? fallback.src)}>
+        <div class="crumbs"><a href={url()}>Portada</a> / <a href={sectionUrl(s.id)}>{s.name}</a></div>
+        <Label story={story} />
         <h1>{d.title}</h1>
-        {d.description && <p class="dek">{d.description}</p>}
+        <p class="dek">{d.description}</p>
+        {/* One line: who and when on the left; reading tools and sharing on the right */}
         <div class="byline">
+          {columnist?.photo && <a class="by-pic" href={url(`opinion/${columnist.slug}`)} tabindex="-1" aria-hidden="true"><img src={url(columnist.photo)} alt="" /></a>}
           <div class="by-who">
-            <strong>Por {d.author}</strong>
-            <span><time datetime={d.date.toISOString()}>{fecha.charAt(0).toUpperCase() + fecha.slice(1)}</time> · {minutes} min de lectura</span>
+            <strong>Por {columnist ? <a href={url(`opinion/${columnist.slug}`)}>{d.author}</a> : d.author}</strong>
+            <span><Time date={d.date} />{d.place && <>, <span class="notranslate" translate="no">{d.place}</span></>} · {minutes} min de lectura</span>
           </div>
           <div class="by-actions" role="toolbar" aria-label="Herramientas de lectura y compartir">
             <button type="button" class="tool" data-save aria-pressed="false">
@@ -59,6 +77,10 @@ const fecha = `${longDate(d.date)}, ${timeOnly(d.date)}`;
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" /></svg>
               <span data-listen-label>Escuchar</span>
             </button>
+            <a class="tool icon cm-jump" href="#comentarios" aria-label="Ir a los comentarios" title="Comentarios">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
+              <span class="cm-jump-n" data-cm-jump></span>
+            </a>
             <span class="by-sep" aria-hidden="true"></span>
             <span class="share" role="group" aria-label="Compartir">
               <button type="button" class="tool icon" data-share="facebook" aria-label="Compartir en Facebook" title="Facebook">
@@ -67,26 +89,44 @@ const fecha = `${longDate(d.date)}, ${timeOnly(d.date)}`;
               <button type="button" class="tool icon" data-share="whatsapp" aria-label="Compartir por WhatsApp" title="WhatsApp">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.6 11.6 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.2-.2-.5-.3z" /></svg>
               </button>
-              <button type="button" class="tool icon" data-share="x" aria-label="Compartir en X" title="X">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.2-8.3L2 3h6.4l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z" /></svg>
-              </button>
               <button type="button" class="tool icon" data-share="copy" aria-label="Copiar enlace" title="Copiar enlace">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
+              </button>
+              <button type="button" class="tool icon" data-share="more" aria-label="Enviar por otra aplicación" title="Enviar" aria-haspopup="true" aria-expanded="false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
               </button>
             </span>
           </div>
         </div>
-        {d.image && (
-          <figure style="margin:0">
-            <Ph src={d.image} alt={d.imageCaption ?? ''} eager />
-            {d.imageCaption && <figcaption class="caption">{d.imageCaption}</figcaption>}
-          </figure>
+        {d.gallery.length > 0 && d.image ? (
+          <Gallery slides={[{ src: d.image, caption, credit, creditUrl }, ...d.gallery]} />
+        ) : (<>
+          <Ph sectionId={d.section} image={d.image} place={d.place} alt={caption} league={d.league} sizes="(max-width:760px) 100vw, 760px" priority />
+          <p class="caption">{caption}{credit && <> {creditUrl ? <a href={creditUrl} rel="noopener" target="_blank">{credit}</a> : credit}</>}</p>
+        </>)}
+        <div class="body">{bodyHtml !== undefined ? <Fragment set:html={bodyHtml.replace(DOC, '')} /> : <Content />}</div>
+        {docs.length > 0 && <section class="doc-attach" aria-label="Documentos"><h2 class="doc-attach-h">{docs.length === 1 ? 'Documento' : 'Documentos'}</h2><Fragment set:html={docs.join('')} /></section>}
+        {/* NotiCel: the story's PDF document (WordPress pdf_url) and its topics */}
+        {d.pdfUrl && <p><a class="tool" href={d.pdfUrl} target="_blank" rel="noopener">📄 {d.pdfTitle || 'Ver documento (PDF)'}</a></p>}
+        {d.tags.length > 0 && <p class="art-tags" aria-label="Temas">{d.tags.map((t) => <a href={url(`buscar?q=${encodeURIComponent(t)}`)}>{t}</a>)}</p>}
+        <AdSlot size="infeed" />
+
+        {d.correction && <p class="sources"><strong>Corrección:</strong> {d.correction} <a href={url('normas-editoriales')}>Nuestra política de correcciones</a></p>}
+        {d.sources.length > 0 && (
+          <p class="sources">Fuentes: {d.sources.map((src, i) => (
+            <>{i > 0 && ', '}{src.url ? <a href={src.url} rel="noopener" target="_blank">{src.name}</a> : src.name}</>
+          ))}</p>
         )}
-        <div class="body"><Content /></div>
-        {d.pdfUrl && <a class="pdf-btn" href={d.pdfUrl} target="_blank" rel="noopener">📄 {d.pdfTitle || 'Ver documento (PDF)'}</a>}
-        {isOpinion && <div class="ai"><strong>Columna de opinión</strong>Este texto expresa la opinión de su autor.</div>}
-        {d.tags.length > 0 && <div class="tags" aria-label="Temas">{d.tags.map((t) => <a href={url(`buscar?q=${encodeURIComponent(t)}`)}>{t}</a>)}</div>}
-        <AdSlot style="aspect-ratio:auto;height:120px;margin-top:28px" />
+        {d.section === 'opiniones' && (
+          <div class="ai"><strong>Columna de opinión</strong>Este texto expresa la opinión de su autor{d.author === 'NotiCel' ? ' y la línea editorial de NotiCel' : ''}. Las noticias de NotiCel se redactan por separado y se limitan a los hechos.</div>
+        )}
+
+        {related.length > 0 && (
+          <section class="rel-box" aria-labelledby="rel-h">
+            <h2 id="rel-h" class="lead-extra-h">Noticias relacionadas</h2>
+            <div class="rel-list">{related.map((x) => <StoryCard story={x} variant="item" />)}</div>
+          </section>
+        )}
 
         <a class="tip-cta" href={url('contacto')}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z" /><path d="M12 7v4M12 13.5h.01" /></svg>
@@ -94,60 +134,82 @@ const fecha = `${longDate(d.date)}, ${timeOnly(d.date)}`;
           <span class="tip-go" aria-hidden="true">›</span>
         </a>
 
-        {more.length > 0 && (
-          <>
-            <div class="sec-h"><h2>Sigue leyendo</h2></div>
-            <div class="grid3">{more.map((x) => <Card story={x} dek={false} />)}</div>
-          </>
-        )}
+        <Comments storyId={story.id} />
+
+        <div class="sec-h"><h2>Te puede interesar</h2></div>
+        <div class="grid2">{more.map((x) => <StoryCard story={x} />)}</div>
+        <div style="margin-top:var(--gap-lg)"><GamesTeaser title="Tómate un break: Juegos NotiCel" /></div>
       </article>
       <Sidebar />
     </div>
   </main>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
+  <DocViewer />
   <script>
-    // Reading tools. Everything is kept only in this browser (same as Noticias Xtra).
-    const art = document.querySelector<HTMLElement>('.art')!;
+    // Comment icon in the toolbar shows the same count as the comments section
+    {
+      const src = document.querySelector<HTMLElement>('[data-cm-count]');
+      const out = document.querySelector<HTMLElement>('[data-cm-jump]');
+      if (src && out) {
+        const sync = () => (out.textContent = (src.textContent || '').replace(/[()]/g, '').trim());
+        sync(); new MutationObserver(sync).observe(src, { childList: true, characterData: true, subtree: true });
+      }
+    }
+    // "Para ti" on the home page: count which sections this reader opens. Stored only in this browser.
+    const art = document.querySelector<HTMLElement>('[data-read-section]');
+    if (art) {
+      try {
+        const reads = JSON.parse(localStorage.getItem('nc-reads') || '{}');
+        reads[art.dataset.readSection!] = (reads[art.dataset.readSection!] || 0) + 1;
+        localStorage.setItem('nc-reads', JSON.stringify(reads));
+        const seen = JSON.parse(localStorage.getItem('nc-seen') || '[]').filter((u: string) => u !== art.dataset.readUrl);
+        localStorage.setItem('nc-seen', JSON.stringify([art.dataset.readUrl, ...seen].slice(0, 50)));
+      } catch { /* private mode or storage blocked: nothing to remember */ }
+    }
+
+    // Reading tools. Everything is kept only in this browser.
     const store = {
       get: <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || '') ?? d; } catch { return d; } },
       set: (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } },
     };
-    const toast = (msg: string) => {
-      const t = document.getElementById('toast')!;
-      t.textContent = msg; t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 2200);
-    };
 
-    // Save for later
+    // Save for later (list shown on /guardadas)
     type Saved = { u: string; t: string; s: string; d: string; i: string; at: number };
-    const saveBtn = document.querySelector<HTMLButtonElement>('[data-save]')!;
-    const me = art.dataset.url!;
-    const paint = () => {
-      const on = store.get<Saved[]>('nc-saved', []).some((x) => x.u === me);
-      saveBtn.setAttribute('aria-pressed', String(on));
-      saveBtn.querySelector('[data-save-label]')!.textContent = on ? 'Guardada' : 'Guardar';
-    };
-    const setSaved = (on: boolean) => {
-      const list = store.get<Saved[]>('nc-saved', []).filter((x) => x.u !== me);
-      const entry = { u: me, t: art.dataset.title!, s: art.dataset.section!, d: art.dataset.date!, i: art.dataset.image!, at: Date.now() };
-      store.set('nc-saved', on ? [entry, ...list].slice(0, 100) : list);
+    const saveBtn = document.querySelector<HTMLButtonElement>('[data-save]');
+    if (art && saveBtn) {
+      const me = art.dataset.readUrl!;
+      const paint = () => {
+        const on = store.get<Saved[]>('nc-saved', []).some((x) => x.u === me);
+        saveBtn.setAttribute('aria-pressed', String(on));
+        saveBtn.querySelector('[data-save-label]')!.textContent = on ? 'Guardada' : 'Guardar';
+      };
+      const entry = (): Saved => ({ u: me, t: art.dataset.title!, s: art.dataset.readSection!, d: art.dataset.date!, i: art.dataset.image!, at: Date.now() });
+      const setSaved = (on: boolean) => {
+        const list = store.get<Saved[]>('nc-saved', []).filter((x) => x.u !== me);
+        store.set('nc-saved', on ? [entry(), ...list].slice(0, 100) : list);
+        dispatchEvent(new Event('nc-saved-change'));
+        paint();
+      };
+      // A small card under the button: what happened, a link to the list and "Deshacer" (fades away by itself)
+      let tip: HTMLElement | null = null, tipTimer = 0;
+      const showTip = (on: boolean) => {
+        tip?.remove(); clearTimeout(tipTimer);
+        tip = document.createElement('div'); tip.className = 'save-tip'; tip.setAttribute('role', 'status');
+        tip.innerHTML = `<span>${on ? '🔖 Guardada en tu lista' : 'Quitada de tus guardadas'}</span>${on ? `<a href="${document.body.dataset.base}guardadas/">Ver guardadas →</a>` : ''}<button type="button">Deshacer</button>`;
+        tip.querySelector('button')!.addEventListener('click', () => { setSaved(!on); tip?.remove(); });
+        // Placed on the byline (the button row scrolls sideways on narrow screens and would cut the card off)
+        const host = saveBtn.closest<HTMLElement>('.byline') ?? saveBtn.parentElement!; host.append(tip);
+        const b = saveBtn.getBoundingClientRect(), h = host.getBoundingClientRect();
+        tip.style.left = `${Math.max(0, b.left - h.left)}px`; tip.style.top = `${b.bottom - h.top + 8}px`;
+        tipTimer = window.setTimeout(() => { tip?.classList.add('out'); setTimeout(() => tip?.remove(), 250); }, 4500);
+      };
+      saveBtn.addEventListener('click', () => {
+        const on = !store.get<Saved[]>('nc-saved', []).some((x) => x.u === me);
+        setSaved(on);
+        saveBtn.classList.remove('pop', 'unpop'); void saveBtn.offsetWidth; saveBtn.classList.add(on ? 'pop' : 'unpop');
+        showTip(on);
+      });
       paint();
-    };
-    let tip: HTMLElement | null = null, tipTimer = 0;
-    saveBtn.addEventListener('click', () => {
-      const on = !store.get<Saved[]>('nc-saved', []).some((x) => x.u === me);
-      setSaved(on);
-      tip?.remove(); clearTimeout(tipTimer);
-      tip = document.createElement('div'); tip.className = 'save-tip'; tip.setAttribute('role', 'status');
-      tip.innerHTML = `<span>${on ? '🔖 Guardada en tu lista' : 'Quitada de tus guardadas'}</span><button type="button">Deshacer</button>`;
-      tip.querySelector('button')!.addEventListener('click', () => { setSaved(!on); tip?.remove(); });
-      const host = saveBtn.closest<HTMLElement>('.byline')!; host.style.position = 'relative'; host.append(tip);
-      const b = saveBtn.getBoundingClientRect(), h = host.getBoundingClientRect();
-      tip.style.left = `${Math.max(0, Math.min(b.left - h.left, h.width - tip.offsetWidth))}px`; tip.style.top = `${b.bottom - h.top + 8}px`;
-      tipTimer = window.setTimeout(() => { tip?.classList.add('out'); setTimeout(() => tip?.remove(), 250); }, 4500);
-    });
-    paint();
+    }
 
     // Text size: 5 steps, remembered for every story
     const sizes = [0.9, 1, 1.12, 1.25, 1.4];
@@ -187,21 +249,6 @@ const fecha = `${longDate(d.date)}, ${timeOnly(d.date)}`;
       addEventListener('pagehide', stop);
     }
 
-    // Share
-    const link = location.origin + location.pathname;
-    const title = art.dataset.title!;
-    const targets: Record<string, string> = {
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`,
-      whatsapp: `https://wa.me/?text=${encodeURIComponent(`${title} ${link}`)}`,
-      x: `https://x.com/intent/post?text=${encodeURIComponent(title)}&url=${encodeURIComponent(link)}`,
-    };
-    document.querySelectorAll<HTMLButtonElement>('[data-share]').forEach((b) => b.addEventListener('click', async () => {
-      const where = b.dataset.share!;
-      if (where === 'copy') {
-        try { await navigator.clipboard.writeText(link); toast('Enlace copiado'); } catch { toast(link); }
-      } else window.open(targets[where], '_blank', 'noopener,width=620,height=560');
-    }));
-
     // Reading progress bar
     const bar = document.querySelector<HTMLElement>('[data-progress]');
     const body = document.querySelector<HTMLElement>('.art .body');
@@ -217,13 +264,11 @@ const fecha = `${longDate(d.date)}, ${timeOnly(d.date)}`;
   </script>
   <script type="application/ld+json" set:html={JSON.stringify({
     '@context': 'https://schema.org',
-    '@type': isOpinion ? 'OpinionNewsArticle' : 'NewsArticle',
+    '@type': 'NewsArticle',
     headline: d.title,
-    description: d.description || undefined,
-    image: d.image ? [d.image] : undefined,
+    description: d.description,
     datePublished: d.date.toISOString(),
-    author: { '@type': d.author === SITE.name || d.author === 'EFE' ? 'Organization' : 'Person', name: d.author },
-    publisher: { '@type': 'Organization', name: SITE.name, logo: { '@type': 'ImageObject', url: new URL('logo.png', Astro.site).href } },
-    mainEntityOfPage: new URL(d.path, Astro.site).href,
+    author: { '@type': 'Organization', name: d.author },
+    publisher: { '@type': 'Organization', name: 'NotiCel' },
   })} />
 </Base>

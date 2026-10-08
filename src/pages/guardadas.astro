@@ -1,24 +1,23 @@
 ---
-// Saved stories (same as Noticias Xtra's): the list lives only in this reader's browser (localStorage 'nc-saved'),
-// filled by the Guardar button on each story page.
+// Saved stories: the list lives only in this reader's browser (localStorage 'nc-saved').
 import Base from '../layouts/Base.astro';
 import { url } from '../lib/site';
 ---
 <Base title="Noticias guardadas" noindex description="Las noticias que guardaste para leer después.">
-  <main id="main" class="wrap" tabindex="-1">
-    <div class="crumbs"><a href={url()}>Portada</a></div>
-    <div class="sv-head"><h1 class="page-h">Guardadas</h1><button type="button" class="tool" data-clear hidden>Borrar todas</button></div>
-    <p class="time">Se guardan solo en este navegador. Para guardar una noticia, toca <strong>Guardar</strong> en la página de la noticia.</p>
-    <div class="stack sv-list" data-list></div>
-    <div class="empty" data-empty hidden>
+  <main class="wrap" id="main">
+    <div class="sec-h" style="margin-top:0"><h1 style="font-size:32px;margin:0;color:var(--purple)">Guardadas</h1><button type="button" class="tool" data-clear hidden>Borrar todas</button></div>
+    <p class="sv-note">Se guardan solo en este navegador. Para guardar una noticia, toca <strong>Guardar</strong> en la página de la noticia.</p>
+    <ul class="sv-list" data-list></ul>
+    <div class="sv-empty" data-empty hidden>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
       <h2>Todavía no has guardado noticias</h2>
-      <p><a class="btn" href={url()}>Ir a la portada</a></p>
+      <p><a href={url()}>Ir a la portada</a></p>
     </div>
   </main>
   <script>
     import { ask } from '../lib/dialogs';
     type Saved = { u: string; t: string; s: string; d: string; i: string; at: number };
-    const list = document.querySelector<HTMLElement>('[data-list]')!;
+    const list = document.querySelector<HTMLUListElement>('[data-list]')!;
     const empty = document.querySelector<HTMLElement>('[data-empty]')!;
     const clear = document.querySelector<HTMLButtonElement>('[data-clear]')!;
     const read = (): Saved[] => { try { return JSON.parse(localStorage.getItem('nc-saved') || '[]'); } catch { return []; } };
@@ -27,22 +26,24 @@ import { url } from '../lib/site';
     const render = () => {
       const items = read();
       list.replaceChildren(...items.map((x) => {
-        const row = document.createElement('article'); row.className = 'row';
+        const li = document.createElement('li');
+        li.className = 'sv-item';
+        const a = document.createElement('a');
+        a.href = x.u;
+        const img = document.createElement('img');
+        img.src = x.i; img.alt = ''; img.loading = 'lazy';
         const box = document.createElement('div');
-        if (x.s) { const k = document.createElement('span'); k.className = 'kicker'; k.textContent = x.s; box.append(k); }
-        const a = document.createElement('a'); a.href = x.u;
-        const h = document.createElement('h3'); h.className = 'hl'; h.textContent = x.t; a.append(h);
-        const when = document.createElement('div'); when.className = 'time'; when.textContent = fmt(x.d);
-        const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'tool sv-rm'; rm.textContent = 'Quitar';
+        const sec = document.createElement('span'); sec.className = 'sv-sec'; sec.textContent = x.s;
+        const h = document.createElement('h2'); h.className = 'hl'; h.textContent = x.t;
+        const when = document.createElement('span'); when.className = 'sv-date'; when.textContent = fmt(x.d);
+        box.append(sec, h, when);
+        a.append(img, box);
+        const rm = document.createElement('button');
+        rm.type = 'button'; rm.className = 'tool'; rm.textContent = 'Quitar';
         rm.setAttribute('aria-label', `Quitar de guardadas: ${x.t}`);
         rm.addEventListener('click', () => { write(read().filter((y) => y.u !== x.u)); render(); });
-        box.append(a, when, rm);
-        const pic = document.createElement('a'); pic.href = x.u; pic.tabIndex = -1; pic.setAttribute('aria-hidden', 'true');
-        const ph = document.createElement('div'); ph.className = 'ph'; ph.style.setProperty('--c', '#006FA6');
-        if (x.i) { const img = document.createElement('img'); img.src = x.i; img.alt = ''; img.loading = 'lazy'; ph.append(img); }
-        pic.append(ph);
-        row.append(box, pic);
-        return row;
+        li.append(a, rm);
+        return li;
       }));
       empty.hidden = items.length > 0;
       clear.hidden = items.length === 0;

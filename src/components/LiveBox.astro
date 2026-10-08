@@ -1,0 +1,25 @@
+---
+// Video box at the top of a section's right column (like "Video del BSN" on Deportes):
+// a channel from LIVE_SOURCES; its live stream when live (checked every 15 minutes), otherwise its newest video.
+import { LIVE_SOURCES, url } from '../lib/site';
+import { checkLive, embedFor } from '../lib/live';
+interface Props { source: string }
+const src = LIVE_SOURCES.find((x) => x.id === Astro.props.source);
+const live = src ? await checkLive(src.channel) : null;
+---
+{src && (
+  <section class="lvbox" aria-label={`Video de ${src.name}`}>
+    <div class="lvbox-h">
+      {live ? <span class="lv-badge"><i></i>EN VIVO</span> : <span class="lvbox-k">Video</span>}
+      <h2>{src.name}</h2>
+    </div>
+    <div class="lg-video-frame">
+      <iframe data-src={embedFor(src.channel, live)} title={live ? `En vivo: ${live.title}` : `Último video de ${src.name}`} loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </div>
+    <p class="lvbox-f">
+      <span>{live ? live.title : 'Su transmisión en vivo aparece aquí cuando están en el aire.'}</span>
+      <a href={url('en-vivo')}>Todos los en vivo ›</a>
+    </p>
+  </section>
+)}

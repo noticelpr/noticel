@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" role="img">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2B1185"/><stop offset="1" stop-color="#120540"/></linearGradient>
+<radialGradient id="l" cx=".2" cy=".15" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity=".3"/></filter></defs>
+<rect width="400" height="240" fill="url(#g)"/><rect width="400" height="240" fill="url(#l)"/>
+<g filter="url(#s)"><circle cx="200" cy="120" r="78" fill="#fff" opacity=".12"/>
+<text x="200" y="160" font-family="Poppins, Arial" font-weight="800" font-size="130" fill="#fff" text-anchor="middle">?</text></g>
+<g transform="translate(300 52)" filter="url(#s)"><rect width="66" height="44" rx="4" fill="#fff"/><rect y="0" width="66" height="8.8" fill="#D7263D"/><rect y="17.6" width="66" height="8.8" fill="#D7263D"/><rect y="35.2" width="66" height="8.8" fill="#D7263D"/>
+<path d="M0 0 L30 22 L0 44 Z" fill="#1F6FDA"/><circle cx="10" cy="22" r="4" fill="#fff"/></g>
+<g transform="translate(70 170)"><circle r="16" fill="#FFE27A"/><text y="6" font-family="Poppins, Arial" font-weight="800" font-size="16" fill="#14111F" text-anchor="middle">A</text></g>
+<g transform="translate(110 196)"><circle r="12" fill="#1F90DA"/><text y="5" font-family="Poppins, Arial" font-weight="800" font-size="13" fill="#fff" text-anchor="middle">B</text></g></svg>

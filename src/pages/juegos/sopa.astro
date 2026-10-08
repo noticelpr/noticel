@@ -1,0 +1,92 @@
+---
+// Sopa de letras: find six Puerto Rico words in a 10x10 grid. A new puzzle each day.
+// To mark a word, tap its first letter and then its last letter.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+import { url } from '../../lib/site';
+---
+<Base title="Sopa de letras" description="Busca seis palabras bien boricuas en la sopa de letras del día.">
+  <main class="wrap" id="main">
+    <GameLayout id="sopa">
+    <div class="jg-game" data-sopa>
+      <p class="tv-kicker"><a href={url('juegos')}>Juegos NotiCel</a> · Sopa de letras del día</p>
+      <h1>Sopa de letras</h1>
+      <p class="jg-help">Toca la primera letra de una palabra y luego la última. Las palabras pueden ir de lado, hacia abajo o en diagonal.</p>
+      <ul class="sp-words" aria-label="Palabras para buscar"></ul>
+      <div class="sp-grid" role="grid" aria-label="Sopa de letras"></div>
+      <p class="jg-msg" aria-live="polite"></p>
+    </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    const POOL = ['COQUI', 'MOFONGO', 'YUNQUE', 'PLENA', 'BOMBA', 'SALSA', 'PLAYA', 'CAFE', 'MANGO', 'PALMA',
+      'TAINO', 'PASTEL', 'CUATRO', 'GUIRO', 'ARROZ', 'LECHON', 'COTORRA', 'FLAMBOYAN', 'ISLA', 'TOSTONES'].filter((w) => w.length <= 10);
+    const N = 10;
+    const box = document.querySelector<HTMLElement>('[data-sopa]')!;
+    const gridEl = box.querySelector<HTMLElement>('.sp-grid')!;
+    const listEl = box.querySelector<HTMLElement>('.sp-words')!;
+    const msg = box.querySelector<HTMLElement>('.jg-msg')!;
+    const day = Math.floor((Date.now() - 4 * 3600e3) / 86400e3); // Puerto Rico day
+
+    // Small seeded random generator, so everyone gets the same puzzle each day
+    let seed = day * 9301 + 49297;
+    const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+    const pick = [...POOL].sort(() => rnd() - 0.5).slice(0, 6);
+    const DIRS = [[0, 1], [1, 0], [1, 1], [-1, 1]];
+    const cells: string[][] = [...Array(N)].map(() => Array(N).fill(''));
+    const placed: Record<string, Array<[number, number]>> = {};
+    for (const w of pick) {
+      for (let t = 0; t < 300 && !placed[w]; t++) {
+        const [dr, dc] = DIRS[Math.floor(rnd() * DIRS.length)];
+        const r0 = Math.floor(rnd() * N), c0 = Math.floor(rnd() * N);
+        const path = [...w].map((_, i) => [r0 + dr * i, c0 + dc * i] as [number, number]);
+        if (path.every(([r, c], i) => r >= 0 && r < N && c >= 0 && c < N && (!cells[r][c] || cells[r][c] === w[i]))) {
+          path.forEach(([r, c], i) => (cells[r][c] = w[i]));
+          placed[w] = path;
+        }
+      }
+    }
+    const words = pick.filter((w) => placed[w]);
+    const ABC = 'ABCDEFGHIJLMNOPRSTUVYZ';
+    cells.forEach((row) => row.forEach((v, c) => { if (!v) row[c] = ABC[Math.floor(rnd() * ABC.length)]; }));
+
+    const key = `nc-sopa-${day}`;
+    let found: string[] = [];
+    try { found = JSON.parse(localStorage.getItem(key) || '[]'); } catch { /* storage blocked */ }
+    const btns: HTMLButtonElement[][] = cells.map((row, r) => row.map((ch, c) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sp-cell'; b.textContent = ch;
+      b.setAttribute('aria-label', `Fila ${r + 1}, columna ${c + 1}: ${ch}`);
+      b.addEventListener('click', () => tap(r, c));
+      gridEl.append(b);
+      return b;
+    }));
+    let first: [number, number] | null = null;
+    function paint() {
+      listEl.replaceChildren(...words.map((w) => { const li = document.createElement('li'); li.textContent = w; if (found.includes(w)) li.className = 'got'; return li; }));
+      btns.flat().forEach((b) => b.classList.remove('got'));
+      found.forEach((w) => placed[w].forEach(([r, c]) => btns[r][c].classList.add('got')));
+      msg.textContent = found.length === words.length ? '¡Encontraste todas las palabras! Mañana hay una sopa nueva.' : `Encontradas: ${found.length} de ${words.length}`;
+      if (found.length === words.length) award('sopa', 80, 'Sopa de letras completa', key);
+    }
+    function tap(r: number, c: number) {
+      if (!first) { first = [r, c]; btns[r][c].classList.add('sel'); return; }
+      const [r0, c0] = first;
+      btns[r0][c0].classList.remove('sel');
+      first = null;
+      // A word counts if its first and last letters match the two taps (either direction)
+      const hit = words.find((w) => {
+        if (found.includes(w)) return false;
+        const p = placed[w], a = p[0], z = p[p.length - 1];
+        return (a[0] === r0 && a[1] === c0 && z[0] === r && z[1] === c) || (z[0] === r0 && z[1] === c0 && a[0] === r && a[1] === c);
+      });
+      if (hit) {
+        found.push(hit);
+        try { localStorage.setItem(key, JSON.stringify(found)); } catch { /* storage blocked */ }
+      }
+      paint();
+    }
+    paint();
+  </script>
+</Base>

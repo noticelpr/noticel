@@ -1,0 +1,366 @@
+---
+// Mi perfil: sign in (demo), then four tabs: Resumen (points, reputation, badges), Notificaciones,
+// Actividad (my comments, saved stories, recent game points) and Ajustes (notification choices, edit, clear data).
+// DEMO: no accounts yet; everything lives only in this browser (localStorage 'nc-profile' and friends).
+import Base from '../layouts/Base.astro';
+import { url, getStories } from '../lib/site';
+import { GAMES } from '../lib/games';
+import { BADGE } from '../lib/badges';
+import { LEVELS, LEVEL_INFO, SPECIALS } from '../lib/reputation';
+import { KINDS } from '../lib/notifications';
+const COLORS = ['#006FA6', '#009DE9', '#D7263D', '#0E8A5F', '#C2410C', '#7C3AED'];
+// Titles so "Mis comentarios" can say where each comment was written
+const titles = Object.fromEntries([
+  ...(await getStories()).map((s) => [s.id, s.data.title]),
+  ...GAMES.map((g) => [`juego-${g.id}`, g.name]),
+]);
+const games = Object.fromEntries(GAMES.map((g) => [g.id, g.name]));
+// NotiCel: each story's address (its old WordPress path), so "Mis comentarios" can link to it
+const paths = Object.fromEntries((await getStories()).map((s) => [s.id, s.data.path]));
+const BADGES = [
+  ...LEVELS.slice(1).map((l) => ({ id: l.id, name: l.name, kind: 'level', means: LEVEL_INFO[l.id].means, how: LEVEL_INFO[l.id].how })),
+  ...SPECIALS.map((x) => ({ id: x.id, name: x.name, kind: 'special', means: x.means, how: x.how })),
+];
+---
+<Base title="Mi perfil" noindex description="Tu perfil de lector en NotiCel.">
+  <main class="wrap" id="main">
+    <div class="pf" data-pf data-base={url()} data-titles={JSON.stringify(titles)} data-paths={JSON.stringify(paths)} data-games={JSON.stringify(games)}>
+      <p class="pf-demo"><span class="sp-demo">DEMO</span> Vista previa de las cuentas: tu perfil se guarda solo en este dispositivo. Muy pronto podrás crear una cuenta real.</p>
+
+      <form class="pf-login" data-login novalidate hidden>
+        <h1>Entra a NotiCel</h1>
+        <ul class="pf-perks">
+          <li>🔖 Guarda noticias para leerlas después</li>
+          <li>💬 Comenta y gana insignias</li>
+          <li>🔔 Recibe avisos cuando te mencionen o les guste tu comentario</li>
+          <li>🎮 Sigue tu progreso en Juegos NotiCel</li>
+        </ul>
+        <label for="pf-name">Tu nombre de usuario</label>
+        <input id="pf-name" maxlength="24" placeholder="ej. lector_boricua" autocomplete="nickname" />
+        <fieldset class="pf-colors"><legend>Color de tu avatar</legend>{COLORS.map((c, i) => <label><input type="radio" name="pf-color" value={c} checked={i === 0} /><span style={`background:${c}`}></span><b class="sr">{c}</b></label>)}</fieldset>
+        <p class="cm-err" data-err hidden></p>
+        <button type="submit" class="jg-btn">Entrar</button>
+      </form>
+
+      <div class="pf-card" data-card hidden>
+        <header class="pf-top">
+          <div class="pf-av-wrap">
+            <span class="pf-av" data-av></span>
+            <label class="pf-cam" title="Cambiar foto de perfil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span class="sr">Cambiar foto de perfil</span><input type="file" accept="image/*" data-photo class="sr" /></label>
+          </div>
+          <div class="pf-who">
+            <h1 data-name></h1>
+            <p class="pf-tags"><span data-rep-badge></span><span class="pf-gtag" data-game-lvl></span></p>
+          </div>
+        </header>
+
+        <nav class="apn-tabs pf-tabs" role="tablist" aria-label="Secciones del perfil">
+          <button type="button" role="tab" data-tab="resumen" aria-selected="true">Resumen</button>
+          <button type="button" role="tab" data-tab="notificaciones" aria-selected="false"><span class="pf-lg">Notificaciones</span><span class="pf-sm">Avisos</span> <b data-nf-n></b></button>
+          <button type="button" role="tab" data-tab="actividad" aria-selected="false">Actividad</button>
+          <button type="button" role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
+        </nav>
+
+        <section class="pf-pane" data-pane="resumen">
+          <div class="pf-tiles">
+            <a class="pf-tile" href={url('juegos')}>
+              <span class="pf-k">Puntos de juegos</span><b data-v="pts">0</b>
+              <span class="pf-bar"><i data-bar="pts"></i></span><small data-v="pts-next"></small>
+            </a>
+            <a class="pf-tile" href="#actividad" data-goto="actividad">
+              <span class="pf-k">Reputación al comentar</span><b data-v="rep">0</b>
+              <span class="pf-bar"><i data-bar="rep"></i></span><small data-v="rep-next"></small>
+            </a>
+            <a class="pf-tile sm" href={url('guardadas')}><span class="pf-k">Guardadas</span><b data-v="saved">0</b></a>
+            <a class="pf-tile sm" href="#actividad" data-goto="actividad"><span class="pf-k">Comentarios</span><b data-v="comments">0</b></a>
+            <a class="pf-tile sm" href={url('juegos')}><span class="pf-k">Racha de juegos</span><b data-v="streak">0</b></a>
+          </div>
+          <h2 class="pf-h">Mis insignias <small data-v="badge-n"></small></h2>
+          <ul class="pf-badges">
+            {BADGES.map((b) => (
+              <li data-badge={b.id} data-kind={b.kind}>
+                <span class={`cm-badge cm-b-${b.id}`}><Fragment set:html={BADGE[b.id]} /> {b.name}</span>
+                <span class="pf-bd-t"><b>{b.means}</b> <span>{b.how}</span></span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section class="pf-pane" data-pane="notificaciones" hidden>
+          <div class="pf-nf-bar">
+            <div class="pf-chips" role="group" aria-label="Filtrar notificaciones">
+              <button type="button" data-nf-f="all" aria-pressed="true">Todas</button>
+              {KINDS.map((k) => <button type="button" data-nf-f={k.id} aria-pressed="false">{k.name}</button>)}
+            </div>
+            <button type="button" class="pf-linkbtn" data-nf-all>Marcar todas como leídas</button>
+          </div>
+          <ul class="nf-list big" data-nf-full></ul>
+          <p class="pf-note">Las menciones, respuestas y Me gusta de otros lectores llegarán cuando existan las cuentas; por ahora verás ejemplos. Las insignias, niveles y avisos de moderación ya son reales.</p>
+        </section>
+
+        <section class="pf-pane" data-pane="actividad" hidden>
+          <h2 class="pf-h">Mis comentarios</h2>
+          <ul class="pf-acts" data-my-comments></ul>
+          <h2 class="pf-h">Guardadas recientes <a href={url('guardadas')}>Ver todas ›</a></h2>
+          <ul class="pf-acts" data-my-saved></ul>
+          <h2 class="pf-h">Puntos recientes en Juegos NotiCel <a href={url('juegos')}>Jugar ›</a></h2>
+          <ul class="pf-acts" data-my-points></ul>
+        </section>
+
+        <section class="pf-pane" data-pane="ajustes" hidden>
+          <h2 class="pf-h">Avísame cuando…</h2>
+          <ul class="pf-prefs">
+            {KINDS.map((k) => (
+              <li><label><span><b>{k.name}</b><small>{k.desc}</small></span><input type="checkbox" class="pf-sw" data-pref={k.id} /></label></li>
+            ))}
+          </ul>
+          <h2 class="pf-h">Editar perfil</h2>
+          <form class="pf-edit" data-edit novalidate>
+            <label for="pf-ename">Nombre de usuario</label>
+            <input id="pf-ename" maxlength="24" autocomplete="nickname" />
+            <p class="pf-lbl">Foto de perfil</p>
+            <div class="pf-photo-row">
+              <span class="pf-av sm" data-av2></span>
+              <label class="adp-btn ghost-dark pf-up">Subir foto<input type="file" accept="image/*" data-photo class="sr" /></label>
+              <button type="button" class="pf-linkbtn red" data-photo-rm hidden>Quitar foto</button>
+            </div>
+            <p class="pf-note pf-photo-note">Usa una foto tuya o un dibujo. Nada ofensivo ni fotos de otras personas: con las cuentas, cada foto se revisa antes de mostrarse.</p>
+            <p class="cm-err" data-perr hidden></p>
+            <fieldset class="pf-colors"><legend>Color de tu avatar (si no tienes foto)</legend>{COLORS.map((c, i) => <label><input type="radio" name="pf-ecolor" value={c} checked={i === 0} /><span style={`background:${c}`}></span><b class="sr">{c}</b></label>)}</fieldset>
+            <p class="cm-err" data-eerr hidden></p>
+            <button type="submit" class="jg-btn">Guardar cambios</button>
+          </form>
+          <h2 class="pf-h">Este dispositivo</h2>
+          <div class="pf-danger">
+            <button type="button" class="tool" data-logout>Cerrar sesión</button>
+            <button type="button" class="pf-linkbtn red" data-wipe>Borrar todos mis datos de este dispositivo</button>
+          </div>
+          <div class="pf-delete" data-delete-box hidden>
+            <h2 class="pf-h">Borrar mi cuenta</h2>
+            <p class="pf-note">Se borran tu cuenta, tus comentarios, fotos, Me gusta, temas del Foro, noticias guardadas, puntos y notificaciones. <b>No se puede deshacer.</b> Lee la <a href={url('privacidad')}>política de privacidad</a>.</p>
+            <button type="button" class="pf-delete-btn" data-delete-account>Borrar mi cuenta para siempre</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <script>
+    import { ask } from '../lib/dialogs';
+    import { getRep, levelOf as repLevel, needs, specialsOf, syncRep, LEVELS } from '../lib/reputation';
+    import { getPoints, levelOf as ptsLevel, streakOf } from '../lib/points';
+    import { getNotifs, markRead, getPrefs, setPrefs, ago, type NotifKind } from '../lib/notifications';
+    import { renderNotifs } from '../lib/notif-view';
+    import { BADGE } from '../lib/badges';
+    import { squarePhoto, paintAvatar } from '../lib/avatar';
+    import { accountsOn, loggedIn, askLogin, signOut, updateProfile, deleteAccount } from '../lib/account';
+    import { askText } from '../lib/dialogs';
+    type Profile = { name?: string; color?: string; photo?: string };
+    const get = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || '') ?? d; } catch { return d; } };
+    const set = (k: string, v: unknown) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const root = document.querySelector<HTMLElement>('[data-pf]')!;
+    const BASE = root.dataset.base!.replace(/\/$/, '');
+    const TITLES: Record<string, string> = JSON.parse(root.dataset.titles!);
+    const GAMES: Record<string, string> = JSON.parse(root.dataset.games!);
+    const login = root.querySelector<HTMLFormElement>('[data-login]')!;
+    const card = root.querySelector<HTMLElement>('[data-card]')!;
+    const $ = <T extends Element = HTMLElement>(s: string) => card.querySelector<T>(s)!;
+    const fmt = (n: number) => n.toLocaleString('es-PR');
+
+    // Tabs, remembered in the address (#notificaciones) so the profile menu can link straight to one
+    const TABS = ['resumen', 'notificaciones', 'actividad', 'ajustes'];
+    const showTab = (t: string) => {
+      if (!TABS.includes(t)) t = 'resumen';
+      card.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+      card.querySelectorAll<HTMLElement>('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== t));
+      if (t === 'notificaciones') setTimeout(() => markRead(), 2500); // seen
+      card.querySelector<HTMLElement>(`[data-tab="${t}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    };
+    card.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tab],[data-goto]');
+      if (!b) return;
+      e.preventDefault();
+      const t = b.dataset.tab || b.dataset.goto!;
+      history.replaceState(null, '', `#${t}`); showTab(t);
+      if (b.dataset.goto) card.querySelector('.pf-tabs')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+
+    // Comments written on this device, newest first
+    const myComments = () => {
+      const out: Array<{ story: string; text: string; at: number; media?: boolean }> = [];
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i)!;
+          if (k.startsWith('nc-comments-')) get<Array<{ text: string; at: number; media?: unknown }>>(k, []).forEach((c) => out.push({ story: k.slice(12), text: c.text, at: c.at, media: !!c.media }));
+        }
+      } catch { /* storage blocked */ }
+      return out.sort((a, b) => b.at - a.at);
+    };
+    const PATHS: Record<string, string> = JSON.parse(root.dataset.paths || '{}');
+    const storyLink = (id: string) => (id.startsWith('juego-') ? `${BASE}/juegos/${id.slice(6)}/` : `${BASE}${PATHS[id] ?? '/'}`);
+
+    let nfFilter = 'all';
+    function paintNotifs() {
+      const all = getNotifs();
+      const unread = all.filter((n) => !n.read).length;
+      $('[data-nf-n]').textContent = unread ? String(unread) : '';
+      const list = nfFilter === 'all' ? all : all.filter((n) => n.kind === nfFilter);
+      $('[data-nf-full]').innerHTML = renderNotifs(list) || '<li class="nf-empty">No hay notificaciones aquí.</li>';
+    }
+
+    // Real accounts (Supabase): log in through the "Entrar / Crear cuenta" box; username and photo are saved to the account
+    const ACC = accountsOn();
+    if (ACC) {
+      document.querySelector<HTMLElement>('.pf-demo')!.hidden = true;
+      login.querySelectorAll<HTMLElement>('label[for="pf-name"], #pf-name, .pf-colors').forEach((e) => (e.hidden = true));
+      login.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent = 'Entrar o crear cuenta';
+      $('[data-logout]').textContent = 'Salir de mi cuenta';
+      addEventListener('nc-account', () => { render(); void syncRep().then(() => render()); });
+      if (loggedIn()) void syncRep().then(() => render()); // reputation counted by the server
+      addEventListener('nc-profile-change', () => { if (!rendering) render(); });
+    }
+    let rendering = false;
+    function render() {
+      let p = get<Profile>('nc-profile', {});
+      if (ACC && !loggedIn()) p = {};
+      login.hidden = !!p.name; card.hidden = !p.name;
+      $('[data-delete-box]').hidden = !(ACC && loggedIn());
+      rendering = true; dispatchEvent(new Event('nc-profile-change')); rendering = false;
+      if (!p.name) return;
+      const av = $('[data-av]');
+      paintAvatar(av, p); paintAvatar($('[data-av2]'), p);
+      $('[data-photo-rm]').hidden = !p.photo;
+      $('[data-name]').textContent = p.name;
+
+      // Comment reputation and level badge
+      const r = getRep(); const lv = repLevel(r);
+      $('[data-rep-badge]').innerHTML = lv.index ? `<span class="cm-badge cm-b-${lv.id}">${BADGE[lv.id] ?? ''} ${lv.name}</span>` : '<span class="pf-gtag">Comentarista nuevo</span>';
+      $('[data-v="rep"]').textContent = fmt(r.points);
+      if (lv.next) {
+        const n = needs(r, lv.next); const done = n.filter((x) => x.have >= x.need).length;
+        $<HTMLElement>('[data-bar="rep"]').style.width = `${Math.min(100, (r.points / lv.next.points) * 100)}%`;
+        $('[data-v="rep-next"]').textContent = `${done} de ${n.length} requisitos para ${lv.next.name}`;
+      } else { $<HTMLElement>('[data-bar="rep"]').style.width = '100%'; $('[data-v="rep-next"]').textContent = 'Nivel más alto: Diamante'; }
+
+      // Game points
+      const pts = getPoints(); const gl = ptsLevel(pts.total);
+      $('[data-game-lvl]').textContent = `⭐ ${gl.name} en Juegos NotiCel`;
+      $('[data-v="pts"]').textContent = fmt(pts.total);
+      $<HTMLElement>('[data-bar="pts"]').style.width = `${gl.pct}%`;
+      $('[data-v="pts-next"]').textContent = gl.next ? `Faltan ${fmt(gl.toNext)} para ${gl.next.name}` : 'Nivel más alto';
+      $('[data-v="streak"]').textContent = `${streakOf(pts.days)} ${streakOf(pts.days) === 1 ? 'día' : 'días'}`;
+
+      const comments = myComments();
+      const saved = get<Array<{ u: string; t: string; at: number }>>('nc-saved', []);
+      $('[data-v="saved"]').textContent = String(saved.length);
+      $('[data-v="comments"]').textContent = String(comments.length);
+
+      // Badges: earned ones in color, the rest grayed with how to get them
+      const sp = specialsOf(r); let got = 0;
+      card.querySelectorAll<HTMLElement>('[data-badge]').forEach((li) => {
+        const id = li.dataset.badge!;
+        const on = li.dataset.kind === 'level' ? LEVELS.findIndex((l) => l.id === id) <= lv.index : !!sp[id];
+        li.classList.toggle('won', on); if (on) got++;
+      });
+      $('[data-v="badge-n"]').textContent = `${got} de ${card.querySelectorAll('[data-badge]').length}`;
+
+      // Activity
+      $('[data-my-comments]').innerHTML = comments.slice(0, 10).map((c) => `<li><a href="${storyLink(c.story)}#comentarios"><span class="pf-act-t">${esc(c.text) || (c.media ? '(sticker o GIF)' : '')}</span><small>${esc(TITLES[c.story] || 'Noticia')} · ${ago(c.at)}</small></a></li>`).join('')
+        || `<li class="pf-empty">Todavía no has comentado. Los comentarios están al final de cada noticia y de cada juego.</li>`;
+      $('[data-my-saved]').innerHTML = saved.slice(0, 3).map((s) => `<li><a href="${esc(s.u)}"><span class="pf-act-t">${esc(s.t)}</span></a></li>`).join('')
+        || `<li class="pf-empty">No has guardado noticias. Toca <b>Guardar</b> en cualquier noticia.</li>`;
+      $('[data-my-points]').innerHTML = pts.log.slice(0, 6).map((l) => `<li><span class="pf-act-row"><span class="pf-act-t">${esc(l.why)}</span><b>+${l.pts}</b></span><small>${esc(l.game === 'bono' ? 'Bono del día' : GAMES[l.game] || l.game)} · ${ago(l.t)}</small></li>`).join('')
+        || `<li class="pf-empty">Juega cualquier juego para empezar a sumar puntos.</li>`;
+
+      // Settings
+      const prefs = getPrefs();
+      card.querySelectorAll<HTMLInputElement>('[data-pref]').forEach((c) => (c.checked = prefs[c.dataset.pref as NotifKind]));
+      $<HTMLInputElement>('#pf-ename').value = p.name;
+      card.querySelectorAll<HTMLInputElement>('input[name="pf-ecolor"]').forEach((c) => (c.checked = c.value === (p.color || '#2B1185')));
+      paintNotifs();
+    }
+
+    const cleanName = (v: string) => v.trim().replace(/\s+/g, '_');
+    login.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (ACC) { askLogin(); return; }
+      const err = login.querySelector<HTMLElement>('[data-err]')!;
+      const name = cleanName((login.querySelector('#pf-name') as HTMLInputElement).value);
+      if (name.length < 3) { err.textContent = 'Escribe un nombre de al menos 3 letras.'; err.hidden = false; return; }
+      const color = (login.querySelector('input[name="pf-color"]:checked') as HTMLInputElement)?.value;
+      set('nc-profile', { name, color });
+      render(); showTab(location.hash.slice(1));
+    });
+    $<HTMLFormElement>('[data-edit]').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = $('[data-eerr]');
+      const name = cleanName($<HTMLInputElement>('#pf-ename').value);
+      if (name.length < 3) { err.textContent = 'Escribe un nombre de al menos 3 letras.'; err.hidden = false; return; }
+      err.hidden = true;
+      const color = card.querySelector<HTMLInputElement>('input[name="pf-ecolor"]:checked')?.value;
+      if (ACC) {
+        const username = name.toLowerCase().replace(/[^a-z0-9._]/g, '');
+        if (username !== get<Profile>('nc-profile', {}).name) {
+          const r = await updateProfile({ username });
+          if (r.error) { err.textContent = r.error; err.hidden = false; return; }
+        }
+        set('nc-profile', { ...get<Profile>('nc-profile', {}), color }); render(); return;
+      }
+      set('nc-profile', { ...get<Profile>('nc-profile', {}), name, color });
+      render();
+    });
+    card.addEventListener('change', (e) => {
+      const c = (e.target as HTMLElement).closest<HTMLInputElement>('[data-pref]');
+      if (c) setPrefs({ ...getPrefs(), [c.dataset.pref!]: c.checked });
+    });
+    card.querySelectorAll<HTMLButtonElement>('[data-nf-f]').forEach((b) => b.addEventListener('click', () => {
+      nfFilter = b.dataset.nfF!;
+      card.querySelectorAll('[data-nf-f]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      paintNotifs();
+    }));
+    $('[data-nf-all]').addEventListener('click', () => markRead());
+    $('[data-nf-full]').addEventListener('click', (e) => { const a = (e.target as HTMLElement).closest<HTMLElement>('[data-nf-id]'); if (a) markRead(a.dataset.nfId); });
+    addEventListener('nc-notifs', paintNotifs);
+    // "Borrar mi cuenta": the reader types their username to confirm
+    $('[data-delete-account]').addEventListener('click', async () => {
+      const me = get<Profile>('nc-profile', {}).name ?? '';
+      const typed = await askText(`Para borrar tu cuenta para siempre, escribe tu nombre de usuario: ${me}`, { placeholder: me, ok: 'Borrar mi cuenta', danger: true });
+      if (typed === null) return;
+      if (typed.trim().replace(/^@/, '').toLowerCase() !== me.toLowerCase()) { dispatchEvent(new CustomEvent('nc-toast', { detail: 'El nombre no coincide. No se borró nada.' })); return; }
+      const btn = $<HTMLButtonElement>('[data-delete-account]'); btn.disabled = true; btn.textContent = 'Borrando…';
+      const r = await deleteAccount();
+      btn.disabled = false; btn.textContent = 'Borrar mi cuenta para siempre';
+      if (r.error) { dispatchEvent(new CustomEvent('nc-toast', { detail: r.error })); return; }
+      dispatchEvent(new CustomEvent('nc-toast', { detail: 'Tu cuenta y todo lo que publicaste fueron borrados.' }));
+      render();
+    });
+    $('[data-logout]').addEventListener('click', async () => { if (ACC) { await signOut(); render(); return; } set('nc-profile', null); render(); });
+    $('[data-wipe]').addEventListener('click', async () => {
+      if (!(await ask('¿Borrar tu perfil, puntos, comentarios, guardadas y notificaciones de este dispositivo? No se puede deshacer.', { ok: 'Borrar todo', danger: true }))) return;
+      try { Object.keys(localStorage).filter((k) => k.startsWith('nc-')).forEach((k) => localStorage.removeItem(k)); } catch { /* storage blocked */ }
+      dispatchEvent(new CustomEvent('nc-notifs')); dispatchEvent(new Event('nc-saved-change'));
+      render();
+    });
+    // Profile picture: cropped to a square in the browser and saved with the profile
+    card.querySelectorAll<HTMLInputElement>('[data-photo]').forEach((inp) => inp.addEventListener('change', async () => {
+      const f = inp.files?.[0]; inp.value = ''; if (!f) return;
+      const err = $('[data-perr]'); err.hidden = true;
+      try {
+        const photo = await squarePhoto(f);
+        if (ACC) { const r = await updateProfile({ photo }); if (r.error) throw new Error(r.error); render(); return; }
+        set('nc-profile', { ...get<Profile>('nc-profile', {}), photo });
+        render();
+      } catch (e) {
+        const m = (e as Error).message;
+        err.textContent = m === 'size' ? 'La foto es muy grande (máximo 15 MB).' : m.startsWith('No ') ? m : 'No pudimos leer esa imagen. Prueba con una foto JPG o PNG.';
+        err.hidden = false; showTab('ajustes');
+      }
+    }));
+    $('[data-photo-rm]').addEventListener('click', async () => {
+      if (ACC) { await updateProfile({ photo: null }); render(); return; }
+      const p = get<Profile>('nc-profile', {}); delete p.photo; set('nc-profile', p); render();
+    });
+    render(); showTab(location.hash.slice(1));
+  </script>
+</Base>

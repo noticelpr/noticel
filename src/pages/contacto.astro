@@ -1,0 +1,23 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../lib/site';
+---
+<Base title="Envía tu denuncia">
+  <main class="wrap" id="main">
+    <div class="page">
+      <h1>Envía tu denuncia</h1>
+      <p>¿Ves algo en tu comunidad que debemos investigar? Escríbenos. Un editor lee cada mensaje.</p>
+      {SITE.email ? (
+        <form data-tip={SITE.email} novalidate>
+          <div class="field"><label for="tipMsg">¿Qué está pasando?</label><textarea id="tipMsg"></textarea><p class="err" hidden></p></div>
+          <div class="field"><label for="tipTown">Pueblo</label><input id="tipTown" type="text" /></div>
+          <div class="field"><label for="tipContact">Correo o teléfono (opcional)</label><input id="tipContact" type="text" /></div>
+          <button class="btn" type="submit">Enviar por correo electrónico</button>
+          <p class="ok" hidden>Se abrió tu aplicación de correo con el mensaje listo. Pulsa «Enviar» allí para que nos llegue. Si no se abrió, escríbenos a <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.</p>
+        </form>
+      ) : (
+        <p>Muy pronto podrás enviarnos tus denuncias desde esta página.</p>
+      )}
+    </div>
+  </main>
+</Base>

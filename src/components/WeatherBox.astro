@@ -1,0 +1,27 @@
+---
+// Compact "Clima" box (right column): live conditions at San Juan airport (TJSJ) from the
+// National Weather Service, read in the reader's browser. The whole box links to the forecast.
+import { SITE } from '../lib/site';
+import { WEATHER_URL } from '../lib/weather';
+---
+<a class="wx-box" href={SITE.forecastUrl} rel="noopener" target="_blank" data-weather={WEATHER_URL} aria-label="Clima en San Juan: ver pronóstico">
+  <span class="wx-icon" data-w-icon aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 18z" /></svg></span>
+  <b class="wx-temp" data-w-temp>—</b>
+  <span class="wx-text">
+    <span class="wx-label">Clima · San Juan</span>
+    <span class="wx-desc" data-w-feels-line>Ver pronóstico</span>
+  </span>
+  <svg class="wx-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+</a>
+
+<script>
+  import { getWeather, weatherIcon } from '../lib/weather';
+  document.querySelectorAll<HTMLElement>('a.wx-box[data-weather]').forEach(async (box) => {
+    const set = (sel: string, v: string) => { const el = box.querySelector(sel); if (el) el.textContent = v; };
+    const w = await getWeather();
+    if (!w) { set('[data-w-feels-line]', 'Ver pronóstico oficial'); return; }
+    set('[data-w-temp]', w.temp);
+    set('[data-w-feels-line]', `${w.sky || 'Ver pronóstico'} · Sensación ${w.feels}`);
+    box.querySelector('[data-w-icon]')!.innerHTML = weatherIcon(w.desc);
+  });
+</script>

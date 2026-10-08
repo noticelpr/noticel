@@ -1,0 +1,17 @@
+---
+// A team's logo (public/logos/teams/<league>-<abbr>.png|svg|webp) or, if there is none,
+// a circle in the team color with its abbreviation.
+import fs from 'node:fs';
+import path from 'node:path';
+import { team } from '../../lib/teams';
+import { url } from '../../lib/site';
+interface Props { league: string; name: string; size?: number }
+const { league, name, size = 28 } = Astro.props;
+const t = team(league, name);
+const slug = `${league}-${t.abbr.toLowerCase()}`;
+// A light copy from scripts/optimize-images.mjs (logos/opt/teams/) when the original is heavy
+const file = [`logos/opt/teams/${slug}.webp`, ...['svg', 'png', 'webp'].map((e) => `logos/teams/${slug}.${e}`)].find((f) => fs.existsSync(path.join(process.cwd(), 'public', f)));
+---
+<span class:list={['tm-logo', { 'has-img': file }]} style={`--c:${t.color};--s:${size}px`} title={name}>
+  {file ? <img src={url(file)} alt="" loading="lazy" /> : <b>{t.abbr}</b>}
+</span>

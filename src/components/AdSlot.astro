@@ -1,5 +1,131 @@
 ---
-// Ad space placeholder. Real ads (Google Ad Manager / Advanced Ads replacement) come later.
-interface Props { style?: string }
+// Ad space in standard sizes. Shows only while SITE.features.ads is on.
+// Order of priority (see src/lib/ads.ts):
+//   1. Direct campaigns paid by our clients (a "toma de portada" takes every space). Several ads in the same
+//      space rotate like a billboard every ROTATE_SECONDS.
+//   2. Google AdSense, only when there is no direct campaign for this space and GOOGLE is filled in.
+//   3. Otherwise the "Anúnciate aquí" placeholder below.
+// leaderboard: 728×90 on computers, 320×100 on phones · rectangle: 300×250 · halfpage: 300×600 · infeed: 728×90
+import { SITE, url } from '../lib/site';
+import type { AdSize } from '../lib/ads';
+interface Props { size: AdSize; sticky?: boolean; class?: string; quiet?: boolean } // quiet: hidden unless an ad fills it (no "Anúnciate aquí" box)
+const { size, sticky = false, class: extra, quiet = false } = Astro.props;
+const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '300 × 250', halfpage: '300 × 600', infeed: '728 × 90' };
 ---
-<div class="ad" style={Astro.props.style}><span>Espacio publicitario</span></div>
+{SITE.features.ads && (
+  <div class:list={['ad-slot', `ad-${size}`, { 'ad-sticky': sticky }, extra]} role="complementary" aria-label="Publicidad" data-ad-size={size} data-quiet={quiet ? '' : undefined} hidden={quiet}>
+    <span class="ad-label">Publicidad</span>
+    <a class="ad-box" href={url('publicidad')}>
+      <strong>Espacio publicitario</strong>
+      <span class="ad-dims">{label[size]}{size === 'leaderboard' && <span class="ad-mob"> · 320 × 100 en celular</span>}</span>
+      <span class="ad-cta">Anúnciate aquí</span>
+    </a>
+  </div>
+)}
+<script>
+  import { CAMPAIGNS, DEMO_CAMPAIGNS, GOOGLE, ROTATE_SECONDS, FORMATS, type AdSize, type Campaign, type Creative } from '../lib/ads';
+  import { isDemo } from '../lib/demo';
+  import { hasBackend, liveCampaigns, countView, countClick } from '../lib/backend';
+  const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+  // Readers in Puerto Rico vs the diaspora, from the device's time zone (no location permission needed)
+  let where: 'island' | 'diaspora' = 'diaspora';
+  try { if (Intl.DateTimeFormat().resolvedOptions().timeZone === 'America/Puerto_Rico') where = 'island'; } catch { /* old browser */ }
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' }); // YYYY-MM-DD
+  // PREVIEW: ads approved in the staff panel on this device show here right away (with a "Vista previa" tag), so the
+  // employee sees where they go. Everyone else sees them once they're published in CAMPAIGNS.
+  type Req = { id: string; status: string; formats: string[]; link?: string; views?: number; takeoverViews?: number; start?: string; client: { business: string }; art?: { files?: Array<{ data: string; w: number; h: number }> } };
+  // Views counted on this device for preview campaigns (with the backend, views are counted for everyone)
+  const VIEWS_KEY = 'nc-ad-views';
+  const localViews = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(VIEWS_KEY) || '{}'); } catch { return {}; } };
+  const addLocalView = (id: string) => { const v = localViews(); v[id] = (v[id] ?? 0) + 1; try { localStorage.setItem(VIEWS_KEY, JSON.stringify(v)); } catch { /* storage blocked */ } };
+  const approvedHere = (): Array<Campaign & { preview?: boolean }> => {
+    let reqs: Req[] = []; try { reqs = JSON.parse(localStorage.getItem('nc-ad-requests') || '[]'); } catch { /* storage blocked */ }
+    return reqs.filter((r) => r.status === 'aprobada' && r.art?.files?.length).map((r) => {
+      const fmts = FORMATS.filter((f) => r.formats.includes(f.id));
+      return { id: r.id, client: r.client.business, start: '0000-00-00', end: '9999-12-31', preview: true, takeover: fmts.some((f) => f.id === 'takeover'), views: r.takeoverViews ?? r.views,
+        sizes: [...new Set(fmts.flatMap((f) => (f.slots.length ? f.slots : ['leaderboard', 'rectangle', 'halfpage', 'infeed'] as AdSize[])))],
+        creatives: r.art!.files!.map((f) => ({ img: f.data, url: r.link || '#', alt: r.client.business, w: f.w, h: f.h })) };
+    });
+  };
+  // Paid views already delivered → the campaign is done and leaves the rotation
+  const seenSoFar = localViews();
+  const notDone = (c: Campaign & { preview?: boolean; delivered?: number }) => !c.views || (c.delivered ?? (c.preview ? seenSoFar[c.id] ?? 0 : 0)) < c.views;
+  const remote = hasBackend() ? await liveCampaigns() : [];
+  const demoAds = isDemo() ? DEMO_CAMPAIGNS.map((c) => ({ ...c, demo: true })) : [];
+  const live = [...CAMPAIGNS, ...demoAds, ...remote, ...approvedHere()].filter((c) => c.start <= today && today <= c.end && c.creatives.length && notDone(c) && (!c.regions || c.regions === 'all' || c.regions === where));
+  // Each space only shows images of its shape (wide banners, 300×250, 300×600); if a campaign has none, it skips the space
+  const RATIO: Record<AdSize, number[]> = { leaderboard: [728 / 90, 320 / 100], infeed: [728 / 90, 320 / 100], rectangle: [300 / 250], halfpage: [300 / 600] };
+  const sizeOf = (cr: Creative) => (cr.w && cr.h ? [cr.w, cr.h] : (cr.img.match(/(\d+)x(\d+)\.\w+$/) ?? []).slice(1).map(Number));
+  const fits = (cr: Creative, size: AdSize) => { const [w, h] = sizeOf(cr); return !w || !h || RATIO[size].some((r) => Math.abs(w / h - r) / r < 0.15); };
+  const takeover = live.find((c) => c.takeover);
+  const track = (name: string, c: Campaign & { preview?: boolean; demo?: boolean }, size: string) => {
+    if (c.demo) return; // sample ads are never counted
+    (window as any).gtag?.('event', name, { ad_campaign: c.id, ad_client: c.client, ad_size: size });
+    if (name === 'ad_impression') { if (c.preview) addLocalView(c.id); else countView(c.id); }
+    if (name === 'ad_click' && !c.preview) countClick(c.id);
+  };
+  const src = (p: string) => (/^https?:/.test(p) ? p : BASE + p.replace(/^\//, ''));
+
+  if (takeover?.skin && location.pathname.replace(/\/$/, '') === BASE.replace(/\/$/, '')) {
+    document.body.classList.add('ad-skin');
+    document.body.style.setProperty('--ad-skin', `url("${src(takeover.skin)}")`);
+  }
+
+  let googleLoaded = false;
+  function google(slot: HTMLElement, size: AdSize) {
+    if (!GOOGLE.client || !GOOGLE.slots[size]) return;
+    slot.querySelector('.ad-box')?.remove();
+    const ins = document.createElement('ins');
+    ins.className = 'adsbygoogle ad-google';
+    ins.dataset.adClient = GOOGLE.client; ins.dataset.adSlot = GOOGLE.slots[size];
+    if (size === 'leaderboard' || size === 'infeed') { ins.dataset.adFormat = 'horizontal'; ins.dataset.fullWidthResponsive = 'true'; }
+    slot.append(ins);
+    if (!googleLoaded) {
+      googleLoaded = true;
+      const s = document.createElement('script');
+      s.async = true; s.crossOrigin = 'anonymous';
+      s.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${GOOGLE.client}`;
+      document.head.append(s);
+    }
+    ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+  }
+
+  function direct(slot: HTMLElement, size: AdSize, pool: Array<{ c: Campaign; cr: Creative }>) {
+    const box = document.createElement('div');
+    box.className = 'ad-rot';
+    box.innerHTML = pool.map(({ c, cr }, i) => `<a href="${cr.url}" target="_blank" rel="sponsored noopener" data-k="${i}"${i ? ' hidden' : ''}>${(c as any).demo ? '' /* the image itself says "ANUNCIO DE EJEMPLO" */ : (c as any).preview ? '<span class="ad-prev">Vista previa · solo en este dispositivo</span>' : ''}<img src="${/^data:/.test(cr.img) ? cr.img : src(cr.img)}" alt="${cr.alt.replace(/"/g, '&quot;')}" loading="lazy" /></a>`).join('')
+      + (pool.length > 1 ? `<span class="ad-dots" aria-hidden="true">${pool.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</span>` : '');
+    slot.querySelector('.ad-box')?.replaceWith(box);
+    const links = [...box.querySelectorAll<HTMLAnchorElement>('a')];
+    const dots = [...box.querySelectorAll('.ad-dots i')];
+    const seen = new Set<number>();
+    let k = 0, visible = false, hover = false;
+    const show = (n: number) => {
+      links[k].hidden = true; dots[k]?.classList.remove('on');
+      k = n; links[k].hidden = false; dots[k]?.classList.add('on');
+      if (visible && !seen.has(k)) { seen.add(k); track('ad_impression', pool[k].c, size); }
+    };
+    links.forEach((a, i) => a.addEventListener('click', () => track('ad_click', pool[i].c, size)));
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) show(k); }, { threshold: 0.5 }).observe(box);
+    if (pool.length > 1) {
+      box.addEventListener('pointerenter', () => (hover = true));
+      box.addEventListener('pointerleave', () => (hover = false));
+      setInterval(() => { if (visible && !hover && !document.hidden) show((k + 1) % pool.length); }, ROTATE_SECONDS * 1000);
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-ad-size]').forEach((slot) => {
+    const size = slot.dataset.adSize as AdSize;
+    const camps = takeover ? [takeover] : live.filter((c) => c.sizes.includes(size));
+    // Each campaign appears `weight` times per round, interleaved; start at a random spot so every client gets first view
+    const rounds = Math.max(1, ...camps.map((c) => c.weight ?? 1));
+    const pool = Array.from({ length: rounds }, (_, r) => camps.filter((c) => r < (c.weight ?? 1)).flatMap((c) => c.creatives.filter((cr) => fits(cr, size)).map((cr) => ({ c, cr })))).flat();
+    const quiet = slot.hasAttribute('data-quiet');
+    if (pool.length) {
+      const start = Math.floor(Math.random() * pool.length);
+      direct(slot, size, [...pool.slice(start), ...pool.slice(0, start)]);
+      slot.hidden = false;
+    } else if (GOOGLE.client && GOOGLE.slots[size]) { google(slot, size); slot.hidden = false; }
+    else if (quiet) slot.remove();
+  });
+</script>

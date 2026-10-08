@@ -1,0 +1,23 @@
+---
+// "Juegos NotiCel" teaser: each game's cover illustration (public/images/juegos) and name. `compact` = a column box (sidebars);
+// otherwise a full-width row (home page, end of stories and section pages).
+import { url } from '../lib/site';
+import { GAMES } from '../lib/games';
+interface Props { compact?: boolean; title?: string }
+const { compact = false, title = 'Juegos NotiCel' } = Astro.props;
+const list = compact ? GAMES.slice(0, 6) : GAMES.slice(0, 8); // the full-width row shows 8 so they always fit in one line
+---
+<section class:list={['gt', { 'gt-compact': compact }]} aria-labelledby={`gt-h-${compact ? 'c' : 'r'}`}>
+  <div class="gt-head">
+    <h2 id={`gt-h-${compact ? 'c' : 'r'}`}>{title}</h2>
+    <a href={url('juegos')}>Ver todos ›</a>
+  </div>
+  <div class="gt-tiles">
+    {list.map((g) => (
+      <a class="gt-tile" href={url(`juegos/${g.id}`)} style={`--gc:${g.color}`}>
+        <img class="gt-art" src={url(`images/juegos/${g.id}.svg`)} alt="" loading="lazy" />
+        <span class="gt-name">{g.name}</span>
+      </a>
+    ))}
+  </div>
+</section>

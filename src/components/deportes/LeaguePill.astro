@@ -1,0 +1,10 @@
+---
+import { league } from '../../lib/leagues';
+import { url } from '../../lib/site';
+interface Props { id?: string; link?: boolean }
+const { id, link = false } = Astro.props;
+const l = league(id);
+---
+{l && (link
+  ? <a class="sp-pill" style={`--lc:${l.color}`} href={url(`ligas/${l.id}`)}>{l.name}</a>
+  : <span class="sp-pill" style={`--lc:${l.color}`}>{l.name}</span>)}

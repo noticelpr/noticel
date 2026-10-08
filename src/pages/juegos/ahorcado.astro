@@ -1,0 +1,100 @@
+---
+// Ahorcado boricua: guess the Puerto Rico word letter by letter, with a clue. Six misses and you lose.
+// Streak and wins are kept only on this device.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+---
+<Base title="Ahorcado boricua" description="Adivina la palabra boricua letra por letra, con una pista. Seis fallos y pierdes.">
+  <main class="wrap" id="main">
+    <GameLayout id="ahorcado">
+      <div class="jg-game ah" data-ah>
+        <p class="jg-stats"><span>Racha: <b data-streak>0</b></span><span>Ganadas: <b data-wins>0</b></span><span>Fallos: <b data-miss>0</b>/6</span></p>
+        <svg class="ah-draw" viewBox="0 0 200 180" aria-hidden="true">
+          <path class="ah-base" d="M20 170h120M50 170V15h80v22" />
+          <circle class="ah-p" data-part="0" cx="130" cy="52" r="15" />
+          <path class="ah-p" data-part="1" d="M130 67v45" />
+          <path class="ah-p" data-part="2" d="M130 80l-22 18" />
+          <path class="ah-p" data-part="3" d="M130 80l22 18" />
+          <path class="ah-p" data-part="4" d="M130 112l-18 30" />
+          <path class="ah-p" data-part="5" d="M130 112l18 30" />
+        </svg>
+        <p class="ah-hint" data-hint></p>
+        <p class="ah-word notranslate" translate="no" data-word aria-live="polite"></p>
+        <p class="jg-msg" aria-live="polite" data-msg></p>
+        <div class="ah-keys" data-keys aria-label="Letras"></div>
+        <button type="button" class="jg-btn" data-new hidden>Otra palabra</button>
+      </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    // Words (written without accents) and their clues
+    const WORDS: Array<[string, string]> = [
+      ['COQUI', 'Ranita símbolo de Puerto Rico'], ['MOFONGO', 'Plátano majado con ajo'], ['YUNQUE', 'Bosque lluvioso del este'],
+      ['PLENA', 'Música de panderos de Ponce'], ['BOMBA', 'Baile afropuertorriqueño de tambores'], ['MORRO', 'Fortaleza de San Juan'],
+      ['ARECIBO', 'Pueblo del radiotelescopio'], ['TAINO', 'Pueblo indígena de la isla'], ['GUIRO', 'Instrumento que se raspa'],
+      ['CUATRO', 'Instrumento de diez cuerdas'], ['PASTELES', 'Se envuelven en hoja de plátano'], ['LECHON', 'Cerdo asado a la varita'],
+      ['TOSTONES', 'Plátano verde frito dos veces'], ['GANDULES', 'Arroz con ___'], ['COQUITO', 'Bebida navideña de coco'],
+      ['PARRANDA', 'Asalto navideño'], ['CULEBRA', 'Isla municipio con playa Flamenco'], ['VIEQUES', 'La Isla Nena'],
+      ['FLAMBOYAN', 'Árbol de flores rojas'], ['QUENEPA', 'Fruta de cáscara verde'], ['PIRAGUA', 'Hielo raspado con sirope'],
+      ['TEMBLEQUE', 'Postre de coco'], ['ALCAPURRIA', 'Fritura de guineo con carne'], ['BORINQUEN', 'Nombre taíno de la isla'],
+      ['JIBARO', 'Campesino puertorriqueño'], ['SOFRITO', 'Base de cebolla, ají y recao'], ['HURACAN', 'Tormenta del Caribe'],
+      ['COTORRA', 'Ave verde en peligro de extinción'], ['CLEMENTE', 'Astro del béisbol, Roberto'], ['LUQUILLO', 'Playa de los kioscos'],
+      ['MAYAGUEZ', 'La Sultana del Oeste'], ['CEIBA', 'Árbol gigante y pueblo'], ['BACALAITO', 'Fritura de bacalao'],
+    ];
+    const box = document.querySelector<HTMLElement>('[data-ah]')!;
+    const $ = (s: string) => box.querySelector<HTMLElement>(s)!;
+    const store = {
+      get: (k: string) => { try { return Number(localStorage.getItem(k)) || 0; } catch { return 0; } },
+      set: (k: string, v: number) => { try { localStorage.setItem(k, String(v)); } catch { /* storage blocked */ } },
+    };
+    let word = '', hint = '', guessed = new Set<string>(), misses = 0, over = false, last = -1;
+    const keys = new Map<string, HTMLButtonElement>();
+    for (const ch of 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ') {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = ch;
+      b.addEventListener('click', () => guess(ch));
+      $('[data-keys]').append(b); keys.set(ch, b);
+    }
+    function start() {
+      let i; do { i = Math.floor(Math.random() * WORDS.length); } while (i === last && WORDS.length > 1);
+      last = i; [word, hint] = WORDS[i];
+      guessed = new Set(); misses = 0; over = false;
+      keys.forEach((b) => { b.disabled = false; b.className = ''; });
+      $('[data-msg]').textContent = ''; $('[data-new]').hidden = true;
+      paint();
+    }
+    function paint() {
+      $('[data-word]').innerHTML = [...word].map((ch) => `<span class="${guessed.has(ch) || over ? 'on' : ''}${over && !guessed.has(ch) ? ' miss' : ''}">${guessed.has(ch) || over ? ch : ''}</span>`).join('');
+      $('[data-hint]').innerHTML = `<b>Pista:</b> ${hint} <small>(${word.length} letras)</small>`;
+      $('[data-miss]').textContent = String(misses);
+      box.querySelectorAll<SVGElement>('[data-part]').forEach((p) => p.classList.toggle('on', Number(p.dataset.part) < misses));
+      $('[data-streak]').textContent = String(store.get('nc-ahorcado-streak'));
+      $('[data-wins]').textContent = String(store.get('nc-ahorcado-wins'));
+    }
+    function guess(ch: string) {
+      if (over || guessed.has(ch)) return;
+      guessed.add(ch);
+      const hit = word.includes(ch);
+      const b = keys.get(ch)!; b.disabled = true; b.classList.add(hit ? 'hit' : 'no');
+      if (!hit) misses++;
+      if ([...word].every((c) => guessed.has(c))) {
+        over = true; award('ahorcado', 20, `Ahorcado: ${word}`); store.set('nc-ahorcado-wins', store.get('nc-ahorcado-wins') + 1); store.set('nc-ahorcado-streak', store.get('nc-ahorcado-streak') + 1);
+        $('[data-msg]').textContent = '¡Bien! Adivinaste la palabra. 🎉';
+      } else if (misses >= 6) {
+        over = true; store.set('nc-ahorcado-streak', 0);
+        $('[data-msg]').textContent = `¡Ay! La palabra era ${word}.`;
+      }
+      if (over) { keys.forEach((k) => (k.disabled = true)); $('[data-new]').hidden = false; }
+      paint();
+    }
+    $('[data-new]').addEventListener('click', start);
+    addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const ch = e.key.toUpperCase();
+      if (/^[A-ZÑ]$/.test(ch)) guess(ch);
+      else if (e.key === 'Enter' && over) start();
+    });
+    start();
+  </script>
+</Base>

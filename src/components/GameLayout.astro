@@ -1,0 +1,39 @@
+---
+// Shared frame for every game page: colorful header (icon, name, tagline), the game itself,
+// and a side column with an ad and "Más juegos" (below the game on phones).
+import AdSlot from './AdSlot.astro';
+import GameBoard from './GameBoard.astro';
+import Comments from './Comments.astro';
+import { url } from '../lib/site';
+import { GAMES } from '../lib/games';
+interface Props { id: (typeof GAMES)[number]['id'] }
+const g = GAMES.find((x) => x.id === Astro.props.id)!;
+const others = GAMES.filter((x) => x.id !== g.id);
+---
+<div class="jg-layout" style={`--gc:${g.color}`}>
+  <div class="jg-stage">
+    <header class="jg-banner">
+      <div class="jg-banner-top">
+        <a class="jg-back" href={url('juegos')}>‹ Juegos NotiCel</a>
+      </div>
+      <div class="jg-banner-main">
+        <img class="jg-banner-img" src={url(`images/juegos/${g.id}.svg`)} alt="" />
+        <div><h1>{g.name}</h1><p>{g.about}</p></div>
+      </div>
+    </header>
+    <slot />
+    <AdSlot size="infeed" class="jg-ad-below" />
+    <div class="jg-comments"><Comments storyId={`juego-${g.id}`} kind="game" /></div>
+  </div>
+  <aside class="jg-aside">
+    <GameBoard game={g.id} title={`Líderes de ${g.name}`} />
+    <AdSlot size="rectangle" />
+    <section class="jg-more">
+      <h2>Más juegos</h2>
+      <ul>{others.map((x) => (
+        <li><a href={url(`juegos/${x.id}`)} style={`--gc:${x.color}`}><img src={url(`images/juegos/${x.id}.svg`)} alt="" loading="lazy" /><b>{x.name}</b></a></li>
+      ))}</ul>
+    </section>
+    <AdSlot size="halfpage" sticky class="jg-ad-tall" />
+  </aside>
+</div>

@@ -1,0 +1,34 @@
+---
+// Internal preview of every holiday logo (not linked from the site). The header picks the right one automatically.
+import Base from '../layouts/Base.astro';
+import Logo from '../components/Logo.astro';
+import { HOLIDAYS, holidayOn, todayPR } from '../lib/holidays';
+const y = Number(todayPR().slice(0, 4));
+const fmt = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric' });
+// Next date each holiday comes up, so the list reads in calendar order from today
+const rows = HOLIDAYS.map((h) => {
+  const [a, b] = h.dates(y)[1] >= todayPR() ? h.dates(y) : h.dates(y + 1);
+  return { h, a, b };
+}).sort((p, q) => p.a.localeCompare(q.a));
+const now = holidayOn(todayPR());
+---
+<Base title="Logos festivos" description="Vista previa de los logos para días feriados (uso interno)." noindex>
+  <main class="wrap" id="main">
+    <p class="pf-demo"><span class="sp-demo">VISTA PREVIA</span> Página interna. El logo cambia solo en estas fechas (hora de Puerto Rico) y se apaga si hay una alerta de ÚLTIMA HORA.</p>
+    <h1 class="lf-h">Logos festivos</h1>
+    <p class="apn-sub">{now ? `Hoy toca: ${now.name}.` : 'Hoy no hay logo festivo: se ve el logo normal.'} {HOLIDAYS.length} fechas en total, en orden desde hoy.</p>
+    <ul class="lf-grid">
+      {rows.map(({ h, a, b }) => (
+        <li class="lf-card">
+          <div class="lf-row">
+            <div class="lf-stage"><Logo holiday={h} href="#" /></div>
+            <div class="lf-stage dark" data-theme="dark"><Logo holiday={h} href="#" /></div>
+          </div>
+          <h2>{h.name} <span class={`lf-tone ${h.tone}`}>{h.tone === 'festivo' ? 'Festivo' : 'Respetuoso'}</span></h2>
+          <p>{h.when} · próximo: <b>{a === b ? fmt(a) : `${fmt(a)} al ${fmt(b)}`}</b></p>
+          <p class="lf-title">Al pasar el ratón: “{h.title}”</p>
+        </li>
+      ))}
+    </ul>
+  </main>
+</Base>

@@ -1,0 +1,54 @@
+---
+// Trivia NotiCel: one Puerto Rico question a day. The answer is checked in the browser.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+import { triviaOfTheDay, todayLong } from '../../lib/daily';
+const t = triviaOfTheDay();
+---
+<Base title="Trivia NotiCel: la pregunta del día" description="Una pregunta diaria sobre Puerto Rico. ¿Cuánto sabes de tu isla?">
+  <main class="wrap" id="main">
+    <GameLayout id="trivia">
+    <div class="tv" data-trivia data-day={t.index} data-answer={t.answer}>
+      <p class="tv-kicker">Juego del día · {todayLong()}</p>
+      <h1>Trivia NotiCel</h1>
+      <p class="tv-q">{t.q}</p>
+      <div class="tv-options">
+        {t.options.map((o, i) => <button type="button" data-i={i}>{o}</button>)}
+      </div>
+      <p class="tv-result" aria-live="polite" hidden></p>
+      <p class="tv-note" hidden>{t.note}</p>
+      <p class="tv-streak" hidden></p>
+      <p class="sp-note">Una pregunta nueva cada día. Vuelve mañana.</p>
+    </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    const box = document.querySelector<HTMLElement>('[data-trivia]')!;
+    const answer = Number(box.dataset.answer);
+    const key = `nc-trivia-${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' })}`;
+    const result = box.querySelector<HTMLElement>('.tv-result')!;
+    const note = box.querySelector<HTMLElement>('.tv-note')!;
+    const streakEl = box.querySelector<HTMLElement>('.tv-streak')!;
+    const buttons = [...box.querySelectorAll<HTMLButtonElement>('.tv-options button')];
+    const store = { get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } } };
+    function show(choice: number) {
+      buttons.forEach((b, i) => { b.disabled = true; b.classList.toggle('right', i === answer); b.classList.toggle('wrong', i === choice && i !== answer); });
+      const ok = choice === answer;
+      if (ok) award('trivia', 30, 'Trivia acertada', key);
+      result.textContent = ok ? '¡Correcto!' : 'Esta vez no. La respuesta correcta está marcada en verde.';
+      result.className = `tv-result ${ok ? 'ok' : 'no'}`;
+      result.hidden = false; note.hidden = false;
+      const streak = Number(store.get('nc-trivia-streak') || 0);
+      if (streak > 1) { streakEl.textContent = `Racha: ${streak} respuestas correctas seguidas.`; streakEl.hidden = false; }
+    }
+    const done = store.get(key);
+    if (done !== null) show(Number(done));
+    buttons.forEach((b) => b.addEventListener('click', () => {
+      const choice = Number(b.dataset.i);
+      store.set(key, String(choice));
+      store.set('nc-trivia-streak', String(choice === answer ? Number(store.get('nc-trivia-streak') || 0) + 1 : 0));
+      show(choice);
+    }));
+  </script>
+</Base>

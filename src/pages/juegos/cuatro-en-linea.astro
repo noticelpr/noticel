@@ -1,0 +1,121 @@
+---
+// Cuatro en Línea: drop discs into a 7x6 board; four in a row (across, down or diagonal) wins.
+// You play purple against the computer (yellow), which looks a few moves ahead. Three levels.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+---
+<Base title="Cuatro en Línea" description="Juega Cuatro en Línea contra la computadora: conecta cuatro fichas antes que ella.">
+  <main class="wrap" id="main">
+    <GameLayout id="cuatro-en-linea">
+      <div class="jg-game c4" data-c4>
+        <div class="sd-levels" role="group" aria-label="Nivel">
+          <button type="button" data-level="1" aria-pressed="false">Fácil</button>
+          <button type="button" data-level="3" aria-pressed="true">Medio</button>
+          <button type="button" data-level="5" aria-pressed="false">Difícil</button>
+        </div>
+        <p class="jg-stats"><span><i class="c4-dot me"></i> Tú: <b data-w-me>0</b></span><span><i class="c4-dot cpu"></i> Computadora: <b data-w-cpu>0</b></span></p>
+        <div class="c4-board" data-board role="grid" aria-label="Tablero: toca una columna para soltar tu ficha"></div>
+        <p class="jg-msg" aria-live="polite" data-msg>Te toca. Toca una columna para soltar tu ficha.</p>
+        <button type="button" class="jg-btn" data-again hidden>Jugar otra vez</button>
+        <p class="jg-help">Conecta cuatro fichas en línea: de lado, de arriba abajo o en diagonal. Tú juegas con las moradas.</p>
+      </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    const W = 7, H = 6;
+    const box = document.querySelector<HTMLElement>('[data-c4]')!;
+    const boardEl = box.querySelector<HTMLElement>('[data-board]')!;
+    const msg = box.querySelector<HTMLElement>('[data-msg]')!;
+    const again = box.querySelector<HTMLButtonElement>('[data-again]')!;
+    let grid: number[][] = [], turn = 1, over = false, depth = 3; // 1 = you, 2 = computer
+    const wins = (() => { try { return JSON.parse(localStorage.getItem('nc-c4') || '') ?? { me: 0, cpu: 0 }; } catch { return { me: 0, cpu: 0 }; } })();
+    const showWins = () => { box.querySelector('[data-w-me]')!.textContent = String(wins.me); box.querySelector('[data-w-cpu]')!.textContent = String(wins.cpu); };
+
+    // Board: one button per column, six cells inside
+    const cols: HTMLButtonElement[] = [];
+    for (let c = 0; c < W; c++) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'c4-col'; b.setAttribute('aria-label', `Columna ${c + 1}`);
+      for (let r = 0; r < H; r++) { const cell = document.createElement('span'); cell.className = 'c4-cell'; b.append(cell); }
+      b.addEventListener('click', () => human(c));
+      boardEl.append(b); cols.push(b);
+    }
+    const free = (g: number[][], c: number) => { for (let r = H - 1; r >= 0; r--) if (!g[r][c]) return r; return -1; };
+    // Four in a row through (r, c)? Returns the winning cells or null
+    function line(g: number[][], r: number, c: number) {
+      const p = g[r][c];
+      for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+        const cells: Array<[number, number]> = [[r, c]];
+        for (const s of [1, -1]) { let rr = r + dr * s, cc = c + dc * s; while (rr >= 0 && rr < H && cc >= 0 && cc < W && g[rr][cc] === p) { cells.push([rr, cc]); rr += dr * s; cc += dc * s; } }
+        if (cells.length >= 4) return cells;
+      }
+      return null;
+    }
+    // Simple position score for the computer: center columns and open threes
+    function score(g: number[][]) {
+      let s = 0;
+      for (let r = 0; r < H; r++) s += (g[r][3] === 2 ? 3 : g[r][3] === 1 ? -3 : 0);
+      const windows: number[][] = [];
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+        const w: number[] = []; for (let k = 0; k < 4; k++) { const rr = r + dr * k, cc = c + dc * k; if (rr < 0 || rr >= H || cc < 0 || cc >= W) break; w.push(g[rr][cc]); }
+        if (w.length === 4) windows.push(w);
+      }
+      for (const w of windows) {
+        const a = w.filter((x) => x === 2).length, b = w.filter((x) => x === 1).length, e = w.filter((x) => !x).length;
+        if (a === 3 && e === 1) s += 6; else if (a === 2 && e === 2) s += 2;
+        if (b === 3 && e === 1) s -= 8; else if (b === 2 && e === 2) s -= 2;
+      }
+      return s;
+    }
+    function minimax(g: number[][], d: number, alpha: number, beta: number, maxing: boolean): [number, number] {
+      const valid = [3, 2, 4, 1, 5, 0, 6].filter((c) => free(g, c) >= 0);
+      if (!valid.length) return [0, -1];
+      if (d === 0) return [score(g), -1];
+      let best = maxing ? -Infinity : Infinity, move = valid[0];
+      for (const c of valid) {
+        const r = free(g, c); g[r][c] = maxing ? 2 : 1;
+        const won = line(g, r, c);
+        const v = won ? (maxing ? 100000 + d : -100000 - d) : minimax(g, d - 1, alpha, beta, !maxing)[0];
+        g[r][c] = 0;
+        if (maxing ? v > best : v < best) { best = v; move = c; }
+        if (maxing) alpha = Math.max(alpha, v); else beta = Math.min(beta, v);
+        if (alpha >= beta) break;
+      }
+      return [best, move];
+    }
+    function paint(winCells: Array<[number, number]> = []) {
+      cols.forEach((b, c) => {
+        [...b.children].forEach((cell, r) => {
+          cell.className = `c4-cell${grid[r][c] === 1 ? ' me' : grid[r][c] === 2 ? ' cpu' : ''}${winCells.some(([wr, wc]) => wr === r && wc === c) ? ' win' : ''}`;
+        });
+        b.disabled = over || turn !== 1 || free(grid, c) < 0;
+      });
+    }
+    function drop(c: number, p: number) {
+      const r = free(grid, c); grid[r][c] = p;
+      const won = line(grid, r, c);
+      if (won) { over = true; if (p === 1) award('cuatro-en-linea', 30, 'Cuatro en Línea ganado'); p === 1 ? wins.me++ : wins.cpu++; try { localStorage.setItem('nc-c4', JSON.stringify(wins)); } catch { /* storage blocked */ } showWins(); msg.textContent = p === 1 ? '¡Ganaste! 🎉' : 'Ganó la computadora. ¡Inténtalo otra vez!'; again.hidden = false; paint(won); return true; }
+      if (grid.every((row) => row.every(Boolean))) { over = true; msg.textContent = 'Empate. ¡El tablero se llenó!'; again.hidden = false; paint(); return true; }
+      return false;
+    }
+    function human(c: number) {
+      if (over || turn !== 1 || free(grid, c) < 0) return;
+      if (drop(c, 1)) return;
+      turn = 2; msg.textContent = 'Piensa la computadora…'; paint();
+      setTimeout(() => {
+        const [, m] = minimax(grid.map((r) => [...r]), depth, -Infinity, Infinity, true);
+        const col = m >= 0 ? m : [3, 2, 4, 1, 5, 0, 6].find((x) => free(grid, x) >= 0)!;
+        if (!drop(col, 2)) { turn = 1; msg.textContent = 'Te toca.'; paint(); }
+      }, 450);
+    }
+    function start() { grid = [...Array(H)].map(() => Array(W).fill(0)); turn = 1; over = false; again.hidden = true; msg.textContent = 'Te toca. Toca una columna para soltar tu ficha.'; paint(); }
+    again.addEventListener('click', start);
+    box.querySelectorAll<HTMLButtonElement>('[data-level]').forEach((b) => b.addEventListener('click', () => {
+      depth = Number(b.dataset.level);
+      box.querySelectorAll('[data-level]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      start();
+    }));
+    showWins(); start();
+  </script>
+</Base>

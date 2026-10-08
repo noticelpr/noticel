@@ -1,0 +1,32 @@
+---
+// League page: standings table(s)
+import { standings, isDemoTable } from '../../lib/scores';
+import TeamLogo from './TeamLogo.astro';
+interface Props { league: string }
+const s = standings(Astro.props.league);
+const demo = !!s && isDemoTable('standings', Astro.props.league);
+const pct = (w: number, l: number) => (w + l ? (w / (w + l)).toFixed(3).replace(/^0/, '') : '.000');
+---
+<section class="sp-panel">
+  <h2>Posiciones{demo && <span class="sp-demo">DEMO</span>}</h2>
+  {!s?.groups?.length ? (
+    <p class="sp-note">Las posiciones se publicarán cuando comience la temporada.</p>
+  ) : (
+    <>
+      {s.groups.map((g) => (
+        <div class="sp-table-wrap">
+          {g.name && <h3>{g.name}</h3>}
+          <table class="sp-table">
+            <thead><tr><th scope="col">Equipo</th><th scope="col">G</th><th scope="col">P</th><th scope="col">PCT</th><th scope="col">DIF</th>{(g.columns ?? []).map((c) => <th scope="col">{c}</th>)}</tr></thead>
+            <tbody>
+              {g.rows.map((r, i) => (
+                <tr><th scope="row" class="notranslate" translate="no"><span class="sp-rank">{i + 1}</span><TeamLogo league={Astro.props.league} name={r.team} size={24} />{r.team}</th><td>{r.w}</td><td>{r.l}</td><td>{pct(r.w, r.l)}</td><td>{r.gb ?? (i === 0 ? '—' : '')}</td>{(r.extra ?? []).map((x) => <td>{x}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      {s.updated && <p class="sp-note">Actualizado: {s.updated}</p>}
+    </>
+  )}
+</section>

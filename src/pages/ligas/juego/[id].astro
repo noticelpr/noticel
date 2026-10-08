@@ -1,0 +1,114 @@
+---
+// Game page: /deportes/juego/<id>/ (scoreboard, line score, team stats, plays, league news)
+import Base from '../../../layouts/Base.astro';
+import Time from '../../../components/Time.astro';
+import LeagueBadge from '../../../components/deportes/LeagueBadge.astro';
+import AdSlot from '../../../components/AdSlot.astro';
+import TeamLogo from '../../../components/deportes/TeamLogo.astro';
+import { games, gameTime, type Game } from '../../../lib/scores';
+import { league } from '../../../lib/leagues';
+import { getStories, url , storyUrl , sectionUrl } from '../../../lib/site';
+
+export function getStaticPaths() {
+  return games().map((g) => ({ params: { id: g.id! }, props: { g } }));
+}
+const { g } = Astro.props as { g: Game };
+const l = league(g.league)!;
+const live = g.status === 'en-vivo';
+const done = g.status !== 'programado';
+const awayWin = g.status === 'final' && (g.awayScore ?? 0) > (g.homeScore ?? 0);
+const homeWin = g.status === 'final' && (g.homeScore ?? 0) > (g.awayScore ?? 0);
+const status = live ? `EN VIVO${g.note ? ` · ${g.note}` : ''}` : g.status === 'final' ? `Final${g.note ? ` · ${g.note}` : ''}` : gameTime(g.date);
+const news = (await getStories()).filter((s) => s.data.section === 'deportes' && s.data.league === g.league).slice(0, 5);
+const title = `${g.awayFull ?? g.away} vs. ${g.homeFull ?? g.home}`;
+---
+<Base title={`${title} | ${l.name}`} active="deportes" description={`${l.full}: ${title}. ${status}.`}>
+  <div class="ys">
+    <div class="wrap ys-page" id="main">
+      <p class="gm-crumb"><a href={sectionUrl('deportes')}>NotiCel Deportes</a> / <a href={url(`ligas/${l.id}`)}>{l.name}</a></p>
+      {g.demo && <p class="gm-demo-note"><span class="sp-demo">DEMO</span> Juego de demostración: el marcador, las estadísticas y las jugadas son de ejemplo.</p>}
+
+      <section class="ys-card gm-board" style={`--lc:${l.color}`}>
+        <div class="gm-league"><LeagueBadge id={l.id} size="sm" />{l.full}</div>
+        <div class="gm-teams notranslate" translate="no">
+          <div class:list={['gm-team', { win: awayWin }]}>
+            <TeamLogo league={g.league} name={g.awayFull ?? g.away} size={64} />
+            <strong>{g.awayFull ?? g.away}</strong>
+            {g.awayRecord && <span>{g.awayRecord}</span>}
+            <small>Visitante</small>
+          </div>
+          <div class="gm-score">
+            {done ? <b>{g.awayScore}<em>–</em>{g.homeScore}</b> : <b class="gm-vs">vs.</b>}
+            <span class:list={['gm-status', { live }]}>{live && <i class="gm-dot" />}{status}</span>
+          </div>
+          <div class:list={['gm-team', 'home', { win: homeWin }]}>
+            <TeamLogo league={g.league} name={g.homeFull ?? g.home} size={64} />
+            <strong>{g.homeFull ?? g.home}</strong>
+            {g.homeRecord && <span>{g.homeRecord}</span>}
+            <small>Local</small>
+          </div>
+        </div>
+        {g.venue && <p class="gm-venue">{g.venue}</p>}
+      </section>
+
+      <div class="sp-league-page">
+        <div class="sp-data">
+          {g.linescore && (
+            <section class="sp-panel">
+              <h2>Marcador por {l.photo === 'basketball' ? 'parcial' : l.photo === 'volleyball' ? 'set' : 'entrada'}</h2>
+              <div class="sp-table-wrap">
+                <table class="sp-table gm-line">
+                  <thead><tr><th scope="col">Equipo</th>{g.linescore.labels.map((x) => <th scope="col">{x}</th>)}{g.linescore.totals.map((x) => <th scope="col" class="tot">{x}</th>)}</tr></thead>
+                  <tbody>
+                    <tr><th scope="row">{g.away}</th>{g.linescore.away.map((x) => <td>{x}</td>)}{g.linescore.awayTotals.map((x) => <td class="tot">{x}</td>)}</tr>
+                    <tr><th scope="row">{g.home}</th>{g.linescore.home.map((x) => <td>{x}</td>)}{g.linescore.homeTotals.map((x) => <td class="tot">{x}</td>)}</tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {g.stats && (
+            <section class="sp-panel">
+              <h2>Estadísticas del juego</h2>
+              <div class="gm-stats">
+                <div class="gm-stats-h"><span>{g.away}</span><span /><span>{g.home}</span></div>
+                {g.stats.map((s) => <div class="gm-stat"><b>{s.away}</b><span>{s.label}</span><b>{s.home}</b></div>)}
+              </div>
+            </section>
+          )}
+
+          {g.plays && (
+            <section class="sp-panel">
+              <h2>Jugada a jugada</h2>
+              <ol class="gm-plays">{g.plays.map((p) => <li><span>{p.when}</span><p>{p.text}</p></li>)}</ol>
+            </section>
+          )}
+
+          {!done && (
+            <section class="sp-panel">
+              <h2>Previa</h2>
+              <p class="sp-note">
+                {g.awayFull ?? g.away}{g.awayRecord && ` (${g.awayRecord})`} visita a {g.homeFull ?? g.home}{g.homeRecord && ` (${g.homeRecord})`}
+                {' '}el {gameTime(g.date)}{g.venue && `, en ${g.venue}`}. El marcador aparecerá aquí cuando empiece el juego.
+              </p>
+            </section>
+          )}
+        </div>
+
+        <aside class="sp-side">
+        <AdSlot size="rectangle" />
+        <section class="ys-card sp-news">
+          <h2>Noticias de {l.name}</h2>
+          {news.length ? news.map((s) => (
+            <article class="sp-news-item gm-news">
+              <div><a href={storyUrl(s)}><h3 class="hl">{s.data.title}</h3></a><Time date={s.data.date} /></div>
+            </article>
+          )) : <p class="sp-note">Todavía no hay noticias de {l.full}.</p>}
+          <p class="gm-more"><a href={url(`ligas/${l.id}`)}>Calendario y posiciones de {l.name} ›</a></p>
+        </section>
+        </aside>
+      </div>
+    </div>
+  </div>
+</Base>

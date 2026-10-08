@@ -1,53 +1,37 @@
 ---
-// Search page (same as Noticias Xtra's): the browser loads search-index.json and looks for every word typed.
-// Old WordPress searches (noticel.com/?s=...) are sent here from the home page.
 import Base from '../layouts/Base.astro';
-import Sidebar from '../components/Sidebar.astro';
 import { url } from '../lib/site';
 ---
 <Base title="Buscar" noindex>
-  <main id="main" class="wrap" tabindex="-1">
-    <div class="crumbs"><a href={url()}>Portada</a></div>
-    <h1 class="page-h" id="searchTitle">Buscar noticias</h1>
-    <form class="page-search" role="search" action={url('buscar')} method="get">
+  <main class="wrap" id="main">
+    <div class="sec-h" style="margin-top:0"><h1 style="font-size:28px;margin:0;color:var(--purple)" id="searchTitle">Buscar noticias</h1><span class="time" id="searchCount"></span></div>
+    <form class="search page-search" role="search" action={url('buscar')} method="get">
       <label for="pageq" class="sr">Buscar noticias</label>
-      <input id="pageq" name="q" type="search" placeholder="Un pueblo, una persona o un tema, como “Bayamón”" />
-      <button class="btn" type="submit">Buscar</button>
+      <input id="pageq" name="q" type="search" placeholder="Un pueblo o un tema, como “Caguas”" />
+      <button type="submit" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg></button>
     </form>
-    <p class="time" id="searchCount" aria-live="polite"></p>
-    <div class="art-grid">
-      <div class="stack" id="results" data-index={url('search-index.json')}></div>
-      <Sidebar />
-    </div>
+    <div class="list" id="results" data-index={url('search-index.json')}></div>
   </main>
   <script>
     const box = document.getElementById('results')!;
     const q = (new URLSearchParams(location.search).get('q') ?? '').trim();
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-    const input = document.getElementById('pageq') as HTMLInputElement;
-    input.value = q;
+    for (const id of ['q', 'pageq']) { const i = document.getElementById(id) as HTMLInputElement | null; if (i) i.value = q; }
+    if (!q) (document.getElementById('pageq') as HTMLInputElement).focus();
     if (!q) {
-      input.focus();
-      box.innerHTML = '<div class="empty"><p>Escribe un pueblo, una persona o un tema, como “Bayamón” o “béisbol”.</p></div>';
+      box.innerHTML = '<div class="empty"><p>Escribe un pueblo o un tema en el buscador, como “Caguas” o “béisbol”.</p></div>';
     } else {
       document.getElementById('searchTitle')!.textContent = `Resultados para “${q}”`;
-      document.title = `${q} | Buscar | NotiCel`;
-      const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-      const fmt = (d: string) => new Date(d).toLocaleString('es-PR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Puerto_Rico' });
-      type Item = { url: string; title: string; description: string; section: string; author: string; date: string; image: string; tags: string[]; text: string };
+      const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       fetch(box.dataset.index!)
         .then((r) => r.json())
-        .then((items: Item[]) => {
-          const words = norm(q).split(/\s+/).filter(Boolean);
-          // Every word must appear; headline and topic matches come first, then the newest
-          const score = (i: Item) => { const head = norm(`${i.title} ${i.tags.join(' ')}`); return words.filter((w) => head.includes(w)).length; };
-          const hits = items
-            .filter((i) => { const all = norm(`${i.title} ${i.description} ${i.tags.join(' ')} ${i.author} ${i.text}`); return words.every((w) => all.includes(w)); })
-            .sort((a, b) => score(b) - score(a) || Date.parse(b.date) - Date.parse(a.date));
+        .then((items: Array<{ url: string; title: string; description: string; section: string; place: string; date: string; text: string }>) => {
+          const t = norm(q);
+          const hits = items.filter((i) => norm(`${i.title} ${i.description} ${i.place} ${i.text}`).includes(t));
           document.getElementById('searchCount')!.textContent = `${hits.length} ${hits.length === 1 ? 'noticia' : 'noticias'}`;
           box.innerHTML = hits.length
-            ? hits.slice(0, 60).map((i) => `<article class="row"><div>${i.section ? `<span class="kicker">${esc(i.section)}</span>` : ''}<a href="${i.url}"><h3 class="hl">${esc(i.title)}</h3></a>${i.description ? `<p class="sr-dek">${esc(i.description)}</p>` : ''}<div class="time">${fmt(i.date)} · <span class="au">${esc(i.author)}</span></div></div><a href="${i.url}" tabindex="-1" aria-hidden="true"><div class="ph" style="--c:#006FA6">${i.image ? `<img src="${esc(i.image)}" alt="" loading="lazy">` : ''}</div></a></article>`).join('')
-            : `<div class="empty"><p>No encontramos noticias con “${esc(q)}”. Prueba con otra palabra, como un pueblo o un tema.</p></div>`;
+            ? hits.map((i) => `<article class="item" style="grid-template-columns:1fr"><div><span class="badge">${esc(i.section)}</span><a href="${i.url}"><h3 class="hl">${esc(i.title)}</h3></a><p style="margin:0 0 4px;color:var(--muted)">${esc(i.description)}</p><span class="time">${esc(i.place)}</span></div></article>`).join('')
+            : `<div class="empty"><p>No encontramos noticias con “${esc(q)}”. Prueba con un pueblo o un tema, como “Caguas” o “béisbol”.</p></div>`;
         })
         .catch(() => { box.innerHTML = '<div class="empty"><p>No se pudo cargar la búsqueda. Recarga la página para intentarlo otra vez.</p></div>'; });
     }

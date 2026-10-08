@@ -1,0 +1,114 @@
+---
+// En vivo: live YouTube feeds on the left, the latest news on the right.
+// Priority (LIVE_SOURCES in src/lib/site.ts): Senado de PR → Cámara de Representantes → Gobierno de PR → Casa Blanca →
+// NotiCel → NASA. Each time the site
+// rebuilds (every 15 minutes) every channel is checked; the first one that is live plays automatically. If none is live,
+// NotiCel's newest video plays. Readers can also switch channels with the buttons under the video.
+// Tapping a story opens it inside the right column, so the video keeps playing while the reader reads.
+import Base from '../layouts/Base.astro';
+import Ph from '../components/Ph.astro';
+import Time from '../components/Time.astro';
+import { getStories, section, url, LIVE_SOURCES , storyUrl } from '../lib/site';
+import { checkLive, embedFor } from '../lib/live';
+
+const stories = (await getStories()).slice(0, 20);
+const sources = await Promise.all(LIVE_SOURCES.map(async (src) => {
+  const live = await checkLive(src.channel);
+  return { ...src, live, src: embedFor(src.channel, live) };
+}));
+const current = sources.find((x) => x.live) ?? sources.find((x) => x.id === 'noticel') ?? sources[0];
+const title = current.live ? current.live.title || `${current.name} en vivo` : `Ningún canal está transmitiendo ahora`;
+---
+<Base title="En vivo" active="en-vivo" description="En vivo: NotiCel, la Cámara de Representantes de Puerto Rico y la Casa Blanca, con las últimas noticias de Puerto Rico.">
+  <main class="wrap lv" id="main">
+    <div class="lv-grid">
+      <section class="lv-player" aria-labelledby="lv-title">
+        <div class="lv-frame">
+          <iframe data-player src={current.src} title={current.live ? `En vivo: ${title}` : `Último video de ${current.name}`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        </div>
+        <div class="lv-info">
+          {current.live ? <span class="lv-badge" data-lv-badge><i></i>EN VIVO · {current.name}</span> : <span class="lv-badge off" data-lv-badge>ÚLTIMO VIDEO · {current.name}</span>}
+          <h1 id="lv-title" data-lv-title>{title}</h1>
+          <p>{current.live ? 'Cambia de canal abajo.' : 'Mientras tanto, mira el video más reciente de NotiCel o escoge otro canal.'} Toca una noticia para leerla sin dejar de ver.</p>
+          <div class="lv-srcs" role="group" aria-label="Canales en vivo">
+            {sources.map((x) => (
+              <button type="button" class:list={['lv-src', { live: !!x.live }]} aria-pressed={String(x === current)} data-src={x.src}
+                data-title={x.live ? x.live.title || `${x.name} en vivo` : `Último video de ${x.name}`} data-badge={x.live ? `EN VIVO · ${x.name}` : `ÚLTIMO VIDEO · ${x.name}`}>
+                <b>{x.name}</b><small>{x.live ? '● En vivo' : 'Sin transmisión'}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <aside class="lv-side" aria-label="Noticias">
+        <div data-listview>
+          <h2 class="lv-h">Últimas noticias</h2>
+          <ol class="lv-news">
+            {stories.map((s) => (
+              <li>
+                <a href={storyUrl(s)} data-read>
+                  <Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} />
+                  <span class="lv-n-t"><small>{section(s.data.section).name} · <Time date={s.data.date} /></small><b class="hl">{s.data.title}</b></span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div class="lv-reader" data-reader hidden>
+          <div class="lv-reader-bar">
+            <button type="button" class="lv-back" data-back>‹ Noticias</button>
+            <a class="lv-open" data-open href="#">Abrir completa ↗</a>
+          </div>
+          <article class="lv-article" data-article aria-live="polite"></article>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <script>
+    // Channel buttons: switch the video (live stream if that channel is live, otherwise its newest video)
+    const frame = document.querySelector<HTMLIFrameElement>('[data-player]')!;
+    document.querySelectorAll<HTMLButtonElement>('[data-src]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-src]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      frame.src = b.dataset.src!;
+      document.querySelector('[data-lv-title]')!.textContent = b.dataset.title!;
+      const badge = document.querySelector<HTMLElement>('[data-lv-badge]')!;
+      badge.classList.toggle('off', !b.classList.contains('live'));
+      badge.innerHTML = `${b.classList.contains('live') ? '<i></i>' : ''}${b.dataset.badge}`;
+    }));
+
+    // Phones: the reader's top bar sits right under the pinned video
+    const player = document.querySelector<HTMLElement>('.lv-player')!;
+    const setH = () => document.documentElement.style.setProperty('--lv-h', `${player.offsetHeight}px`);
+    setH(); addEventListener('resize', setH);
+
+    // Read a story inside the right column (the video keeps playing)
+    const side = document.querySelector<HTMLElement>('.lv-side')!;
+    const listView = side.querySelector<HTMLElement>('[data-listview]')!;
+    const reader = side.querySelector<HTMLElement>('[data-reader]')!;
+    const art = side.querySelector<HTMLElement>('[data-article]')!;
+    const open = side.querySelector<HTMLAnchorElement>('[data-open]')!;
+    const toTop = () => { side.scrollTop = 0; if (matchMedia('(max-width: 899px)').matches) reader.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    async function read(href: string) {
+      listView.hidden = true; reader.hidden = false; open.href = href;
+      art.innerHTML = '<p class="lv-loading">Cargando…</p>'; toTop();
+      try {
+        const doc = new DOMParser().parseFromString(await (await fetch(href)).text(), 'text/html');
+        const src = doc.querySelector('article.art');
+        if (!src) throw new Error('no article');
+        // Keep the story itself (label, title, summary, byline, photo, text, sources); drop tools, comments, ads and extras
+        src.querySelectorAll('script, .crumbs, .by-actions, .by-pic, section, aside, nav, .ad-slot, .gt, form, button').forEach((n) => n.remove());
+        art.replaceChildren(document.importNode(src, true));
+      } catch {
+        art.innerHTML = `<p class="lv-loading">No se pudo cargar. <a href="${href}">Ábrela aquí</a>.</p>`;
+      }
+    }
+    side.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-read]');
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault(); read(a.href);
+    });
+    side.querySelector('[data-back]')!.addEventListener('click', () => { reader.hidden = true; listView.hidden = false; art.innerHTML = ''; toTop(); });
+  </script>
+</Base>

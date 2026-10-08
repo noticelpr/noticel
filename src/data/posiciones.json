@@ -1,0 +1,1431 @@
+{
+  "doble-a": {
+    "updated": "Temporada regular 2026 (final). Fuente: beisboldobleapr.com",
+    "groups": [
+      {
+        "name": "Sección Este",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Artesanos de Las Piedras",
+            "w": 18,
+            "l": 2,
+            "gb": "—",
+            "extra": [
+              "9-1",
+              "G7"
+            ]
+          },
+          {
+            "team": "Cariduros de Fajardo",
+            "w": 13,
+            "l": 7,
+            "gb": "5",
+            "extra": [
+              "7-3",
+              "G2"
+            ]
+          },
+          {
+            "team": "Mulos del Valenciano de Juncos",
+            "w": 11,
+            "l": 9,
+            "gb": "7",
+            "extra": [
+              "6-4",
+              "P1"
+            ]
+          },
+          {
+            "team": "Guerrilleros de Río Grande",
+            "w": 9,
+            "l": 11,
+            "gb": "9",
+            "extra": [
+              "5-5",
+              "P2"
+            ]
+          },
+          {
+            "team": "Cocoteros de Loíza",
+            "w": 8,
+            "l": 12,
+            "gb": "10",
+            "extra": [
+              "2-8",
+              "P3"
+            ]
+          },
+          {
+            "team": "Halcones de Gurabo",
+            "w": 3,
+            "l": 17,
+            "gb": "15",
+            "extra": [
+              "0-10",
+              "P10"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sección Sureste",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Azucareros de Yabucoa",
+            "w": 13,
+            "l": 7,
+            "gb": "—",
+            "extra": [
+              "6-4",
+              "P2"
+            ]
+          },
+          {
+            "team": "Jueyeros de Maunabo",
+            "w": 11,
+            "l": 9,
+            "gb": "2",
+            "extra": [
+              "4-6",
+              "G1"
+            ]
+          },
+          {
+            "team": "Leones de Patillas",
+            "w": 10,
+            "l": 10,
+            "gb": "3",
+            "extra": [
+              "6-4",
+              "G3"
+            ]
+          },
+          {
+            "team": "Grises de Humacao",
+            "w": 9,
+            "l": 11,
+            "gb": "4",
+            "extra": [
+              "5-5",
+              "G1"
+            ]
+          },
+          {
+            "team": "Samaritanos de San Lorenzo",
+            "w": 5,
+            "l": 15,
+            "gb": "8",
+            "extra": [
+              "2-8",
+              "P4"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sección Central",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Toritos de Cayey",
+            "w": 16,
+            "l": 4,
+            "gb": "—",
+            "extra": [
+              "7-3",
+              "P2"
+            ]
+          },
+          {
+            "team": "Pescadores del Plata de Comerío",
+            "w": 15,
+            "l": 5,
+            "gb": "1",
+            "extra": [
+              "10-0",
+              "G10"
+            ]
+          },
+          {
+            "team": "Criollos de Caguas",
+            "w": 12,
+            "l": 8,
+            "gb": "4",
+            "extra": [
+              "5-5",
+              "P3"
+            ]
+          },
+          {
+            "team": "Bravos de Cidra",
+            "w": 9,
+            "l": 12,
+            "gb": "7.5",
+            "extra": [
+              "5-5",
+              "G2"
+            ]
+          },
+          {
+            "team": "Próceres de Barranquitas",
+            "w": 8,
+            "l": 13,
+            "gb": "8.5",
+            "extra": [
+              "5-5",
+              "P1"
+            ]
+          },
+          {
+            "team": "Polluelos de Aibonito",
+            "w": 7,
+            "l": 13,
+            "gb": "9",
+            "extra": [
+              "5-5",
+              "P2"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sección Norte",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Arenosos de Camuy",
+            "w": 13,
+            "l": 7,
+            "gb": "—",
+            "extra": [
+              "5-5",
+              "P3"
+            ]
+          },
+          {
+            "team": "Tigres de Hatillo",
+            "w": 12,
+            "l": 8,
+            "gb": "1",
+            "extra": [
+              "6-4",
+              "P1"
+            ]
+          },
+          {
+            "team": "Atenienses de Manatí",
+            "w": 11,
+            "l": 9,
+            "gb": "2",
+            "extra": [
+              "7-3",
+              "G4"
+            ]
+          },
+          {
+            "team": "Titanes de Florida",
+            "w": 10,
+            "l": 10,
+            "gb": "3",
+            "extra": [
+              "4-6",
+              "P3"
+            ]
+          },
+          {
+            "team": "Industriales de Barceloneta",
+            "w": 9,
+            "l": 11,
+            "gb": "4",
+            "extra": [
+              "3-7",
+              "P1"
+            ]
+          },
+          {
+            "team": "Montañeses de Utuado",
+            "w": 9,
+            "l": 11,
+            "gb": "4",
+            "extra": [
+              "7-3",
+              "P1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sección Metro",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Guardianes de Dorado",
+            "w": 13,
+            "l": 7,
+            "gb": "—",
+            "extra": [
+              "6-4",
+              "G2"
+            ]
+          },
+          {
+            "team": "Gigantes de Carolina",
+            "w": 13,
+            "l": 7,
+            "gb": "—",
+            "extra": [
+              "6-4",
+              "G2"
+            ]
+          },
+          {
+            "team": "Lancheros de Cataño",
+            "w": 11,
+            "l": 9,
+            "gb": "2",
+            "extra": [
+              "6-4",
+              "G3"
+            ]
+          },
+          {
+            "team": "Maceteros de Vega Alta",
+            "w": 10,
+            "l": 10,
+            "gb": "3",
+            "extra": [
+              "6-4",
+              "P1"
+            ]
+          },
+          {
+            "team": "Mets de Guaynabo",
+            "w": 6,
+            "l": 14,
+            "gb": "7",
+            "extra": [
+              "2-8",
+              "P2"
+            ]
+          },
+          {
+            "team": "Melao Melao de Vega Baja",
+            "w": 3,
+            "l": 17,
+            "gb": "10",
+            "extra": [
+              "1-9",
+              "G1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sección Noroeste",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Patrulleros de San Sebastián",
+            "w": 19,
+            "l": 1,
+            "gb": "—",
+            "extra": [
+              "9-1",
+              "G6"
+            ]
+          },
+          {
+            "team": "Libertadores de Hormigueros",
+            "w": 14,
+            "l": 6,
+            "gb": "5",
+            "extra": [
+              "7-3",
+              "G3"
+            ]
+          },
+          {
+            "team": "Tiburones de Aguadilla",
+            "w": 12,
+            "l": 8,
+            "gb": "7",
+            "extra": [
+              "6-4",
+              "P3"
+            ]
+          },
+          {
+            "team": "Fundadores de Añasco",
+            "w": 10,
+            "l": 10,
+            "gb": "9",
+            "extra": [
+              "4-6",
+              "G1"
+            ]
+          },
+          {
+            "team": "Navegantes de Aguada",
+            "w": 2,
+            "l": 18,
+            "gb": "17",
+            "extra": [
+              "1-9",
+              "P2"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sección Sur",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Poetas de Juana Díaz",
+            "w": 13,
+            "l": 7,
+            "gb": "—",
+            "extra": [
+              "6-4",
+              "G2"
+            ]
+          },
+          {
+            "team": "Brujos de Guayama",
+            "w": 10,
+            "l": 10,
+            "gb": "3",
+            "extra": [
+              "6-4",
+              "G2"
+            ]
+          },
+          {
+            "team": "Maratonistas de Coamo",
+            "w": 10,
+            "l": 10,
+            "gb": "3",
+            "extra": [
+              "4-6",
+              "G3"
+            ]
+          },
+          {
+            "team": "Peces Voladores de Salinas",
+            "w": 9,
+            "l": 11,
+            "gb": "4",
+            "extra": [
+              "4-6",
+              "G1"
+            ]
+          },
+          {
+            "team": "Potros de Santa Isabel",
+            "w": 8,
+            "l": 12,
+            "gb": "5",
+            "extra": [
+              "3-7",
+              "P1"
+            ]
+          },
+          {
+            "team": "Cachorros de Ponce",
+            "w": 4,
+            "l": 16,
+            "gb": "9",
+            "extra": [
+              "1-9",
+              "P9"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sección Suroeste",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Petateros de Sabana Grande",
+            "w": 11,
+            "l": 9,
+            "gb": "—",
+            "extra": [
+              "7-3",
+              "G1"
+            ]
+          },
+          {
+            "team": "Petroleros de Peñuelas",
+            "w": 9,
+            "l": 11,
+            "gb": "2",
+            "extra": [
+              "5-5",
+              "P3"
+            ]
+          },
+          {
+            "team": "Cafeteros de Yauco",
+            "w": 8,
+            "l": 12,
+            "gb": "3",
+            "extra": [
+              "3-7",
+              "G1"
+            ]
+          },
+          {
+            "team": "Piratas de Cabo Rojo",
+            "w": 8,
+            "l": 12,
+            "gb": "3",
+            "extra": [
+              "4-6",
+              "P1"
+            ]
+          },
+          {
+            "team": "Cardenales de Lajas",
+            "w": 7,
+            "l": 13,
+            "gb": "4",
+            "extra": [
+              "4-6",
+              "G1"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "mlb": {
+    "updated": "Temporada regular 2026 (final). Fuente: MLB.com",
+    "groups": [
+      {
+        "name": "Liga Americana · Este",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Tampa Bay Rays",
+            "w": 98,
+            "l": 64,
+            "gb": "—",
+            "extra": [
+              "5-5",
+              "P1"
+            ]
+          },
+          {
+            "team": "New York Yankees",
+            "w": 93,
+            "l": 68,
+            "gb": "4.5",
+            "extra": [
+              "5-5",
+              "G1"
+            ]
+          },
+          {
+            "team": "Boston Red Sox",
+            "w": 87,
+            "l": 75,
+            "gb": "11.0",
+            "extra": [
+              "5-5",
+              "P1"
+            ]
+          },
+          {
+            "team": "Baltimore Orioles",
+            "w": 79,
+            "l": 82,
+            "gb": "18.5",
+            "extra": [
+              "6-4",
+              "P1"
+            ]
+          },
+          {
+            "team": "Toronto Blue Jays",
+            "w": 79,
+            "l": 83,
+            "gb": "19.0",
+            "extra": [
+              "4-6",
+              "G1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Liga Americana · Central",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Cleveland Guardians",
+            "w": 85,
+            "l": 77,
+            "gb": "—",
+            "extra": [
+              "8-2",
+              "P1"
+            ]
+          },
+          {
+            "team": "Chicago White Sox",
+            "w": 84,
+            "l": 78,
+            "gb": "1.0",
+            "extra": [
+              "7-3",
+              "G1"
+            ]
+          },
+          {
+            "team": "Minnesota Twins",
+            "w": 77,
+            "l": 85,
+            "gb": "8.0",
+            "extra": [
+              "6-4",
+              "G1"
+            ]
+          },
+          {
+            "team": "Detroit Tigers",
+            "w": 76,
+            "l": 86,
+            "gb": "9.0",
+            "extra": [
+              "4-6",
+              "P1"
+            ]
+          },
+          {
+            "team": "Kansas City Royals",
+            "w": 69,
+            "l": 93,
+            "gb": "16.0",
+            "extra": [
+              "2-8",
+              "G1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Liga Americana · Oeste",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Houston Astros",
+            "w": 81,
+            "l": 81,
+            "gb": "—",
+            "extra": [
+              "5-5",
+              "G2"
+            ]
+          },
+          {
+            "team": "Texas Rangers",
+            "w": 80,
+            "l": 82,
+            "gb": "1.0",
+            "extra": [
+              "4-6",
+              "P1"
+            ]
+          },
+          {
+            "team": "Seattle Mariners",
+            "w": 76,
+            "l": 86,
+            "gb": "5.0",
+            "extra": [
+              "6-4",
+              "G2"
+            ]
+          },
+          {
+            "team": "Athletics",
+            "w": 64,
+            "l": 98,
+            "gb": "17.0",
+            "extra": [
+              "3-7",
+              "P2"
+            ]
+          },
+          {
+            "team": "Los Angeles Angels",
+            "w": 62,
+            "l": 100,
+            "gb": "19.0",
+            "extra": [
+              "4-6",
+              "P2"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Liga Nacional · Este",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Atlanta Braves",
+            "w": 94,
+            "l": 68,
+            "gb": "—",
+            "extra": [
+              "5-5",
+              "P1"
+            ]
+          },
+          {
+            "team": "Philadelphia Phillies",
+            "w": 88,
+            "l": 74,
+            "gb": "6.0",
+            "extra": [
+              "4-6",
+              "G1"
+            ]
+          },
+          {
+            "team": "Miami Marlins",
+            "w": 80,
+            "l": 82,
+            "gb": "14.0",
+            "extra": [
+              "5-5",
+              "G1"
+            ]
+          },
+          {
+            "team": "Washington Nationals",
+            "w": 77,
+            "l": 85,
+            "gb": "17.0",
+            "extra": [
+              "6-4",
+              "G1"
+            ]
+          },
+          {
+            "team": "New York Mets",
+            "w": 74,
+            "l": 88,
+            "gb": "20.0",
+            "extra": [
+              "5-5",
+              "P1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Liga Nacional · Central",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Milwaukee Brewers",
+            "w": 103,
+            "l": 59,
+            "gb": "—",
+            "extra": [
+              "8-2",
+              "G5"
+            ]
+          },
+          {
+            "team": "Chicago Cubs",
+            "w": 89,
+            "l": 73,
+            "gb": "14.0",
+            "extra": [
+              "5-5",
+              "G1"
+            ]
+          },
+          {
+            "team": "Pittsburgh Pirates",
+            "w": 82,
+            "l": 80,
+            "gb": "21.0",
+            "extra": [
+              "7-3",
+              "G1"
+            ]
+          },
+          {
+            "team": "St. Louis Cardinals",
+            "w": 77,
+            "l": 85,
+            "gb": "26.0",
+            "extra": [
+              "2-8",
+              "P4"
+            ]
+          },
+          {
+            "team": "Cincinnati Reds",
+            "w": 75,
+            "l": 87,
+            "gb": "28.0",
+            "extra": [
+              "4-6",
+              "P1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Liga Nacional · Oeste",
+        "columns": [
+          "ÚLT. 10",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Los Angeles Dodgers",
+            "w": 100,
+            "l": 62,
+            "gb": "—",
+            "extra": [
+              "8-2",
+              "G3"
+            ]
+          },
+          {
+            "team": "San Diego Padres",
+            "w": 91,
+            "l": 71,
+            "gb": "9.0",
+            "extra": [
+              "8-2",
+              "G2"
+            ]
+          },
+          {
+            "team": "Arizona Diamondbacks",
+            "w": 86,
+            "l": 76,
+            "gb": "14.0",
+            "extra": [
+              "6-4",
+              "P2"
+            ]
+          },
+          {
+            "team": "San Francisco Giants",
+            "w": 65,
+            "l": 97,
+            "gb": "35.0",
+            "extra": [
+              "2-8",
+              "P5"
+            ]
+          },
+          {
+            "team": "Colorado Rockies",
+            "w": 58,
+            "l": 104,
+            "gb": "42.0",
+            "extra": [
+              "2-8",
+              "P1"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "lvsf": {
+    "updated": "Temporada regular 2026 (final, 19 de marzo de 2026). Fuente: Federación Puertorriqueña de Voleibol",
+    "groups": [
+      {
+        "columns": [
+          "PUNTOS"
+        ],
+        "rows": [
+          {
+            "team": "Cangrejeras de Santurce",
+            "w": 20,
+            "l": 0,
+            "gb": "—",
+            "extra": [
+              "57"
+            ]
+          },
+          {
+            "team": "Criollas de Caguas",
+            "w": 10,
+            "l": 10,
+            "gb": "10",
+            "extra": [
+              "31"
+            ]
+          },
+          {
+            "team": "Pinkin de Corozal",
+            "w": 9,
+            "l": 11,
+            "gb": "11",
+            "extra": [
+              "27"
+            ]
+          },
+          {
+            "team": "Leonas de Ponce",
+            "w": 8,
+            "l": 12,
+            "gb": "12",
+            "extra": [
+              "24"
+            ]
+          },
+          {
+            "team": "Atenienses de Manatí",
+            "w": 7,
+            "l": 13,
+            "gb": "13",
+            "extra": [
+              "22"
+            ]
+          },
+          {
+            "team": "Valencianas de Juncos",
+            "w": 6,
+            "l": 14,
+            "gb": "14",
+            "extra": [
+              "19"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "nfl": {
+    "updated": "2 de octubre de 2026 (después del jueves de la semana 4). Fuente: NFL.com",
+    "groups": [
+      {
+        "name": "AFC Este",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Buffalo Bills",
+            "w": 3,
+            "l": 0,
+            "gb": "—",
+            "extra": [
+              "101",
+              "78",
+              "0-0",
+              "G3"
+            ]
+          },
+          {
+            "team": "New York Jets",
+            "w": 1,
+            "l": 2,
+            "gb": "2.0",
+            "extra": [
+              "64",
+              "61",
+              "0-0",
+              "P2"
+            ]
+          },
+          {
+            "team": "New England Patriots",
+            "w": 1,
+            "l": 2,
+            "gb": "2.0",
+            "extra": [
+              "36",
+              "51",
+              "0-0",
+              "P1"
+            ]
+          },
+          {
+            "team": "Miami Dolphins",
+            "w": 0,
+            "l": 3,
+            "gb": "3.0",
+            "extra": [
+              "36",
+              "86",
+              "0-0",
+              "P3"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AFC Norte",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Cleveland Browns",
+            "w": 3,
+            "l": 1,
+            "gb": "—",
+            "extra": [
+              "81",
+              "95",
+              "1-0",
+              "G3"
+            ]
+          },
+          {
+            "team": "Baltimore Ravens",
+            "w": 2,
+            "l": 1,
+            "gb": "0.5",
+            "extra": [
+              "92",
+              "78",
+              "0-0",
+              "G1"
+            ]
+          },
+          {
+            "team": "Cincinnati Bengals",
+            "w": 2,
+            "l": 1,
+            "gb": "0.5",
+            "extra": [
+              "80",
+              "63",
+              "0-1",
+              "P1"
+            ]
+          },
+          {
+            "team": "Pittsburgh Steelers",
+            "w": 2,
+            "l": 2,
+            "gb": "1.0",
+            "extra": [
+              "77",
+              "87",
+              "1-1",
+              "P1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AFC Sur",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Jacksonville Jaguars",
+            "w": 2,
+            "l": 1,
+            "gb": "—",
+            "extra": [
+              "82",
+              "36",
+              "0-0",
+              "G1"
+            ]
+          },
+          {
+            "team": "Indianapolis Colts",
+            "w": 1,
+            "l": 2,
+            "gb": "1.0",
+            "extra": [
+              "72",
+              "91",
+              "1-0",
+              "G1"
+            ]
+          },
+          {
+            "team": "Tennessee Titans",
+            "w": 0,
+            "l": 3,
+            "gb": "2.0",
+            "extra": [
+              "37",
+              "59",
+              "0-0",
+              "P3"
+            ]
+          },
+          {
+            "team": "Houston Texans",
+            "w": 0,
+            "l": 3,
+            "gb": "2.0",
+            "extra": [
+              "54",
+              "75",
+              "0-1",
+              "P3"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AFC Oeste",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Kansas City Chiefs",
+            "w": 3,
+            "l": 0,
+            "gb": "—",
+            "extra": [
+              "88",
+              "50",
+              "1-0",
+              "G3"
+            ]
+          },
+          {
+            "team": "Las Vegas Raiders",
+            "w": 3,
+            "l": 0,
+            "gb": "—",
+            "extra": [
+              "88",
+              "54",
+              "1-0",
+              "G3"
+            ]
+          },
+          {
+            "team": "Denver Broncos",
+            "w": 2,
+            "l": 1,
+            "gb": "1.0",
+            "extra": [
+              "60",
+              "70",
+              "0-1",
+              "G2"
+            ]
+          },
+          {
+            "team": "Los Angeles Chargers",
+            "w": 0,
+            "l": 3,
+            "gb": "3.0",
+            "extra": [
+              "44",
+              "76",
+              "0-1",
+              "P3"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "NFC Este",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Philadelphia Eagles",
+            "w": 2,
+            "l": 1,
+            "gb": "—",
+            "extra": [
+              "55",
+              "69",
+              "1-0",
+              "P1"
+            ]
+          },
+          {
+            "team": "New York Giants",
+            "w": 2,
+            "l": 1,
+            "gb": "—",
+            "extra": [
+              "46",
+              "55",
+              "1-0",
+              "G1"
+            ]
+          },
+          {
+            "team": "Dallas Cowboys",
+            "w": 1,
+            "l": 2,
+            "gb": "1.0",
+            "extra": [
+              "88",
+              "82",
+              "1-1",
+              "P1"
+            ]
+          },
+          {
+            "team": "Washington Commanders",
+            "w": 1,
+            "l": 2,
+            "gb": "1.0",
+            "extra": [
+              "75",
+              "92",
+              "0-2",
+              "G1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "NFC Norte",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Minnesota Vikings",
+            "w": 3,
+            "l": 0,
+            "gb": "—",
+            "extra": [
+              "71",
+              "41",
+              "2-0",
+              "G3"
+            ]
+          },
+          {
+            "team": "Detroit Lions",
+            "w": 2,
+            "l": 1,
+            "gb": "1.0",
+            "extra": [
+              "93",
+              "95",
+              "0-0",
+              "G1"
+            ]
+          },
+          {
+            "team": "Chicago Bears",
+            "w": 2,
+            "l": 1,
+            "gb": "1.0",
+            "extra": [
+              "89",
+              "53",
+              "0-1",
+              "G1"
+            ]
+          },
+          {
+            "team": "Green Bay Packers",
+            "w": 1,
+            "l": 2,
+            "gb": "2.0",
+            "extra": [
+              "56",
+              "91",
+              "0-1",
+              "P1"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "NFC Sur",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "Carolina Panthers",
+            "w": 1,
+            "l": 2,
+            "gb": "—",
+            "extra": [
+              "89",
+              "83",
+              "1-0",
+              "P1"
+            ]
+          },
+          {
+            "team": "New Orleans Saints",
+            "w": 1,
+            "l": 2,
+            "gb": "—",
+            "extra": [
+              "81",
+              "83",
+              "0-0",
+              "P1"
+            ]
+          },
+          {
+            "team": "Atlanta Falcons",
+            "w": 1,
+            "l": 2,
+            "gb": "—",
+            "extra": [
+              "51",
+              "68",
+              "0-1",
+              "G1"
+            ]
+          },
+          {
+            "team": "Tampa Bay Buccaneers",
+            "w": 0,
+            "l": 3,
+            "gb": "1.0",
+            "extra": [
+              "62",
+              "79",
+              "0-0",
+              "P3"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "NFC Oeste",
+        "columns": [
+          "PF",
+          "PC",
+          "DIV",
+          "RACHA"
+        ],
+        "rows": [
+          {
+            "team": "San Francisco 49ers",
+            "w": 3,
+            "l": 0,
+            "gb": "—",
+            "extra": [
+              "98",
+              "50",
+              "2-0",
+              "G3"
+            ]
+          },
+          {
+            "team": "Seattle Seahawks",
+            "w": 2,
+            "l": 1,
+            "gb": "1.0",
+            "extra": [
+              "75",
+              "50",
+              "1-0",
+              "P1"
+            ]
+          },
+          {
+            "team": "Los Angeles Rams",
+            "w": 1,
+            "l": 2,
+            "gb": "2.0",
+            "extra": [
+              "61",
+              "63",
+              "0-1",
+              "P1"
+            ]
+          },
+          {
+            "team": "Arizona Cardinals",
+            "w": 1,
+            "l": 2,
+            "gb": "2.0",
+            "extra": [
+              "63",
+              "81",
+              "0-2",
+              "P2"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

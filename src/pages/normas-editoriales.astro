@@ -1,0 +1,38 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE, url , sectionUrl } from '../lib/site';
+---
+<Base title="Normas editoriales y correcciones" description="Cómo trabajamos en NotiCel y cómo corregimos nuestros errores.">
+  <main class="wrap" id="main">
+    <div class="page">
+      <h1>Normas editoriales y correcciones</h1>
+      <p class="pg-draft"><span class="sp-demo">BORRADOR</span> Texto tomado de Noticias Xtra para el sitio de prueba. NotiCel debe revisarlo y aprobarlo antes del lanzamiento.</p>
+
+      <h2>Exactitud</h2>
+      <p>Solo publicamos hechos que podemos atribuir a una fuente. No inventamos cifras, nombres ni citas. Cuando una fuente hace una afirmación que otros podrían disputar, lo decimos claramente: "según el Departamento de Justicia", "afirmó la Casa Blanca".</p>
+
+      <h2>Fuentes</h2>
+      <p>Damos prioridad a fuentes oficiales y primarias. Al final de cada noticia aparecen las fuentes con su enlace cuando está disponible. No copiamos el trabajo de otros medios.</p>
+
+      <h2>Noticias y opinión</h2>
+      <p>Las noticias se limitan a los hechos. Las columnas y editoriales aparecen solo en la sección de <a href={sectionUrl('opiniones')}>Opinión</a>, identificadas como tales. Nuestra línea editorial se explica en <a href={url('quienes-somos')}>Quiénes somos</a>.</p>
+
+      <h2>Lenguaje sencillo</h2>
+      <p>Escribimos con oraciones cortas y palabras de uso diario. Explicamos los términos técnicos y las siglas la primera vez que aparecen.</p>
+
+      <h2>Cómo revisamos</h2>
+      <p>Preparamos las noticias a partir de fuentes oficiales. Los avisos de rutina, como las alertas del tiempo, salen de inmediato y la redacción los revisa después. Las noticias sobre crímenes, accidentes, menores de edad, política o acusaciones contra personas siempre las aprueba un editor antes de publicarse.</p>
+
+      <h2>Fotos</h2>
+      <p>Cuando una foto no es del suceso mismo, lo indicamos con "Imagen de archivo" o "Imagen de referencia". Cada foto muestra el nombre de su autor y su licencia.</p>
+
+      <h2>Correcciones</h2>
+      <p>Si cometemos un error, lo corregimos lo antes posible. Al final de la noticia añadimos una nota de corrección con la fecha y lo que cambió. No borramos errores en silencio.</p>
+      {SITE.email ? (
+        <p>¿Encontraste un error? Escríbenos a <a href={`mailto:${SITE.email}?subject=${encodeURIComponent('Corrección')}`}>{SITE.email}</a> con el enlace de la noticia y lo que debe corregirse.</p>
+      ) : (
+        <p>Muy pronto publicaremos el correo para solicitar correcciones.</p>
+      )}
+    </div>
+  </main>
+</Base>

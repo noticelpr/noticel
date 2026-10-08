@@ -1,0 +1,120 @@
+{
+  "mlb": {
+    "name": "Postemporada MLB 2026",
+    "updated": "1 de octubre de 2026. Fuente: MLB.com",
+    "rounds": [
+      {
+        "name": "Serie de Comodines",
+        "series": [
+          {
+            "a": "Chicago White Sox",
+            "b": "Houston Astros",
+            "aWins": 2,
+            "bWins": 0,
+            "note": "Liga Americana"
+          },
+          {
+            "a": "New York Yankees",
+            "b": "Boston Red Sox",
+            "aWins": 2,
+            "bWins": 0,
+            "note": "Liga Americana"
+          },
+          {
+            "a": "San Diego Padres",
+            "b": "Chicago Cubs",
+            "aWins": 2,
+            "bWins": 0,
+            "note": "Liga Nacional"
+          },
+          {
+            "a": "Atlanta Braves",
+            "b": "Philadelphia Phillies",
+            "aWins": 2,
+            "bWins": 1,
+            "note": "Liga Nacional"
+          }
+        ]
+      },
+      {
+        "name": "Serie Divisional",
+        "series": [
+          {
+            "a": "Cleveland Guardians",
+            "b": "Chicago White Sox",
+            "note": "Liga Americana · Comienza el 3 de octubre"
+          },
+          {
+            "a": "Tampa Bay Rays",
+            "b": "New York Yankees",
+            "note": "Liga Americana · Comienza el 3 de octubre"
+          },
+          {
+            "a": "Los Angeles Dodgers",
+            "b": "Atlanta Braves",
+            "note": "Liga Nacional · Comienza el 3 de octubre"
+          },
+          {
+            "a": "Milwaukee Brewers",
+            "b": "San Diego Padres",
+            "note": "Liga Nacional · Comienza el 3 de octubre"
+          }
+        ]
+      },
+      {
+        "name": "Serie de Campeonato",
+        "series": [
+          {
+            "a": "Por definir",
+            "b": "Por definir",
+            "note": "Liga Americana · Comienza el 12 de octubre"
+          },
+          {
+            "a": "Por definir",
+            "b": "Por definir",
+            "note": "Liga Nacional · Comienza el 11 de octubre"
+          }
+        ]
+      },
+      {
+        "name": "Serie Mundial",
+        "series": [
+          {
+            "a": "Campeón Liga Americana",
+            "b": "Campeón Liga Nacional",
+            "note": "Comienza el 23 de octubre"
+          }
+        ]
+      }
+    ]
+  },
+  "lvsf": {
+    "name": "Postemporada 2026: Cangrejeras de Santurce, campeonas",
+    "updated": "29 de abril de 2026. Fuente: Federación Puertorriqueña de Voleibol",
+    "rounds": [
+      {
+        "name": "Semifinal",
+        "series": [
+          {
+            "a": "Cangrejeras de Santurce",
+            "b": "Valencianas de Juncos",
+            "aWins": 4,
+            "bWins": 0
+          }
+        ]
+      },
+      {
+        "name": "Serie Final",
+        "series": [
+          {
+            "a": "Cangrejeras de Santurce",
+            "b": "Leonas de Ponce",
+            "aWins": 4,
+            "bWins": 0,
+            "note": "Barrida histórica: temporada regular perfecta de 20-0"
+          }
+        ]
+      }
+    ]
+  }
+}

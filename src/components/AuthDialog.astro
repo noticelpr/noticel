@@ -1,0 +1,106 @@
+---
+// "Entrar / Crear cuenta" box for readers (src/lib/account.ts). Opened from the profile menu, the comment box or
+// anywhere with askLogin(). Google, or email + password; new accounts pick a public username.
+// Also finishes a Google login when the reader comes back to the page (#access_token in the address).
+---
+<dialog class="auth" data-auth aria-labelledby="auth-h">
+  <form method="dialog" class="auth-x-f"><button class="auth-x" aria-label="Cerrar">✕</button></form>
+  <h2 id="auth-h" data-auth-h>Entra a NotiCel</h2>
+  <p class="auth-why" data-auth-why hidden></p>
+  <button type="button" class="auth-google" data-auth-google hidden>
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.5z"/></svg>
+    Continuar con Google
+  </button>
+  <p class="auth-or" data-auth-or hidden><span>o con tu correo</span></p>
+  <div class="auth-tabs" role="tablist">
+    <button type="button" role="tab" data-auth-tab="in" aria-selected="true">Entrar</button>
+    <button type="button" role="tab" data-auth-tab="up" aria-selected="false">Crear cuenta</button>
+  </div>
+  <form class="auth-form" data-auth-form novalidate>
+    <label data-auth-user hidden>Nombre de usuario (público)
+      <span class="auth-at"><b>@</b><input name="username" autocomplete="username" maxlength="20" placeholder="ej. lectora_bayamon" /></span>
+      <small>3 a 20 letras minúsculas, números, punto o guion bajo. Así te verán en los comentarios.</small>
+    </label>
+    <label>Correo<input name="email" type="email" autocomplete="email" required placeholder="tu@correo.com" /></label>
+    <label>Contraseña<input name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="Al menos 8 caracteres" /></label>
+    <p class="auth-err" data-auth-err role="alert" hidden></p>
+    <button type="submit" class="auth-go" data-auth-go>Entrar</button>
+    <button type="button" class="auth-link" data-auth-reset>¿Olvidaste tu contraseña?</button>
+    <p class="auth-fine" data-auth-fine hidden>Al crear tu cuenta confirmas que tienes 13 años o más y aceptas los <a href="terminos/">términos de uso</a> y la <a href="privacidad/">política de privacidad</a>.</p>
+  </form>
+</dialog>
+<dialog class="auth" data-newpass aria-labelledby="np-h">
+  <h2 id="np-h">Crea tu contraseña nueva</h2>
+  <form class="auth-form" data-np-form novalidate>
+    <label>Contraseña nueva<input name="p1" type="password" autocomplete="new-password" minlength="8" placeholder="Al menos 8 caracteres" /></label>
+    <label>Repítela<input name="p2" type="password" autocomplete="new-password" minlength="8" /></label>
+    <p class="auth-err" data-np-err role="alert" hidden></p>
+    <button type="submit" class="auth-go">Guardar contraseña</button>
+  </form>
+</dialog>
+<script>
+  import { accountsOn, signIn, signUp, signInWithGoogle, finishRedirect, sendReset, setPassword, loggedIn, me, googleEnabled } from '../lib/account';
+  const dlg = document.querySelector<HTMLDialogElement>('[data-auth]');
+  if (dlg && accountsOn()) {
+    const $ = <T extends Element = HTMLElement>(s: string) => dlg.querySelector<T>(s)!;
+    const form = $<HTMLFormElement>('[data-auth-form]'), err = $('[data-auth-err]'), go = $<HTMLButtonElement>('[data-auth-go]');
+    // Links in the fine print are relative to the site's base
+    dlg.querySelectorAll<HTMLAnchorElement>('.auth-fine a').forEach((a) => (a.href = `${document.body.dataset.base}${a.getAttribute('href')}`));
+    let mode: 'in' | 'up' = 'in';
+    const setMode = (m: 'in' | 'up') => {
+      mode = m; err.hidden = true;
+      dlg.querySelectorAll<HTMLElement>('[data-auth-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.authTab === m)));
+      $('[data-auth-user]').hidden = m !== 'up'; $('[data-auth-fine]').hidden = m !== 'up'; $('[data-auth-reset]').hidden = m !== 'in';
+      $('[data-auth-h]').textContent = m === 'up' ? 'Crea tu cuenta' : 'Entra a NotiCel';
+      go.textContent = m === 'up' ? 'Crear cuenta' : 'Entrar';
+      form.password.autocomplete = m === 'up' ? 'new-password' : 'current-password';
+    };
+    const say = (t: string) => { err.textContent = t; err.hidden = false; };
+    addEventListener('nc-auth-open', (e) => {
+      const w = (e as CustomEvent).detail?.why as string | undefined;
+      $('[data-auth-why]').textContent = w ?? ''; $('[data-auth-why]').hidden = !w;
+      setMode('in'); form.reset(); dlg.showModal(); form.email.focus();
+    });
+    dlg.querySelectorAll<HTMLElement>('[data-auth-tab]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.authTab as 'in' | 'up')));
+    $('[data-auth-google]').addEventListener('click', signInWithGoogle);
+    // "Continuar con Google" shows only once Google login is turned on in Supabase
+    void googleEnabled().then((on) => { $('[data-auth-google]').hidden = !on; $('[data-auth-or]').hidden = !on; });
+    form.username.addEventListener('input', () => { form.username.value = form.username.value.toLowerCase().replace(/[^a-z0-9._]/g, ''); });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); err.hidden = true;
+      const email = form.email.value.trim(), pass = form.password.value;
+      if (!/^\S+@\S+\.\S+$/.test(email)) return say('Escribe un correo válido.');
+      if (pass.length < 8) return say('La contraseña necesita al menos 8 caracteres.');
+      go.disabled = true; go.textContent = mode === 'up' ? 'Creando…' : 'Entrando…';
+      const r = mode === 'up' ? await signUp(email, pass, form.username.value.trim()) : await signIn(email, pass);
+      go.disabled = false; setMode(mode);
+      if (r.error) return say(r.error);
+      if ('confirm' in r && r.confirm) return say('¡Listo! Te enviamos un correo: toca el enlace para activar tu cuenta y luego entra.');
+      dlg.close();
+    });
+    $('[data-auth-reset]').addEventListener('click', async () => {
+      const email = form.email.value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(email)) return say('Escribe tu correo arriba y toca otra vez “¿Olvidaste tu contraseña?”.');
+      const r = await sendReset(email);
+      say(r.ok ? 'Te enviamos un correo para crear una contraseña nueva.' : r.error!);
+    });
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    // Back from Google: finish the login; otherwise refresh the profile once per visit
+    // From a password-reset email: the reader is signed in for a moment to pick a new password
+    const np = document.querySelector<HTMLDialogElement>('[data-newpass]')!;
+    const npForm = np.querySelector<HTMLFormElement>('[data-np-form]')!, npErr = np.querySelector<HTMLElement>('[data-np-err]')!;
+    npForm.addEventListener('submit', async (e) => {
+      e.preventDefault(); npErr.hidden = true;
+      const p1 = npForm.p1.value, p2 = npForm.p2.value;
+      if (p1 !== p2) { npErr.textContent = 'Las dos contraseñas no son iguales.'; npErr.hidden = false; return; }
+      const r = await setPassword(p1);
+      if (r.error) { npErr.textContent = r.error; npErr.hidden = false; return; }
+      np.close(); dispatchEvent(new CustomEvent('nc-toast', { detail: 'Listo: tu contraseña nueva quedó guardada.' }));
+    });
+    void finishRedirect().then((back) => {
+      if (back === 'recovery') { np.showModal(); npForm.p1.focus(); return; }
+      if (back) dispatchEvent(new CustomEvent('nc-toast', { detail: '¡Bienvenido! Ya entraste a tu cuenta.' }));
+      else if (loggedIn()) { try { if (!sessionStorage.getItem('nc-me')) { sessionStorage.setItem('nc-me', '1'); void me(); } } catch { /* storage blocked */ } }
+    });
+  }
+</script>

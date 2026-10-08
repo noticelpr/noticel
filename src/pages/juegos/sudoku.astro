@@ -1,0 +1,150 @@
+---
+// Sudoku del día: a new 9x9 puzzle every day (same for everyone), made in the browser.
+// Three levels. Progress and best times are kept only on this device.
+import Base from '../../layouts/Base.astro';
+import GameLayout from '../../components/GameLayout.astro';
+import { url } from '../../lib/site';
+---
+<Base title="Sudoku del día" description="Un sudoku nuevo cada día, en tres niveles. Gratis y sin registrarte.">
+  <main class="wrap" id="main">
+    <GameLayout id="sudoku">
+    <div class="jg-game sd" data-sudoku>
+      <p class="tv-kicker"><a href={url('juegos')}>Juegos NotiCel</a> · Sudoku del día</p>
+      <h1>Sudoku</h1>
+      <div class="sd-levels" role="group" aria-label="Nivel">
+        <button type="button" data-level="0" aria-pressed="true">Fácil</button>
+        <button type="button" data-level="1" aria-pressed="false">Medio</button>
+        <button type="button" data-level="2" aria-pressed="false">Difícil</button>
+      </div>
+      <p class="jg-stats"><span>Tiempo: <b data-time>0:00</b></span><span>Errores: <b data-errors>0</b></span></p>
+      <div class="sd-board" role="grid" aria-label="Tablero de sudoku"></div>
+      <div class="sd-pad" aria-label="Números">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => <button type="button" data-n={n}>{n}</button>)}
+        <button type="button" data-n="0" class="sd-erase" aria-label="Borrar">⌫</button>
+      </div>
+      <p class="jg-help">Toca una casilla y luego un número. Cada fila, columna y cuadro de 3×3 debe tener del 1 al 9 sin repetir. Los errores se marcan en rojo.</p>
+      <p class="jg-msg" aria-live="polite"></p>
+    </div>
+    </GameLayout>
+  </main>
+  <script>
+    import { award } from '../../lib/points';
+    const box = document.querySelector<HTMLElement>('[data-sudoku]')!;
+    const boardEl = box.querySelector<HTMLElement>('.sd-board')!;
+    const msg = box.querySelector<HTMLElement>('.jg-msg')!;
+    const timeEl = box.querySelector<HTMLElement>('[data-time]')!;
+    const errEl = box.querySelector<HTMLElement>('[data-errors]')!;
+    const day = Math.floor((Date.now() - 4 * 3600e3) / 86400e3); // Puerto Rico day
+    const store = {
+      get: <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || '') ?? d; } catch { return d; } },
+      set: (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } },
+    };
+
+    // Seeded random numbers, so the puzzle of the day is the same for everyone
+    function rng(seed: number) { return () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }; }
+    const shuffle = <T,>(a: T[], r: () => number) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const ok = (g: number[], i: number, n: number) => {
+      const r = Math.floor(i / 9), c = i % 9, br = r - (r % 3), bc = c - (c % 3);
+      for (let k = 0; k < 9; k++) if (g[r * 9 + k] === n || g[k * 9 + c] === n || g[(br + Math.floor(k / 3)) * 9 + bc + (k % 3)] === n) return false;
+      return true;
+    };
+    // Fill a full valid grid
+    function fill(g: number[], r: () => number): boolean {
+      const i = g.indexOf(0); if (i < 0) return true;
+      for (const n of shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], r)) { if (ok(g, i, n)) { g[i] = n; if (fill(g, r)) return true; g[i] = 0; } }
+      return false;
+    }
+    // Count solutions (stops at 2) to keep the puzzle with a single answer
+    function count(g: number[]): number {
+      const i = g.indexOf(0); if (i < 0) return 1;
+      let total = 0;
+      for (let n = 1; n <= 9 && total < 2; n++) if (ok(g, i, n)) { g[i] = n; total += count(g); g[i] = 0; }
+      return total;
+    }
+    function make(level: number) {
+      const r = rng(day * 31 + level * 7 + 11);
+      const sol = Array(81).fill(0); fill(sol, r);
+      const puzzle = [...sol];
+      const target = [38, 46, 52][level]; // cells to empty
+      let removed = 0;
+      for (const i of shuffle([...Array(81).keys()], r)) {
+        if (removed >= target) break;
+        const keep = puzzle[i]; puzzle[i] = 0;
+        if (count([...puzzle]) !== 1) puzzle[i] = keep; else removed++;
+      }
+      return { sol, puzzle };
+    }
+
+    let level = 0, sol: number[] = [], given: number[] = [], cur: number[] = [], sel = -1, errors = 0, start = 0, done = false, timer = 0;
+    const key = () => `nc-sudoku-${day}-${level}`;
+    const cells: HTMLButtonElement[] = [];
+    for (let i = 0; i < 81; i++) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sd-cell';
+      const r = Math.floor(i / 9), c = i % 9;
+      if (c % 3 === 2 && c < 8) b.classList.add('br'); if (r % 3 === 2 && r < 8) b.classList.add('bb');
+      b.addEventListener('click', () => { sel = i; paint(); });
+      boardEl.append(b); cells.push(b);
+    }
+    function paint() {
+      const sr = Math.floor(sel / 9), sc = sel % 9;
+      cells.forEach((b, i) => {
+        const v = cur[i];
+        b.textContent = v ? String(v) : '';
+        b.className = b.className.replace(/ (given|sel|peer|wrong|same)/g, '');
+        if (given[i]) b.classList.add('given');
+        if (sel >= 0) {
+          const r = Math.floor(i / 9), c = i % 9;
+          if (i === sel) b.classList.add('sel');
+          else if (r === sr || c === sc || (Math.floor(r / 3) === Math.floor(sr / 3) && Math.floor(c / 3) === Math.floor(sc / 3))) b.classList.add('peer');
+          if (v && cur[sel] === v && i !== sel) b.classList.add('same');
+        }
+        if (v && !given[i] && v !== sol[i]) b.classList.add('wrong');
+        b.setAttribute('aria-label', `Fila ${Math.floor(i / 9) + 1}, columna ${(i % 9) + 1}: ${v || 'vacía'}`);
+      });
+      errEl.textContent = String(errors);
+    }
+    function tick() { const s = Math.floor((Date.now() - start) / 1000); timeEl.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+    function load(lv: number) {
+      level = lv; msg.textContent = 'Preparando el sudoku…';
+      setTimeout(() => {
+        const p = make(level); sol = p.sol; given = p.puzzle;
+        const saved = store.get<{ cur: number[]; errors: number; secs: number; done: boolean } | null>(key(), null);
+        cur = saved?.cur ?? [...given]; errors = saved?.errors ?? 0; done = !!saved?.done;
+        start = Date.now() - (saved?.secs ?? 0) * 1000; sel = -1;
+        clearInterval(timer); tick(); if (!done) timer = window.setInterval(tick, 1000);
+        msg.textContent = done ? '¡Ya completaste este sudoku hoy! Prueba otro nivel o vuelve mañana.' : '';
+        paint();
+      }, 20);
+    }
+    function save() { store.set(key(), { cur, errors, secs: Math.floor((Date.now() - start) / 1000), done }); }
+    function put(n: number) {
+      if (done || sel < 0 || given[sel]) return;
+      cur[sel] = n;
+      if (n && n !== sol[sel]) errors++;
+      if (cur.every((v, i) => v === sol[i])) {
+        done = true; clearInterval(timer); tick();
+        msg.textContent = `¡Felicidades! Completaste el sudoku en ${timeEl.textContent} con ${errors} ${errors === 1 ? 'error' : 'errores'}.`;
+        award('sudoku', 60 + Number(level) * 45, `Sudoku ${['fácil', 'medio', 'difícil'][Number(level)] ?? ''} resuelto`, key());
+      }
+      save(); paint();
+    }
+    box.querySelectorAll<HTMLButtonElement>('[data-n]').forEach((b) => b.addEventListener('click', () => put(Number(b.dataset.n))));
+    box.querySelectorAll<HTMLButtonElement>('[data-level]').forEach((b) => b.addEventListener('click', () => {
+      box.querySelectorAll('[data-level]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      save(); load(Number(b.dataset.level));
+    }));
+    addEventListener('keydown', (e) => {
+      if (sel < 0) return;
+      if (/^[1-9]$/.test(e.key)) put(Number(e.key));
+      else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') put(0);
+      else if (e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const d = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[e.key] ?? 0;
+        sel = Math.min(80, Math.max(0, sel + d)); paint();
+      }
+    });
+    addEventListener('pagehide', save);
+    load(0);
+  </script>
+</Base>
