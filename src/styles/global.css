@@ -307,3 +307,12 @@ aside .ad{margin-top:20px}
 .sec-lead h2{font-size:clamp(26px,3vw,36px);line-height:1.1;margin:6px 0 10px}
 .sec-lead p{color:var(--muted);font-size:17px;margin:0 0 10px}
 @media (max-width:720px){.sec-lead{grid-template-columns:1fr}}
+
+/* ===== Search and saved stories (same pages as Noticias Xtra) ===== */
+.page-search{display:flex;gap:10px;max-width:620px;margin:6px 0 10px}
+.page-search input{flex:1;min-width:0;font:inherit;font-size:17px;border:0;border-bottom:2px solid var(--ink);padding:8px 2px;background:transparent}
+.page-search input:focus{outline:none;border-color:var(--red)}
+.sr-dek{margin:0 0 6px;color:var(--muted);font-size:15px}
+.sv-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sv-rm{margin-top:8px;height:30px}
+.empty h2{margin:0 0 12px;font-size:22px}

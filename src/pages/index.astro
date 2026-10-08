@@ -116,4 +116,9 @@ const pairs = [['gobierno', 'deportes'], ['mundo', 'policiacas'], ['el-tiempo', 
       </>
     ))}
   </div>
+  <script>
+    // Old WordPress searches (noticel.com/?s=palabra) open the new search page
+    const s = new URLSearchParams(location.search).get('s');
+    if (s) location.replace(`${document.body.dataset.base}buscar/?q=${encodeURIComponent(s)}`);
+  </script>
 </Base>
