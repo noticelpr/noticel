@@ -11,8 +11,8 @@ import { isDemo } from './demo';
 export const BACKEND = {
   // NotiCel's OWN Supabase project goes here once it exists (never Noticias Xtra's: each site keeps its own accounts).
   // Empty = preview mode (VISTA PREVIA): the panel works on this device only.
-  url: '',
-  anonKey: '',
+  url: 'https://tadrjmankkictvqzuibu.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhZHJqbWFua2tpY3R2cXp1aWJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0ODU2MDEsImV4cCI6MjEwNzA2MTYwMX0.xzUXK192CWpDDU-OoWh8DEfxiL5vwXYvJ1AJ_JB6BzM',
 };
 // Demo mode (src/lib/demo.ts) works like the preview: sample data only, never the real database
 export const hasBackend = () => !!(BACKEND.url && BACKEND.anonKey) && !isDemo();
