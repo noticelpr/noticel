@@ -54,7 +54,9 @@ const today = longDate(new Date());
   </div></div>
   </header>
 
-  {!staff && <nav class="nav" aria-label="Secciones"><div class="wrap">
+  {!staff && <nav class="nav" aria-label="Secciones" data-nav><div class="wrap">
+    {/* Small logo that slides in on the left once the big header scrolls away (same as Noticias Xtra) */}
+    <a href={url()} class="nav-logo" tabindex="-1" aria-hidden="true"><img src={url('logo.png')} alt="" width="72" height="30" /></a>
     {MENU.map((slug) => <a href={categoryUrl(slug)} aria-current={active === slug ? 'page' : undefined}>{CATEGORIES[slug]}</a>)}
   </div></nav>}
 
@@ -78,6 +80,11 @@ const today = longDate(new Date());
   </footer>
 
   <script>
+    // The section menu stays on top while scrolling; once the big header is out of sight, the small logo shows
+    const navBar = document.querySelector<HTMLElement>('[data-nav]');
+    const mast = document.querySelector<HTMLElement>('.mast');
+    if (navBar && mast) new IntersectionObserver(([e]) => navBar.classList.toggle('stuck', !e.isIntersecting)).observe(mast);
+
     const btn = document.getElementById('searchToggle');
     const bar = document.getElementById('searchbar');
     btn?.addEventListener('click', () => {

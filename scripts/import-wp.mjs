@@ -76,9 +76,14 @@ const posts = items
   })
   .sort((a, b) => b.date.localeCompare(a.date));
 
-// The newest stories, plus enough of each home-page block's category to fill it
+// The newest stories, plus enough of each home-page block's category to fill it: Opiniones, and the most-read
+// sections (total views per category, same ranking the home page uses)
 const pick = new Map(posts.slice(0, newest).map((p) => [p.wpId, p]));
-for (const [slug, n] of [['opiniones', 4], ['gobierno', 3], ['deportes', 3], ['mundo', 3], ['policiacas', 3], ['el-tiempo', 3], ['entretenimiento', 3]]) {
+const BROAD = ['noticias', 'ultima-hora', 'opiniones', 'uncategorized'];
+const viewsBy = new Map();
+for (const p of posts) for (const c of p.categories) viewsBy.set(c, (viewsBy.get(c) ?? 0) + p.views);
+const topSections = [...viewsBy].filter(([c]) => !BROAD.includes(c)).sort((a, b) => b[1] - a[1]).slice(0, 14).map(([c]) => c);
+for (const [slug, n] of [['opiniones', 4], ...topSections.map((c) => [c, 3])]) {
   posts.filter((p) => p.categories.includes(slug)).slice(0, n + 3).forEach((p) => pick.set(p.wpId, p));
 }
 

@@ -10,7 +10,7 @@ import Card from '../components/Card.astro';
 import Latest from '../components/Latest.astro';
 import Section from '../components/Section.astro';
 import AdSlot from '../components/AdSlot.astro';
-import { allStories, mostRead, inCategory, categoryUrl, url, shortDate, type Story } from '../lib/site';
+import { allStories, mostRead, inCategory, categoryUrl, url, shortDate, CATEGORIES, type Story } from '../lib/site';
 
 const all = await allStories();
 const used = new Set<string>();
@@ -20,6 +20,7 @@ const take = (list: Story[], n: number) => {
   return out;
 };
 const DAY = 864e5;
+const MAX_BLOCKS = 12; // section blocks at the bottom of the page (2 per row)
 
 const tops = all.filter((s) => s.data.topStory);
 const [lead] = take(tops.length ? tops : all, 1);
@@ -39,8 +40,21 @@ const breaking = all.find((s) => inCategory(s, 'ultima-hora')) ?? null;
 const ultima = take(all.filter((s) => inCategory(s, 'ultima-hora')), 8);
 const opinions = all.filter((s) => inCategory(s, 'opiniones')).slice(0, 4);
 const initials = (name: string) => name.replace(/^Lcd[oa]\.?\s*/u, '').split(' ').slice(0, 2).map((w) => w.charAt(0)).join('');
-const block = (slug: string) => take(all.filter((s) => inCategory(s, slug)), 3);
-const pairs = [['gobierno', 'deportes'], ['mundo', 'policiacas'], ['el-tiempo', 'entretenimiento']].map((p) => p.map((slug) => ({ slug, stories: block(slug) })));
+// Section blocks: the most-read sections first (total views of their stories), so the page fills with what readers
+// read most. Noticias, Última Hora and Opiniones have their own places above. A section needs 2+ stories not shown yet.
+const BROAD = ['noticias', 'ultima-hora', 'opiniones', 'uncategorized'];
+const viewsBy = new Map<string, number>();
+all.forEach((s) => s.data.categories.forEach((c) => viewsBy.set(c, (viewsBy.get(c) ?? 0) + s.data.views)));
+const ranked = [...viewsBy].filter(([c]) => !BROAD.includes(c) && CATEGORIES[c]).sort((a, b) => b[1] - a[1]).map(([c]) => c);
+const blocks: Array<{ slug: string; stories: Story[] }> = [];
+for (const slug of ranked) {
+  if (blocks.length >= MAX_BLOCKS) break;
+  const fresh = all.filter((s) => inCategory(s, slug) && !used.has(s.id)).slice(0, 3);
+  if (fresh.length < 2) continue;
+  fresh.forEach((s) => used.add(s.id));
+  blocks.push({ slug, stories: fresh });
+}
+const pairs = Array.from({ length: Math.ceil(blocks.length / 2) }, (_, i) => blocks.slice(i * 2, i * 2 + 2));
 ---
 <Base breaking={breaking}>
   <main id="main" class="wrap" tabindex="-1">
@@ -112,7 +126,7 @@ const pairs = [['gobierno', 'deportes'], ['mundo', 'policiacas'], ['el-tiempo', 
     {pairs.map((pair, i) => (
       <>
         <div class="split">{pair.map((b) => <Section slug={b.slug} stories={b.stories} />)}</div>
-        {i === 0 && <AdSlot style="aspect-ratio:auto;height:120px;margin-top:40px" />}
+        {i % 2 === 0 && i < pairs.length - 1 && <AdSlot style="aspect-ratio:auto;height:120px;margin-top:40px" />}
       </>
     ))}
   </div>
