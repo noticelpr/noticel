@@ -7,7 +7,7 @@
 // with "Contents: Read and write". SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are built in.
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64';
 
-const REPO = ''; // NotiCel's own GitHub repository, "owner/name" (same value as src/lib/repo.ts)
+const REPO = 'noticelpr/noticel'; // NotiCel's own GitHub repository (same value as src/lib/repo.ts)
 const BRANCH = 'main';
 const DIR = 'src/content/noticias';
 

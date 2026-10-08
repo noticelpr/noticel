@@ -8,3 +8,6 @@ dist/
 *.zip
 *.xml
 noticel-demo-real.html
+# Kept on this computer only (the repository is public): project notes, and the password page with the test address
+CLAUDE.md
+cloudflare/
