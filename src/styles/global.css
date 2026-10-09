@@ -4584,3 +4584,14 @@ footer{background:#000;border-top:4px solid var(--green)}
 .nav-links>a,.nav-dd>a,.nav-dd-label,.nav-dd-menu a{font-weight:800}
 h1,h2,h3,.hl,.ncs-title,.sec-h h2,.bb-lead h1,.bb-lead h2,.bb-side-item h3,.card h3,.art h1{font-weight:800}
 .sec-subs a{font-weight:700}
+
+/* Opiniones: columnists listed in the right column, most recent first */
+.ncs-right{min-width:0;display:flex;flex-direction:column;gap:20px}
+.ncs-writers{border:1px solid var(--line);border-radius:6px;padding:16px 18px;background:var(--card)}
+.ncs-writers ol{list-style:none;margin:0;padding:0}
+.ncs-writers li{display:grid;grid-template-columns:40px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.ncs-writers li:first-child{border-top:0;padding-top:4px}
+.ncs-av{width:40px;height:40px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
+[data-theme="dark"] .ncs-av{background:var(--green);color:#000}
+.ncs-wname{display:block;font-weight:800;font-size:15px}
+.ncs-wlast{display:block;font-size:14px;line-height:1.35;color:var(--muted);margin:2px 0 4px;font-style:italic}
