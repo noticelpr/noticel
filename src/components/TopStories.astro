@@ -1,7 +1,8 @@
 ---
 // The top of the home page and of every section page (NotiCel, 2026-10-08; inspired by BBC News' front page):
 // the main headline on the left in large type, its photo in the middle with two stories under it, two stories on the
-// right. Phones: the photo first, then the main headline, then the other stories.
+// right. Phones: the main headline first (visible right away), then its photo, then the other stories.
+// Sections with few stories: without stories for the right column, the block uses two columns.
 import Ph from './Ph.astro';
 import Label from './Label.astro';
 import Time from './Time.astro';
@@ -11,13 +12,14 @@ interface Props { lead: Story; more?: Story[]; center?: Story[]; right?: Story[]
 const { lead, more = [], center = [], right = [], h1 = true } = Astro.props;
 const H = h1 ? 'h1' : 'h2';
 ---
-<div class="bb-hero">
+<div class:list={['bb-hero', { 'bb-noright': right.length === 0 }]}>
   <div class="bb-lead">
-    <a class="bb-lead-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
-      <Ph sectionId={lead.data.section} image={lead.data.image} league={lead.data.league} sizes="100vw" />
-    </a>
     <Label story={lead} />
     <a href={storyUrl(lead)}><H class="hl">{lead.data.title}</H></a>
+    {/* Phones only: the photo goes right under the main headline (wider screens show it in the middle column) */}
+    <a class="bb-lead-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
+      <Ph sectionId={lead.data.section} image={lead.data.image} league={lead.data.league} sizes="100vw" priority />
+    </a>
     {lead.data.description && <p class="bb-dek">{lead.data.description}</p>}
     <Time date={lead.data.date} />
     {more.length > 0 && <ul class="bb-more">{more.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}</ul>}

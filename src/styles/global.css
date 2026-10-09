@@ -4426,7 +4426,7 @@ footer{background:#000;border-top:4px solid var(--green)}
 
 /* Phones: the main photo goes on top of the main headline (the center photo hides) */
 .bb-lead-photo{display:none}
-@media (max-width:760px){.bb-lead-photo{display:block;margin-bottom:12px}.bb-lead-photo .ph{aspect-ratio:16/10;border-radius:4px}.bb-photo{display:none}.bb-center-two{margin-top:0;border-top:0;padding-top:0}}
+@media (max-width:760px){.bb-lead-photo{display:block;margin:12px 0}.bb-lead-photo .ph{aspect-ratio:16/10;border-radius:4px}.bb-photo{display:none}.bb-center-two{margin-top:0;border-top:0;padding-top:0}}
 
 /* ===== NotiCel section pages (one design for all) ===== */
 .sp-page{padding-top:22px}
@@ -4483,3 +4483,18 @@ footer{background:#000;border-top:4px solid var(--green)}
 .home-grid{padding-top:36px;border-top:1px solid var(--line);margin-top:28px}
 @media (max-width:760px){.home-main .bb-row4{grid-template-columns:1fr}.home-main{gap:32px}}
 .sp-box-h span{font-size:13px;color:var(--muted)}
+
+/* Few stories: no right column, the main story takes more room */
+.bb-hero.bb-noright{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
+@media (max-width:760px){.bb-hero.bb-noright{grid-template-columns:1fr}}
+/* Phones: the main headline is the first thing under the menu */
+@media (max-width:760px){.bb-top{padding-top:16px}.bb-lead h1,.bb-lead h2{font-size:26px;margin:4px 0 0}.sp-top{margin-bottom:20px;padding-bottom:18px}}
+
+/* Section titles: tighter */
+.sp-page{padding-top:16px}
+.sp-head{margin-bottom:14px}
+.sp-crumb{margin:0 0 2px;font-size:12px}
+.sp-title{font-size:clamp(26px,2.6vw,36px);line-height:1;letter-spacing:-.02em;gap:10px;margin:0 0 10px}
+.sp-title::before{width:6px;height:.8em}
+.sp-head .sec-subs{margin:0}
+.sp-head .sec-subs a{padding:3px 12px;font-size:13px}

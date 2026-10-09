@@ -86,6 +86,10 @@ const topSections = [...viewsBy].filter(([c]) => !BROAD.includes(c)).sort((a, b)
 for (const [slug, n] of [['opiniones', 4], ...topSections.map((c) => [c, 3])]) {
   posts.filter((p) => p.categories.includes(slug)).slice(0, n + 3).forEach((p) => pick.set(p.wpId, p));
 }
+// Every section in the menu and its drop-downs gets up to 16 stories, so its page fills (top block + rows)
+const MENU_SECTIONS = ['noticias', 'gobierno', 'legislatura', 'tribunales', 'policiacas', 'politica', 'economia', 'deportes', 'opiniones',
+  'el-tiempo', 'mundo', 'estados-unidos', 'entretenimiento', 'vida-y-bienestar', 'educacion', 'energia', 'judicatura', 'la-calle', 'ultima-hora'];
+for (const slug of MENU_SECTIONS) posts.filter((p) => p.categories.includes(slug)).slice(0, 16).forEach((p) => pick.set(p.wpId, p));
 
 // A few stories with deeper addresses (/noticias/la-calle/policiacas/20260808/...), to test those keep working
 posts.filter((p) => p.path.split('/').filter(Boolean).length > 3).slice(0, 3).forEach((p) => pick.set(p.wpId, p));
