@@ -3,7 +3,7 @@
 // type, its photo in the middle, two more stories with photos on the right; a row of four; Lo más leído in two
 // columns; then Última hora, Destacadas, videos and each section as a row of three (most-read sections first).
 // Right column below the top: Noticias Xtra's sidebar (Tendencias, lottery, Foro…). Each story appears once at the top.
-import Markets from '../components/economia/Markets.astro';
+import MarketsBar from '../components/MarketsBar.astro';
 import Base from '../layouts/Base.astro';
 import StoryCard from '../components/StoryCard.astro';
 import VideoCard from '../components/VideoCard.astro';
@@ -60,6 +60,7 @@ const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) =
     </section>
   )}
 
+  <div class="wrap"><AdSlot size="leaderboard" class="ad-under-top" /></div>
   <div class="wrap home-grid">
     <main class="home-main">
       {breaking.length > 0 && (
@@ -100,12 +101,12 @@ const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) =
             <div class="sec-h"><h2>{SECTIONS.find((x) => x.id === r.id)?.name}</h2><a href={sectionUrl(r.id)}>Ver todo</a></div>
             <div class="bb-row4">{r.list.map((s) => <StoryCard story={s} />)}</div>
           </section>
-          {i === 1 && <AdSlot size="infeed" />}
+          {i % 2 === 1 && i !== 3 && i < sectionRows.length - 1 && <AdSlot size="infeed" />}
           {i === 3 && <GamesTeaser />}
         </>
       ))}
 
-      <Markets strip />
+      <MarketsBar />
 
       {F.app && <section class="promo">
         <img src={url('icon-192.png')} alt="" />

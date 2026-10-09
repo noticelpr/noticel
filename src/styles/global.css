@@ -4603,3 +4603,21 @@ h1,h2,h3,.hl{font-family:var(--head)}
 .bb-side-item h3,.card h3{font-size:19px}
 .art h1{font-size:clamp(34px,3.6vw,52px)}
 .nav-links>a,.nav-dd>a,.nav-dd-label{font-size:15px;letter-spacing:.03em}
+
+/* Ads added 2026-10-08: banner under the top stories, inside the story */
+.ad-under-top{margin:24px auto 0}
+.ad-in-story{margin:28px 0}
+.ncs-tape-h:hover{background:var(--purple) !important}
+
+/* Phones: secondary stories as compact rows (headline left, small photo right), so pages scroll less */
+@media (max-width:760px){
+  .bb-center-two,.bb-side,.bb-row4{gap:0 !important}
+  .bb-row4 .card,.bb-side-item{display:grid;grid-template-columns:minmax(0,1fr) 104px;column-gap:12px;align-items:start;padding:14px 0;border-top:1px solid var(--line)}
+  .bb-row4 .card > a:first-child,.bb-side-item > a:first-child{grid-column:2;grid-row:1 / span 3}
+  .bb-row4 .card > :not(:first-child),.bb-side-item > :not(:first-child){grid-column:1}
+  .bb-row4 .card .ph,.bb-side-item .ph{aspect-ratio:1/1 !important;margin:0 !important;border-radius:4px}
+  .bb-row4 .card > div{margin-top:0 !important}
+  .bb-row4 .card h3,.bb-side-item h3{font-size:18px !important;line-height:1.2;margin:2px 0 6px !important}
+  .bb-side-item + .bb-side-item{border-top:1px solid var(--line) !important;padding-top:14px !important}
+}
+@media (max-width:760px){.bb-row4,.bb-top>.bb-row4,.home-main .bb-row4{grid-template-columns:1fr !important}}

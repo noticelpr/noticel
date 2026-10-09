@@ -13,7 +13,7 @@ import LeagueBadge from '../deportes/LeagueBadge.astro';
 import { SITE, SECTION_LIVE, CATEGORIES, url, categoryUrl, parentOf, subsectionsOf, getStories, storyUrl, shortDate, type Story } from '../../lib/site';
 import { LEAGUES, league } from '../../lib/leagues';
 import { scores } from '../../lib/scores';
-import { getMarkets, fmtPrice, curOf, pctOf } from '../../lib/markets';
+import MarketsBar from '../MarketsBar.astro';
 import { COLUMNISTS, initials } from '../../lib/columnists';
 import { upcomingEvents, dateTile } from '../../lib/events';
 
@@ -32,7 +32,6 @@ const rows = Array.from({ length: Math.ceil(rest.length / 3) }, (_, i) => rest.s
 // Section boxes (page 1 only)
 const box = page === 1 ? slug : '';
 const games = box === 'deportes' ? scores(undefined, 8) : [];
-const markets = box === 'economia' ? (await getMarkets()).list.filter((q) => q.group === 'pr' || q.group === 'mp' || q.group === 'us').slice(0, 12) : [];
 const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 // Opiniones: the columnists, whoever wrote most recently first, each with their latest column
 const allStories = box === 'opiniones' ? await getStories() : [];
@@ -65,14 +64,7 @@ const writers = COLUMNISTS.map((c) => ({ c, last: allStories.find((s) => s.data.
         )}
       </section>
     )}
-    {markets.length > 0 && (
-      <section class="ncs-tape" aria-label="Mercados">
-        <span class="ncs-tape-h">Mercados</span>
-        <div class="ncs-tape-row">
-          {markets.map((q) => { const p = pctOf(q); return <span class="ncs-tape-i"><b>{q.name}</b> {curOf(q)}{fmtPrice(q)}{q.suf ?? ''} <em class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</em></span>; })}
-        </div>
-      </section>
-    )}
+    {box === 'economia' && <MarketsBar />}
     {box === 'el-tiempo' && (
       <section class="ncs-tape ncs-wx" aria-label="Pronóstico oficial">
         <span class="ncs-tape-h">Pronóstico</span>
@@ -89,6 +81,7 @@ const writers = COLUMNISTS.map((c) => ({ c, last: allStories.find((s) => s.data.
     )}
 
     {lead && <div class="ncs-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
+    {lead && <AdSlot size="leaderboard" class="ad-under-top" />}
 
     <div class="home-grid ncs-grid">
       <div class="home-main">
@@ -99,7 +92,7 @@ const writers = COLUMNISTS.map((c) => ({ c, last: allStories.find((s) => s.data.
             {rows.map((r, i) => (
               <>
                 <div class="bb-row4 ncs-row">{r.map((s) => <StoryCard story={s} />)}</div>
-                {i === 1 && <AdSlot size="infeed" />}
+                {i % 2 === 1 && i < rows.length - 1 && <AdSlot size="infeed" />}
               </>
             ))}
           </section>

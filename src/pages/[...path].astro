@@ -30,6 +30,10 @@ const { Content } = await render(story);
 const DOC = /<figure class="doc-card">[\s\S]*?<\/figure>/g;
 const bodyHtml = story.rendered?.html;
 const docs = bodyHtml?.match(DOC) ?? [];
+// NotiCel: an ad space inside the story, after the third paragraph (only in stories long enough to have more after it)
+const cleanHtml = (bodyHtml ?? '').replace(DOC, '');
+const cut = (() => { let i = -1; for (let n = 0; n < 3; n++) { i = cleanHtml.indexOf('</p>', i + 1); if (i < 0) return -1; } return i + 4; })();
+const bodyParts = cut > 0 && cleanHtml.slice(cut).includes('<p') ? [cleanHtml.slice(0, cut), cleanHtml.slice(cut)] : [cleanHtml, ''];
 // Photo caption and credit: the story's own photo, or its section's default photo
 const fallback = defaultPhoto(d.section, d.league);
 const caption = d.image ? d.imageCaption ?? (d.place ? `${d.place}. Imagen de referencia.` : 'Imagen de referencia.') : `${fallback.caption} Imagen de archivo.`;
@@ -104,7 +108,13 @@ const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
           <Ph sectionId={d.section} image={d.image} place={d.place} alt={caption} league={d.league} sizes="(max-width:760px) 100vw, 760px" priority />
           <p class="caption">{caption}{credit && <> {creditUrl ? <a href={creditUrl} rel="noopener" target="_blank">{credit}</a> : credit}</>}</p>
         </>)}
-        <div class="body">{bodyHtml !== undefined ? <Fragment set:html={bodyHtml.replace(DOC, '')} /> : <Content />}</div>
+        <div class="body">{bodyHtml !== undefined ? (
+          <>
+            <Fragment set:html={bodyParts[0]} />
+            {bodyParts[1] && <AdSlot size="infeed" class="ad-in-story" />}
+            {bodyParts[1] && <Fragment set:html={bodyParts[1]} />}
+          </>
+        ) : <Content />}</div>
         {docs.length > 0 && <section class="doc-attach" aria-label="Documentos"><h2 class="doc-attach-h">{docs.length === 1 ? 'Documento' : 'Documentos'}</h2><Fragment set:html={docs.join('')} /></section>}
         {/* NotiCel: the story's PDF document (WordPress pdf_url). Its topics (tags) are not shown, by the publisher's
             choice; search still uses them. */}
