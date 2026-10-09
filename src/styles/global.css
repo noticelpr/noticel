@@ -4574,3 +4574,17 @@ footer{background:#000;border-top:4px solid var(--green)}
 .nav-dd.on{background:var(--green);border-radius:2px;border-bottom-color:transparent;align-self:center;margin:6px 2px}
 .nav-dd.on>a,.nav-dd.on .nav-dd-label,.nav-dd.on .nav-dd-btn{color:#000;opacity:1}
 .nav-dd.on>a{padding-top:6px;padding-bottom:6px}
+
+/* Header right side: rectangles like the menu. En vivo red, icons in a white box (Noticias Xtra + profile), Anúnciate green */
+.masthead .live-btn{border-radius:4px;box-shadow:none;height:36px}
+.masthead .mh-icons{border-radius:6px}
+.masthead .mh-ico{border-radius:4px}
+.masthead .mh-ad-btn{border-radius:4px;box-shadow:none;height:36px;background:var(--green);color:#000}
+.masthead .mh-ad-btn:hover{background:#A6E01A;color:#000}
+.masthead .sw-nx{background:transparent;border-radius:6px}
+.masthead .sw-nx img{transform:none}
+
+/* Bold section names (menu) and titles (section titles, headlines) */
+.nav-links>a,.nav-dd>a,.nav-dd-label,.nav-dd-menu a{font-weight:800}
+h1,h2,h3,.hl,.ncs-title,.sec-h h2,.bb-lead h1,.bb-lead h2,.bb-side-item h3,.card h3,.art h1{font-weight:800}
+.sec-subs a{font-weight:700}
