@@ -1,0 +1,47 @@
+---
+// Opiniones page top (2026-10-09): the columnists are the stars. The newest column as a big quote with its writer,
+// then a card for every columnist (most recent writer first) with their latest column as a quote.
+import { url, storyUrl, shortDate, type Story } from '../../lib/site';
+import { COLUMNISTS, initials, type Columnist } from '../../lib/columnists';
+
+interface Props { columns: Story[] }
+const { columns } = Astro.props;
+const clean = (n: string) => n.replace(/^Lcd[oa]\.?\s*/u, '');
+const writers: Array<{ c: Columnist; last: Story; count: number }> = COLUMNISTS
+  .map((c) => { const mine = columns.filter((s) => s.data.author === c.name); return { c, last: mine[0], count: mine.length }; })
+  .filter((w) => w.last).sort((a, b) => b.last.data.date.valueOf() - a.last.data.date.valueOf());
+const star = writers[0];
+const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
+---
+{star && (
+  <section class="op-star" aria-labelledby="op-star-h">
+    <div class="op-star-q" aria-hidden="true">“</div>
+    <div class="op-star-body">
+      <span class="op-star-tag">La columna de hoy</span>
+      <a href={storyUrl(star.last)}><h2 id="op-star-h" class="op-star-title">{star.last.data.title}</h2></a>
+      {star.last.data.description && <p class="op-star-dek">{star.last.data.description}</p>}
+      <a class="op-star-who" href={url(`opinion/${star.c.slug}`)}>
+        <span class="op-av op-av-xl" style={`--ring:${TONES[0]}`}>{initials(clean(star.c.name))}</span>
+        <span><b>{star.c.name}</b><small>{star.c.role ?? 'Columnista'} · {shortDate(star.last.data.date)}</small></span>
+      </a>
+      <a class="op-star-go" href={storyUrl(star.last)}>Leer la columna ›</a>
+    </div>
+  </section>
+)}
+{writers.length > 0 && (
+  <section class="op-voices" aria-labelledby="op-voices-h">
+    <div class="sec-h"><h2 id="op-voices-h">Nuestras voces</h2><span class="op-count">{writers.length} columnistas</span></div>
+    <div class="op-grid">
+      {writers.map(({ c, last, count }, i) => (
+        <article class="op-card">
+          <a class="op-card-top" href={url(`opinion/${c.slug}`)}>
+            <span class="op-av" style={`--ring:${TONES[i % TONES.length]}`}>{initials(clean(c.name))}</span>
+            <span class="op-card-name"><b>{c.name}</b><small>{count} {count === 1 ? 'columna' : 'columnas'}</small></span>
+          </a>
+          <a class="op-card-q hl" href={storyUrl(last)}>“{last.data.title}”</a>
+          <span class="time">{shortDate(last.data.date)}</span>
+        </article>
+      ))}
+    </div>
+  </section>
+)}

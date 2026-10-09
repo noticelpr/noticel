@@ -5,6 +5,7 @@
 // Opiniones (columnists), El Tiempo (official forecast) and Entretenimiento (upcoming events).
 import Base from '../../layouts/Base.astro';
 import TopStories from '../TopStories.astro';
+import OpinionTop from './OpinionTop.astro';
 import StoryCard from '../StoryCard.astro';
 import Sidebar from '../Sidebar.astro';
 import AdSlot from '../AdSlot.astro';
@@ -23,20 +24,17 @@ const name = CATEGORIES[slug] ?? slug;
 const parent = parentOf(slug);
 const subs = subsectionsOf(slug);
 const pageUrl = (n: number) => (n === 1 ? categoryUrl(slug) : `${categoryUrl(slug)}page/${n}/`);
-// Page 1: top block (7 stories) and then rows of four; page 2+: rows of four only
+// Section boxes and special tops (page 1 only)
+const box = page === 1 ? slug : '';
+// Page 1: top block (7 stories) and then rows of three; page 2+: rows of three only
 const first = page === 1 ? list : [];
 const [lead, ...after] = first;
 const more = after.slice(0, 2), center = after.slice(2, 4), right = after.slice(4, 6);
-const rest = page === 1 ? after.slice(6) : list;
+const rest = box === 'opiniones' ? list : page === 1 ? after.slice(6) : list;
 const rows = Array.from({ length: Math.ceil(rest.length / 3) }, (_, i) => rest.slice(i * 3, i * 3 + 3));
 // Section boxes (page 1 only)
-const box = page === 1 ? slug : '';
 const games = box === 'deportes' ? scores(undefined, 8) : [];
 const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
-// Opiniones: the columnists, whoever wrote most recently first, each with their latest column
-const allStories = box === 'opiniones' ? await getStories() : [];
-const writers = COLUMNISTS.map((c) => ({ c, last: allStories.find((s) => s.data.section === 'opiniones' && s.data.author === c.name) }))
-  .filter((w) => w.last).sort((a, b) => b.last!.data.date.valueOf() - a.last!.data.date.valueOf());
 ---
 <Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`}>
   <main class="wrap ncs-page" id="main">
@@ -80,7 +78,8 @@ const writers = COLUMNISTS.map((c) => ({ c, last: allStories.find((s) => s.data.
       </section>
     )}
 
-    {lead && <div class="ncs-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
+    {box === 'opiniones' && <OpinionTop columns={list} />}
+    {lead && box !== 'opiniones' && <div class="ncs-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
     {lead && <AdSlot size="leaderboard" class="ad-under-top" />}
 
     <div class="home-grid ncs-grid">
@@ -88,7 +87,7 @@ const writers = COLUMNISTS.map((c) => ({ c, last: allStories.find((s) => s.data.
         {list.length === 0 && <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>}
         {rows.length > 0 && (
           <section class="bb-sec">
-            <div class="sec-h"><h2>{page === 1 ? `Más de ${name}` : 'Noticias'}</h2></div>
+            <div class="sec-h"><h2>{box === 'opiniones' ? 'Las columnas más recientes' : page === 1 ? `Más de ${name}` : 'Noticias'}</h2></div>
             {rows.map((r, i) => (
               <>
                 <div class="bb-row4 ncs-row">{r.map((s) => <StoryCard story={s} />)}</div>
@@ -108,23 +107,6 @@ const writers = COLUMNISTS.map((c) => ({ c, last: allStories.find((s) => s.data.
         <GamesTeaser />
       </div>
       <div class="ncs-right">
-        {writers.length > 0 && (
-          <section class="ncs-writers" aria-labelledby="ncs-col-h">
-            <h2 class="box-h" id="ncs-col-h">Nuestros columnistas</h2>
-            <ol>
-              {writers.map(({ c, last }) => (
-                <li>
-                  <a class="ncs-av" href={url(`opinion/${c.slug}`)} aria-hidden="true" tabindex="-1">{initials(c.name.replace(/^Lcd[oa]\.?\s*/u, ''))}</a>
-                  <div>
-                    <a class="ncs-wname" href={url(`opinion/${c.slug}`)}>{c.name}</a>
-                    <a class="ncs-wlast hl" href={storyUrl(last!)}>{last!.data.title}</a>
-                    <span class="time">{shortDate(last!.data.date)}</span>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
         <Sidebar live={SECTION_LIVE[slug]} />
       </div>
     </div>
