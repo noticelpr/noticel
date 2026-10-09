@@ -3,9 +3,11 @@
 :root{
   --p-purple:#007BB6; --p-purple-bg:#000000; --p-blue:#009DE9; --p-red:#D7263D;
   --p-card:#FFFFFF; --p-soft:#F3F4F6; --p-bg:#FFFFFF;
-  --p-head:"Trueno","Inter",system-ui,sans-serif; --p-body:"Trueno","Inter",system-ui,sans-serif;
+  --p-head:"Inter",system-ui,sans-serif; --p-body:"Inter",system-ui,sans-serif;
   --p-gap:20px; --p-gap-lg:32px; --p-mh-h:0px;
 }
+/* Night mode: the panel follows the site's dark colors (it used to keep white boxes with light text) */
+[data-theme="dark"]{--p-card:var(--card); --p-soft:var(--soft); --p-bg:var(--bg); --p-purple:#5CC4F5; --p-purple-bg:#007BB6}
 .demo{background:var(--p-soft);color:var(--muted);font-size:13px;text-align:center;padding:6px 12px;padding-top:calc(6px + env(safe-area-inset-top,0px))}
 .logo{display:block;flex:none}
 .logo img{display:block;height:66px;width:auto}
@@ -154,7 +156,7 @@
 .mod-quote img{display:block;max-width:140px;margin-top:8px}
 .mod-flags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
 .mod-chip{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#FDECEE;color:#8A1424}
-.mod-chip.r{background:#EEE9FB;color:var(--p-purple)}
+.mod-chip.r{background:#E6F5FD;color:var(--p-purple)}
 .mod-score{display:inline-flex;align-items:center;gap:6px}
 .mod-score i{display:inline-block;width:60px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
 .mod-score i b{display:block;height:100%;background:var(--p-red)}
@@ -215,7 +217,7 @@ button.pnl-kpi:hover{border-color:var(--p-purple)}
 .pnl-draft{display:grid;gap:12px;padding:16px;border-radius:16px;background:var(--p-card);border:1px solid var(--line);transition:opacity .25s,transform .25s}
 .pnl-draft h2,.pnl-row h2{margin:4px 0;font-size:18px;line-height:1.3}
 .pnl-row h2 a{color:var(--ink)}
-.pnl-tag{display:inline-block;padding:2px 9px;border-radius:999px;background:#EEE9FB;color:var(--p-purple);font-size:12px;font-weight:700}
+.pnl-tag{display:inline-block;padding:2px 9px;border-radius:999px;background:#E6F5FD;color:var(--p-purple);font-size:12px;font-weight:700}
 .pnl-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;background:var(--p-card);border:1px solid var(--line);transition:opacity .25s}
 .pnl-row-acts{display:flex;gap:10px;align-items:center;flex:none}
 .pnl-gone{opacity:0;transform:translateY(-4px)}
@@ -324,7 +326,7 @@ button.pnl-kpi:hover{border-color:var(--p-purple)}
 .sd-chk input{width:18px;height:18px;accent-color:var(--p-purple);flex:none}
 .sd-chk span{display:grid;line-height:1.25}
 .sd-chk small{color:var(--muted);font-weight:600}
-.sd-chk:has(input:checked){border-color:var(--p-purple);background:#EEE9FB}
+.sd-chk:has(input:checked){border-color:var(--p-purple);background:#E6F5FD}
 .sd-chk.sm{padding:6px 10px}
 .sd-regs{display:flex;flex-wrap:wrap;gap:6px}
 .sd-regs[hidden]{display:none !important}
@@ -451,7 +453,7 @@ button.pnl-kpi:hover{border-color:var(--p-purple)}
 .wr-lay{margin:0;padding:0;border:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .wr-lay legend{font-size:13px;font-weight:800;margin-bottom:4px;width:100%}
 .wr-lay label{display:inline-flex !important;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;font-weight:600 !important;cursor:pointer}
-.wr-lay label:has(input:checked){border-color:var(--p-purple);background:#EEE9FB;color:var(--p-purple)}
+.wr-lay label:has(input:checked){border-color:var(--p-purple);background:#E6F5FD;color:var(--p-purple)}
 .wr-lay input{accent-color:var(--p-purple);margin:0}
 .wr-emb-prev{max-height:280px;overflow:auto;border-radius:12px;background:var(--p-soft);padding:10px}
 .wr-emb-body{font-size:13px !important;line-height:1.5}
@@ -735,3 +737,7 @@ button.pnl-kpi:hover{border-color:var(--p-purple)}
 .sd-leads-h{margin:14px 0 0}
 /* NotiCel: a pane's sections may shrink to the screen (wide tab bars scroll inside instead of widening the page on phones) */
 .pnl-pane > *,.wr > *{min-width:0}
+/* Night mode: blue-tinted chips and selected options get a dark tint so the light-blue text stays readable */
+[data-theme="dark"] .pnl-tag,[data-theme="dark"] .mod-chip.r,[data-theme="dark"] .sd-chk:has(input:checked),[data-theme="dark"] .wr-lay label:has(input:checked){background:rgba(92,196,245,.16)}
+[data-theme="dark"] .cm{border-color:var(--line)}
+[data-theme="dark"] .docv-pages{background:#0B0B0D}
