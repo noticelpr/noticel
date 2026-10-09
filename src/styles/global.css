@@ -4568,3 +4568,9 @@ footer{background:#000;border-top:4px solid var(--green)}
 /* Notificaciones card in the strip */
 .hs-bell{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--green);color:#000}
 .hs-push-t{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--purple);margin-right:4px}
+
+/* Menu: the section you're in is a green rectangle with black letters (phones and computers) */
+.nav-links>a[aria-current="page"],.nav-links>a[aria-current="page"]:first-child{background:var(--green) !important;color:#000 !important;opacity:1;border-radius:2px !important;border-bottom-color:transparent !important;box-shadow:none !important;align-self:center;margin:6px 2px !important;padding:6px 10px !important}
+.nav-dd.on{background:var(--green);border-radius:2px;border-bottom-color:transparent;align-self:center;margin:6px 2px}
+.nav-dd.on>a,.nav-dd.on .nav-dd-label,.nav-dd.on .nav-dd-btn{color:#000;opacity:1}
+.nav-dd.on>a{padding-top:6px;padding-bottom:6px}
