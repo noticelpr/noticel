@@ -1,0 +1,37 @@
+---
+// Opiniones page list (2026-10-09): the latest columns as an editorial list instead of photo cards. Each row: the
+// writer's circle, name and date, the title as an italic quote with its summary, and a small photo on the right.
+import Ph from '../Ph.astro';
+import AdSlot from '../AdSlot.astro';
+import { url, storyUrl, shortDate, type Story } from '../../lib/site';
+import { columnistOf, initials } from '../../lib/columnists';
+
+interface Props { columns: Story[] }
+const { columns } = Astro.props;
+const clean = (n: string) => n.replace(/^Lcd[oa]\.?\s*/u, '');
+const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
+// The same writer keeps the same ring color down the list
+const tone = new Map<string, string>();
+const toneOf = (a: string) => { if (!tone.has(a)) tone.set(a, TONES[tone.size % TONES.length]); return tone.get(a)!; };
+---
+<ol class="op-feed">
+  {columns.map((s, i) => {
+    const d = s.data, c = columnistOf(d.author), href = storyUrl(s);
+    return (
+      <>
+        <li class="op-row">
+          <a class="op-row-who" href={c ? url(`opinion/${c.slug}`) : href}>
+            <span class="op-av" style={`--ring:${toneOf(d.author)}`}>{initials(clean(d.author))}</span>
+            <span><b>{d.author}</b><time datetime={d.date.toISOString()}>{shortDate(d.date)}</time></span>
+          </a>
+          <a class="op-row-main" href={href}>
+            <h3 class="op-row-title hl"><span aria-hidden="true">“</span>{d.title}</h3>
+            {d.description && <p class="op-row-dek">{d.description}</p>}
+          </a>
+          {d.image && <a class="op-row-ph" href={href} tabindex="-1" aria-hidden="true"><Ph sectionId={d.section} image={d.image} sizes="(max-width:760px) 96px, 180px" /></a>}
+        </li>
+        {i % 5 === 4 && i < columns.length - 1 && <li class="op-row-ad"><AdSlot size="infeed" /></li>}
+      </>
+    );
+  })}
+</ol>

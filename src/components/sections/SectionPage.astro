@@ -6,6 +6,7 @@
 import Base from '../../layouts/Base.astro';
 import TopStories from '../TopStories.astro';
 import OpinionTop from './OpinionTop.astro';
+import OpinionFeed from './OpinionFeed.astro';
 import StoryCard from '../StoryCard.astro';
 import Sidebar from '../Sidebar.astro';
 import AdSlot from '../AdSlot.astro';
@@ -87,8 +88,8 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
         {list.length === 0 && <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>}
         {rows.length > 0 && (
           <section class="bb-sec">
-            <div class="sec-h"><h2>{box === 'opiniones' ? 'Las columnas más recientes' : page === 1 ? `Más de ${name}` : 'Noticias'}</h2></div>
-            {rows.map((r, i) => (
+            <div class="sec-h"><h2>{slug === 'opiniones' ? 'Las columnas más recientes' : page === 1 ? `Más de ${name}` : 'Noticias'}</h2></div>
+            {slug === 'opiniones' ? <OpinionFeed columns={rest} /> : rows.map((r, i) => (
               <>
                 <div class="bb-row4 ncs-row">{r.map((s) => <StoryCard story={s} />)}</div>
                 {i % 2 === 1 && i < rows.length - 1 && <AdSlot size="infeed" />}
