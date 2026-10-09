@@ -6,6 +6,7 @@
 import Ph from './Ph.astro';
 import Label from './Label.astro';
 import Time from './Time.astro';
+import AdSlot from './AdSlot.astro';
 import { storyUrl, type Story } from '../lib/site';
 
 interface Props { lead: Story; more?: Story[]; center?: Story[]; right?: Story[]; h1?: boolean }
@@ -23,6 +24,8 @@ const H = h1 ? 'h1' : 'h2';
     {lead.data.description && <p class="bb-dek">{lead.data.description}</p>}
     <Time date={lead.data.date} />
     {more.length > 0 && <ul class="bb-more">{more.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}</ul>}
+    {/* Wide screens: an ad fills the space under the left column's headlines (hidden on phones) */}
+    <AdSlot size="rectangle" class="bb-lead-ad" />
   </div>
   <div class="bb-center">
     <a class="bb-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
