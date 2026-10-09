@@ -4684,3 +4684,17 @@ h1,h2,h3,.hl,.ncs-title,.sec-h h2,.bb-lead h1,.bb-lead h2,.bb-side-item h3,.card
 /* Top block: ad under the left column's headlines (wide screens only) */
 .bb-lead-ad{margin:22px 0 0}
 @media (max-width:760px){.bb-lead-ad{display:none}}
+.bb-center-ad{margin:20px 0 0}
+.bb-center-ad .ad-box{width:100%;max-width:728px;height:90px}
+@media (max-width:760px){.bb-center-ad{display:none}}
+/* Menu bar on laptop-size screens: tighter so all sections fit; if a window is still too narrow, the bar slides
+   sideways inside itself instead of making the whole page scroll sideways (drop-downs are fixed-position, so not cut) */
+@media (min-width:1000px) and (max-width:1380px){
+  .nav-links>a,.nav-dd-label{font-size:12px;letter-spacing:0}
+  .nav-links>a{padding-left:6px;padding-right:6px}
+  .nav-links>a:first-child{padding-left:0}
+}
+@media (min-width:761px) and (max-width:1380px){
+  .nav .wrap{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .nav .wrap::-webkit-scrollbar{display:none}
+}
