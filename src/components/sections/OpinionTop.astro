@@ -14,34 +14,37 @@ const star = writers[0];
 const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
 ---
 {star && (
-  <section class="op-star" aria-labelledby="op-star-h">
-    <div class="op-star-q" aria-hidden="true">“</div>
-    <div class="op-star-body">
-      <span class="op-star-tag">La columna de hoy</span>
-      <a href={storyUrl(star.last)}><h2 id="op-star-h" class="op-star-title">{star.last.data.title}</h2></a>
-      {star.last.data.description && <p class="op-star-dek">{star.last.data.description}</p>}
-      <a class="op-star-who" href={url(`opinion/${star.c.slug}`)}>
-        <span class="op-av op-av-xl" style={`--ring:${TONES[0]}`}>{initials(clean(star.c.name))}</span>
-        <span><b>{star.c.name}</b><small>{star.c.role ?? 'Columnista'} · {shortDate(star.last.data.date)}</small></span>
-      </a>
-      <a class="op-star-go" href={storyUrl(star.last)}>Leer la columna ›</a>
-    </div>
-  </section>
-)}
-{writers.length > 0 && (
-  <section class="op-voices" aria-labelledby="op-voices-h">
-    <div class="sec-h"><h2 id="op-voices-h">Nuestras voces</h2><span class="op-count">{writers.length} columnistas</span></div>
-    <div class="op-grid">
-      {writers.map(({ c, last, count }, i) => (
-        <article class="op-card">
-          <a class="op-card-top" href={url(`opinion/${c.slug}`)}>
-            <span class="op-av" style={`--ring:${TONES[i % TONES.length]}`}>{initials(clean(c.name))}</span>
-            <span class="op-card-name"><b>{c.name}</b><small>{count} {count === 1 ? 'columna' : 'columnas'}</small></span>
+  <div class="op-hero">
+    <section class="op-star" aria-labelledby="op-star-h">
+      <div class="op-star-q" aria-hidden="true">“</div>
+      <div class="op-star-body">
+        <span class="op-star-tag">La columna de hoy</span>
+        <a href={storyUrl(star.last)}><h2 id="op-star-h" class="op-star-title">{star.last.data.title}</h2></a>
+        {star.last.data.description && <p class="op-star-dek">{star.last.data.description}</p>}
+        <div class="op-star-foot">
+          <a class="op-star-who" href={url(`opinion/${star.c.slug}`)}>
+            <span class="op-av" style={`--ring:${TONES[0]}`}>{initials(clean(star.c.name))}</span>
+            <span><b>{star.c.name}</b><small>{star.c.role ?? 'Columnista'} · {shortDate(star.last.data.date)}</small></span>
           </a>
-          <a class="op-card-q hl" href={storyUrl(last)}>“{last.data.title}”</a>
-          <span class="time">{shortDate(last.data.date)}</span>
-        </article>
-      ))}
-    </div>
-  </section>
+          <a class="op-star-go" href={storyUrl(star.last)}>Leer la columna ›</a>
+        </div>
+      </div>
+    </section>
+    <section class="op-voices" aria-labelledby="op-voices-h">
+      <div class="op-voices-h"><h2 id="op-voices-h">Nuestras voces</h2><span class="op-count">{writers.length} columnistas</span></div>
+      <ul class="op-list">
+        {writers.map(({ c, last, count }, i) => (
+          <li class="op-item">
+            <a class="op-item-av" href={url(`opinion/${c.slug}`)} aria-label={c.name}>
+              <span class="op-av" style={`--ring:${TONES[i % TONES.length]}`}>{initials(clean(c.name))}</span>
+            </a>
+            <span class="op-item-t">
+              <a class="op-item-name" href={url(`opinion/${c.slug}`)}><b>{c.name}</b><small>{count} {count === 1 ? 'columna' : 'columnas'}</small></a>
+              <a class="op-item-q hl" href={storyUrl(last)}>“{last.data.title}”</a>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </div>
 )}
