@@ -75,7 +75,7 @@ export const NAV: Array<{ id?: SectionId; label?: string; children?: string[] }>
   { id: 'legislatura' },
   { id: 'tribunales' },
   { id: 'policiacas' },
-  { id: 'economia' },
+  { id: 'economia', children: ['agricultura', 'auto', 'comercio', 'empresarismo', 'finanzas-y-banca', 'tecnologia', 'turismo'] },
   { id: 'deportes' },
   { id: 'opiniones' },
   { id: 'el-tiempo' },

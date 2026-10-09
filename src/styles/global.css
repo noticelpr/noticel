@@ -4498,3 +4498,34 @@ footer{background:#000;border-top:4px solid var(--green)}
 .sp-title::before{width:6px;height:.8em}
 .sp-head .sec-subs{margin:0}
 .sp-head .sec-subs a{padding:3px 12px;font-size:13px}
+
+/* Section title with its subsections on the same line */
+.sp-titlerow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;margin-bottom:4px}
+.sp-titlerow .sp-title{margin:0}
+.sp-titlerow .sec-subs{margin:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
+.sp-titlerow .sec-subs::-webkit-scrollbar{display:none}
+.sp-titlerow .sec-subs a{flex:none}
+
+/* Thin bars: Economía's markets and El Tiempo's forecast (one line, slides sideways on phones) */
+.sp-tape{display:flex;align-items:center;gap:14px;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);padding:7px 0;margin-bottom:20px;font-size:13.5px;white-space:nowrap;overflow:hidden}
+.sp-tape-h{flex:none;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:var(--ink);color:#fff;padding:3px 8px;border-radius:2px}
+.sp-tape-row{display:flex;gap:22px;overflow-x:auto;scrollbar-width:none}
+.sp-tape-row::-webkit-scrollbar{display:none}
+.sp-tape-i{flex:none;font-variant-numeric:tabular-nums}
+.sp-tape-i em{font-style:normal;font-weight:700}
+.sp-tape-i em.up{color:#13804A}.sp-tape-i em.down{color:var(--red)}
+.sp-tape.sp-wx{border-left:0;border-radius:0;flex-wrap:nowrap;justify-content:flex-start}
+.sp-wx-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.sp-tape a{flex:none;font-weight:700;color:var(--purple)}
+
+/* Deportes: leagues and scores, each in one row that slides sideways */
+.sp-leagues,.sp-scores{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:4px}
+.sp-leagues a{flex:none}
+.sp-scores{display:flex;gap:10px}
+.sp-game{flex:0 0 190px}
+
+/* Header and logo a bit bigger */
+.masthead .wrap{padding-top:20px;padding-bottom:20px}
+.logo img{height:74px}
+@media (min-width:1000px){.masthead .wrap{min-height:112px}.masthead .logo img{height:84px}}
+@media (max-width:760px){.masthead .wrap{padding-top:10px;padding-bottom:10px}.logo img{height:46px}}

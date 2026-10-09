@@ -32,15 +32,17 @@ const rows = Array.from({ length: Math.ceil(rest.length / 3) }, (_, i) => rest.s
 // Section boxes (page 1 only)
 const box = page === 1 ? slug : '';
 const games = box === 'deportes' ? scores(undefined, 8) : [];
-const markets = box === 'economia' ? (await getMarkets()).list.filter((q) => q.group === 'pr' || q.group === 'mp').slice(0, 8) : [];
+const markets = box === 'economia' ? (await getMarkets()).list.filter((q) => q.group === 'pr' || q.group === 'mp' || q.group === 'us').slice(0, 12) : [];
 const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 ---
 <Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`}>
   <main class="wrap sp-page" id="main">
     <header class="sp-head">
       {parent && <p class="sp-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
-      <h1 class="sp-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
-      {subs.length > 0 && <nav class="sec-subs" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>}
+      <div class="sp-titlerow">
+        <h1 class="sp-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
+        {subs.length > 0 && <nav class="sec-subs" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>}
+      </div>
     </header>
 
     {box === 'deportes' && (
@@ -60,12 +62,11 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
       </section>
     )}
     {markets.length > 0 && (
-      <section class="sp-box" aria-labelledby="sp-mk-h">
-        <div class="sp-box-h"><h2 id="sp-mk-h">Mercados</h2><span>Cierre más reciente</span></div>
-        <table class="sp-mk">
-          <thead><tr><th>Valor</th><th>Precio</th><th>Cambio</th></tr></thead>
-          <tbody>{markets.map((q) => { const p = pctOf(q); return <tr><td>{q.name}</td><td>{curOf(q)}{fmtPrice(q)}{q.suf ?? ''}</td><td class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '+' : ''}{p.toFixed(2)}%</td></tr>; })}</tbody>
-        </table>
+      <section class="sp-tape" aria-label="Mercados">
+        <span class="sp-tape-h">Mercados</span>
+        <div class="sp-tape-row">
+          {markets.map((q) => { const p = pctOf(q); return <span class="sp-tape-i"><b>{q.name}</b> {curOf(q)}{fmtPrice(q)}{q.suf ?? ''} <em class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</em></span>; })}
+        </div>
       </section>
     )}
     {box === 'opiniones' && COLUMNISTS.length > 0 && (
@@ -75,9 +76,11 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
       </section>
     )}
     {box === 'el-tiempo' && (
-      <section class="sp-box sp-wx">
-        <div><h2>Pronóstico oficial para Puerto Rico</h2><p>El Servicio Nacional de Meteorología en San Juan publica el pronóstico, los avisos y las advertencias oficiales.</p></div>
-        <div class="sp-wx-links"><a class="btn" href={SITE.forecastUrl} rel="noopener" target="_blank">Ver el pronóstico ↗</a><a class="btn" href="https://www.nhc.noaa.gov/" rel="noopener" target="_blank">Centro Nacional de Huracanes ↗</a></div>
+      <section class="sp-tape sp-wx" aria-label="Pronóstico oficial">
+        <span class="sp-tape-h">Pronóstico</span>
+        <span class="sp-wx-t">Pronóstico, avisos y advertencias oficiales del Servicio Nacional de Meteorología en San Juan</span>
+        <a href={SITE.forecastUrl} rel="noopener" target="_blank">Ver el pronóstico ↗</a>
+        <a href="https://www.nhc.noaa.gov/" rel="noopener" target="_blank">Huracanes ↗</a>
       </section>
     )}
     {events.length > 0 && (
