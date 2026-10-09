@@ -4561,9 +4561,9 @@ footer{background:#000;border-top:4px solid var(--green)}
 
 /* Header buttons like Noticias Xtra's: same height, the icons in a white pill */
 .masthead .mh-right{gap:10px}
-.masthead .live-btn,.masthead .mh-ad-btn{height:36px;padding:0 14px;font-size:13px;border-radius:999px}
-.masthead .mh-icons{background:#fff;border:1px solid #fff;padding:2px;gap:2px}
-.masthead .mh-ico{width:32px;height:32px;color:#171717}
+.masthead .live-btn,.masthead .mh-ad-btn{height:36px;padding:0 14px;font-size:13px;border-radius:999px;box-shadow:0 2px 0 #A9172B}
+.masthead .mh-icons{background:#fff;border:1px solid #fff;padding:2px;gap:2px;border-radius:999px}
+.masthead .mh-ico{width:32px;height:32px;color:#171717;border-radius:50%}
 .masthead .mh-ico:hover{background:#EEF1F4;color:#007BB6}
 /* Notificaciones card in the strip */
 .hs-bell{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--green);color:#000}
@@ -4575,14 +4575,10 @@ footer{background:#000;border-top:4px solid var(--green)}
 .nav-dd.on>a,.nav-dd.on .nav-dd-label,.nav-dd.on .nav-dd-btn{color:#000;opacity:1}
 .nav-dd.on>a{padding-top:6px;padding-bottom:6px}
 
-/* Header right side: rectangles like the menu. En vivo red, icons in a white box (Noticias Xtra + profile), Anúnciate green */
-.masthead .live-btn{border-radius:4px;box-shadow:none;height:36px}
-.masthead .mh-icons{border-radius:6px}
-.masthead .mh-ico{border-radius:4px}
-.masthead .mh-ad-btn{border-radius:4px;box-shadow:none;height:36px;background:var(--green);color:#000}
-.masthead .mh-ad-btn:hover{background:#A6E01A;color:#000}
-.masthead .sw-nx{background:transparent;border-radius:6px}
-.masthead .sw-nx img{transform:none}
+/* Header right side exactly like Noticias Xtra's: round red pills, the icons in a round white pill; the sister-site
+   icon (Noticias Xtra's) in a circle, like Noticias Xtra shows NotiCel's */
+.masthead .sw-nx{background:#fff;border-radius:50%;overflow:hidden}
+.masthead .sw-nx img{transform:scale(1.04)}
 
 /* Bold section names (menu) and titles (section titles, headlines) */
 .nav-links>a,.nav-dd>a,.nav-dd-label,.nav-dd-menu a{font-weight:800}
