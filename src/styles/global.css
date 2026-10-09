@@ -4698,3 +4698,5 @@ h1,h2,h3,.hl,.ncs-title,.sec-h h2,.bb-lead h1,.bb-lead h2,.bb-side-item h3,.card
   .nav .wrap{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
   .nav .wrap::-webkit-scrollbar{display:none}
 }
+/* The plain-background rule for home and section blocks must not erase the games box's own blue background */
+.home-main > section.gt,[data-theme="dark"] .home-main > section.gt{background:linear-gradient(135deg,#000000,#006FA6 55%,#009DE9) !important;padding:16px 18px}
