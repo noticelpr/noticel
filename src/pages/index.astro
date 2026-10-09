@@ -29,6 +29,7 @@ const take = (list: typeof stories, n: number) => {
 };
 const related = (lead?.data.related ?? []).map((id) => stories.find((s) => s.id === id)).filter((s): s is (typeof stories)[number] => !!s);
 const leadMore = take(related.length ? related : ordered, 2); // two short headlines under the main one
+const center = take(ordered, 2); // two more main stories under the photo
 const right = take(ordered, 2);
 const row4 = take(ordered, 4);
 const breaking = take(stories.filter((s) => inCategory(s, 'ultima-hora')), 4);
@@ -55,9 +56,23 @@ const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) =
           <Time date={lead.data.date} />
           {leadMore.length > 0 && <ul class="bb-more">{leadMore.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}</ul>}
         </div>
-        <a class="bb-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
-          <Ph sectionId={lead.data.section} image={lead.data.image} league={lead.data.league} sizes="(max-width:760px) 100vw, 620px" priority />
-        </a>
+        <div class="bb-center">
+          <a class="bb-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
+            <Ph sectionId={lead.data.section} image={lead.data.image} league={lead.data.league} sizes="(max-width:760px) 100vw, 620px" priority />
+          </a>
+          {center.length > 0 && (
+            <div class="bb-center-two">
+              {center.map((s) => (
+                <article class="bb-side-item">
+                  <a href={storyUrl(s)} tabindex="-1" aria-hidden="true"><Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} sizes="300px" /></a>
+                  <Label story={s} />
+                  <a href={storyUrl(s)}><h3 class="hl">{s.data.title}</h3></a>
+                  <Time date={s.data.date} />
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
         <div class="bb-side">
           {right.map((s) => (
             <article class="bb-side-item">
