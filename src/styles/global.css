@@ -7,9 +7,10 @@
   --purple-bg:#000000; /* black behind white text (buttons, boxes) */
   --ink:#171717; --muted:#6B6A6A; --line:#E5E7EB; --soft:#F4F5F7; --bg:#FFFFFF;
   --card:#FFFFFF; --band:var(--band); --page2:var(--page2); --nav:#000000; --ad1:#F5F5F7; --ad2:#EFEFF2;
-  --head:"Trueno", "Inter", "Segoe UI", system-ui, sans-serif;
-  --body:"Inter", "Segoe UI", system-ui, sans-serif;
-  --serif:"Merriweather", Georgia, serif; /* story text, as in NotiCel's 2026 redesign */
+  /* Fonts chosen 2026-10-08: Barlow Condensed (headlines, menu, titles; condensed like the logo) + Barlow (text) */
+  --head:"Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body:"Barlow", "Segoe UI", system-ui, sans-serif;
+  --serif:"Barlow", "Segoe UI", system-ui, sans-serif; /* story text */
   --wrap:2560px; /* the site fills the screen, up to very large 2560px monitors */
   --gutter:clamp(16px,2.4vw,40px); /* side margins grow with the screen */
   color-scheme:light;
@@ -631,7 +632,7 @@ a.sp-games-teams:hover span:first-child,a.sp-games-teams:hover span:last-child{c
 .hs-pop-story a:hover{color:var(--purple);text-decoration:underline}
 .hs-pop-story time{display:block;font-family:var(--body);font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
 /* Zodiac signs: fonts that include them on Mac, Windows, Android and Linux */
-.hs-zodiac,.hz-sym{font-family:"Apple Symbols","Segoe UI Symbol","Noto Sans Symbols","Noto Sans Symbols 2","DejaVu Sans",sans-serif;font-weight:400}
+.hs-zodiac,.hz-sym{font-family:"Apple Symbols","Segoe UI Symbol","Barlow Symbols","Barlow Symbols 2","DejaVu Sans",sans-serif;font-weight:400}
 
 /* Horóscopo */
 .hz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
@@ -4595,3 +4596,10 @@ h1,h2,h3,.hl,.ncs-title,.sec-h h2,.bb-lead h1,.bb-lead h2,.bb-side-item h3,.card
 [data-theme="dark"] .ncs-av{background:var(--green);color:#000}
 .ncs-wname{display:block;font-weight:800;font-size:15px}
 .ncs-wlast{display:block;font-size:14px;line-height:1.35;color:var(--muted);margin:2px 0 4px;font-style:italic}
+
+/* Barlow Condensed is narrow: headlines a touch bigger so they keep their weight on the page */
+h1,h2,h3,.hl{font-family:var(--head)}
+.bb-lead h1,.bb-lead h2{font-size:clamp(32px,3vw,46px)}
+.bb-side-item h3,.card h3{font-size:19px}
+.art h1{font-size:clamp(34px,3.6vw,52px)}
+.nav-links>a,.nav-dd>a,.nav-dd-label{font-size:15px;letter-spacing:.03em}

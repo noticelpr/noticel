@@ -27,7 +27,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, max: number): string[
 export async function drawInstagram(canvas: HTMLCanvasElement, s: SocialStory, logoSrc: string): Promise<boolean> {
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d')!;
-  await Promise.all([document.fonts?.load('800 64px Inter'), document.fonts?.load('700 30px Inter')].filter(Boolean)).catch(() => null);
+  await Promise.all([document.fonts?.load('800 64px "Barlow Condensed"'), document.fonts?.load('700 30px "Barlow Condensed"')].filter(Boolean)).catch(() => null);
   const [photo, logo] = await Promise.all([load(s.photo), load(logoSrc)]);
 
   // Background: the photo, cropped to fill; without one, the brand gradient
@@ -48,7 +48,7 @@ export async function drawInstagram(canvas: HTMLCanvasElement, s: SocialStory, l
   const pad = 64, maxW = W - pad * 2, bottom = H - 150;
   let size = 76, lines: string[] = [];
   for (; size >= 44; size -= 4) {
-    ctx.font = `800 ${size}px Inter, sans-serif`;
+    ctx.font = `800 ${size}px "Barlow Condensed", sans-serif`;
     lines = wrap(ctx, s.title, maxW);
     if (lines.length <= 5) break;
   }
@@ -58,7 +58,7 @@ export async function drawInstagram(canvas: HTMLCanvasElement, s: SocialStory, l
   lines.forEach((l, i) => ctx.fillText(l, pad, top + i * lh));
 
   // Section label above the headline
-  ctx.font = '700 30px Inter, sans-serif';
+  ctx.font = '700 30px "Barlow Condensed", sans-serif';
   const label = s.sectionName.toUpperCase(), lw = ctx.measureText(label).width + 40;
   ctx.fillStyle = GREEN; roundRect(ctx, pad, top - 74, lw, 50, 25); ctx.fill();
   ctx.fillStyle = '#000'; ctx.textBaseline = 'middle'; ctx.fillText(label, pad + 20, top - 49);
@@ -66,7 +66,7 @@ export async function drawInstagram(canvas: HTMLCanvasElement, s: SocialStory, l
   // Logo, and the photo credit in small print
   if (logo) { const lh2 = 64, lw2 = (logo.width / logo.height) * lh2; ctx.drawImage(logo, pad, H - 108, lw2, lh2); }
   if (s.credit) {
-    ctx.font = '400 22px Inter, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+    ctx.font = '400 22px Barlow, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
     const cr = s.credit.replace(/,? ?vía Wikimedia Commons/i, ''); ctx.fillText(cr.length > 60 ? `${cr.slice(0, 59)}…` : cr, W - pad, H - 52); ctx.textAlign = 'left';
   }
   return !!photo;

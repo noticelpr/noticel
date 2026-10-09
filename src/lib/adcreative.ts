@@ -44,8 +44,8 @@ export function drawAd(canvas: HTMLCanvasElement, w: number, h: number, t: AdTex
   const g = ctx.createLinearGradient(0, 0, w, h); g.addColorStop(0, theme.a); g.addColorStop(1, theme.b);
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
   ctx.textBaseline = 'top';
-  const head = (px: number) => `800 ${px}px Poppins, system-ui, sans-serif`;
-  const body = (px: number) => `500 ${px}px "Noto Sans", system-ui, sans-serif`;
+  const head = (px: number) => `800 ${px}px Barlow Condensed, system-ui, sans-serif`;
+  const body = (px: number) => `500 ${px}px "Barlow", system-ui, sans-serif`;
   const title = t.title.trim() || t.business.trim() || 'Tu negocio';
   const msg = t.msg.trim(); const cta = t.cta.trim();
   const wide = w / h > 2.5;

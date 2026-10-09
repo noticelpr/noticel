@@ -3,7 +3,7 @@
 :root{
   --p-purple:#007BB6; --p-purple-bg:#000000; --p-blue:#009DE9; --p-red:#D7263D;
   --p-card:#FFFFFF; --p-soft:#F3F4F6; --p-bg:#FFFFFF;
-  --p-head:"Trueno","Inter",system-ui,sans-serif; --p-body:"Trueno","Inter",system-ui,sans-serif;
+  --p-head:"Barlow Condensed",system-ui,sans-serif; --p-body:"Barlow",system-ui,sans-serif;
   --p-gap:20px; --p-gap-lg:32px; --p-mh-h:0px;
 }
 .demo{background:var(--p-soft);color:var(--muted);font-size:13px;text-align:center;padding:6px 12px;padding-top:calc(6px + env(safe-area-inset-top,0px))}
