@@ -60,7 +60,7 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
   )}
   {newsletter && SITE.features.newsletter && (
     <div class="newsletter">
-      <h3>Boletín Xtra</h3>
+      <h3>Boletín NotiCel</h3>
       <p>Las noticias más importantes de Puerto Rico, cada mañana en tu correo.</p>
       <form data-newsletter novalidate>
         <label for="nlEmail" class="sr">Correo electrónico</label>
@@ -68,7 +68,7 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
         <p class="err" hidden></p>
         <button class="btn" type="submit">Suscribirme</button>
       </form>
-      <p class="ok" style="color:#fff" hidden>¡Gracias! El Boletín Xtra comenzará muy pronto.</p>
+      <p class="ok" style="color:#fff" hidden>¡Gracias! El Boletín NotiCel comenzará muy pronto.</p>
     </div>
   )}
   {showForo && (

@@ -37,6 +37,8 @@ const signText = horoscope(signIndex);
 // NotiCel: the newest Gobierno story and the newest column, each with its own card
 const gov = stories.find((s) => s.data.section === 'gobierno' && s.id !== trendStory?.id && s.id !== latest?.id);
 const column = stories.find((s) => s.data.section === 'opiniones');
+// NotiCel: the latest app push alerts (stories with a push title or text), newest first
+const pushes = stories.filter((s) => s.data.push?.body || s.data.push?.title).slice(0, 6);
 // "Para ti": default is the newest story outside the trending one; the browser swaps it for
 // one from the reader's most-read section (stored only in their own browser).
 const forYou = stories.find((s) => s.id !== trendStory?.id && s.id !== latest?.id && s.data.section !== 'opiniones') ?? stories[0];
@@ -132,6 +134,20 @@ const mkt = MKT_KEYS.map((k) => mktAll.find((q) => q.key === k)).filter((q): q i
             <p class="hs-pop-h">Opiniones</p>
             <ul class="hs-pop-list plain">{stories.filter((s) => s.data.section === 'opiniones' && s.id !== column.id).slice(0, 5).map((s) => <li><a href={storyUrl(s)}>{s.data.title} <small>· {s.data.author}</small></a></li>)}</ul>
             <a class="hs-pop-more" href={sectionUrl('opiniones')}>Todas las opiniones <Fragment set:html={chev} /></a>
+          </div>
+        </div>
+      )}
+
+      {pushes.length > 0 && (
+        <div class="hs-item">
+          <a class="hs-card hs-push" href={storyUrl(pushes[0])}>
+            <span class="hs-bell" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg></span>
+            <div class="hs-text"><span class="hs-label">Notificaciones · <em>{pushes[0].data.push!.title || 'NotiCel'}</em></span><strong>{pushes[0].data.push!.body || pushes[0].data.title}</strong></div>
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Últimas notificaciones de la app</p>
+            <ul class="hs-pop-list plain">{pushes.map((s) => <li><a href={storyUrl(s)}><small class="hs-push-t">{s.data.push!.title || 'NotiCel'}</small> {s.data.push!.body || s.data.title}</a></li>)}</ul>
+            <a class="hs-pop-more" href={url('perfil')}>Activa las notificaciones <Fragment set:html={chev} /></a>
           </div>
         </div>
       )}

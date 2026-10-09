@@ -185,14 +185,15 @@ export const TOWNS = [
   { name: 'Fajardo', temp: 28, sky: 'Lluvia' },
 ];
 
-// "En vivo" page (src/pages/en-vivo.astro): live YouTube channels in order of priority. Each time the site
-// rebuilds (every 15 minutes), the first one that is live plays; if none is live, NotiCel's newest video plays.
+// "En vivo" page (src/pages/en-vivo.astro): live YouTube channels in order of priority. NotiCel first (the user's
+// choice, 2026-10-08): if NotiCel is live it plays; otherwise the first other channel that is live; if none is live,
+// NotiCel's newest video plays. Checked each time the site rebuilds (every 15 minutes).
 export const LIVE_SOURCES = [
+  { id: 'noticel', name: 'NotiCel', channel: VIDEO_SOURCES.noticel.channel, url: VIDEO_SOURCES.noticel.url },
   { id: 'senado', name: 'Senado de Puerto Rico', channel: 'UC4B_LPWngCxJS9bUzFVf0gA', url: 'https://www.youtube.com/channel/UC4B_LPWngCxJS9bUzFVf0gA' },
   { id: 'camara', name: 'Cámara de Representantes', channel: 'UCm0SWjunIA5PDT9l4qW59Kw', url: 'https://www.youtube.com/channel/UCm0SWjunIA5PDT9l4qW59Kw' },
   { id: 'gobierno', name: 'Gobierno de Puerto Rico', channel: 'UCU4E9onNJk_vMOq22EisoCQ', url: 'https://www.youtube.com/@GobiernodePR' },
   { id: 'casa-blanca', name: 'Casa Blanca (EE. UU.)', channel: 'UCYxRlFDqcWM4y7FfpiAN3KQ', url: 'https://www.youtube.com/@WhiteHouse' },
-  { id: 'noticel', name: 'NotiCel', channel: VIDEO_SOURCES.noticel.channel, url: VIDEO_SOURCES.noticel.url },
   { id: 'nasa', name: 'NASA', channel: 'UCLA_DiR1FfKNvjuUpBHmylQ', url: 'https://www.youtube.com/@NASA' },
 ];
 // Section pages with a live video box at the top of the right column (ids from LIVE_SOURCES)

@@ -43,7 +43,7 @@ const related = d.related.map((id) => stories.find((x) => x.id === id)).filter((
 const more = stories
   .filter((x) => x.id !== story.id && !related.includes(x))
   .sort((a, b) => Number(b.data.section === d.section) - Number(a.data.section === d.section))
-  .slice(0, 4);
+  .slice(0, 6);
 // Opinion columns: the byline shows the columnist's picture and links to their profile
 const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
 ---
@@ -137,7 +137,7 @@ const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
         <Comments storyId={story.id} />
 
         <div class="sec-h"><h2>Te puede interesar</h2></div>
-        <div class="grid2">{more.map((x) => <StoryCard story={x} />)}</div>
+        <div class="bb-row4 art-more">{more.map((x) => <StoryCard story={x} />)}</div>
         <div style="margin-top:var(--gap-lg)"><GamesTeaser title="Tómate un break: Juegos NotiCel" /></div>
       </article>
       <Sidebar />

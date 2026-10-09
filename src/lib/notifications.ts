@@ -12,7 +12,7 @@ export const KINDS: Array<{ id: NotifKind; name: string; desc: string }> = [
   { id: 'mention', name: 'Menciones', desc: 'Cuando alguien escribe @tu_nombre en un comentario.' },
   { id: 'reply', name: 'Respuestas', desc: 'Cuando alguien responde a tu comentario.' },
   { id: 'like', name: 'Me gusta', desc: 'Cuando a alguien le gusta tu comentario.' },
-  { id: 'badge', name: 'Insignias y niveles', desc: 'Cuando subes de nivel en comentarios o en Juegos Xtra.' },
+  { id: 'badge', name: 'Insignias y niveles', desc: 'Cuando subes de nivel en comentarios o en Juegos NotiCel.' },
   { id: 'mod', name: 'Moderación', desc: 'Cuando la redacción revisa un comentario tuyo.' },
 ];
 

@@ -196,7 +196,8 @@ const TABS = [
           <a class="nav-ad" href={url('publicidad')}>Anúnciate</a>
           <a href={url()} aria-current={active === 'home' ? 'page' : undefined}>Portada</a>
           {NAV.map((n, i) => {
-            const on = active === n.id || !!n.children?.some((c) => c === active);
+            // Light up the item itself, or a drop-down whose subsection is open, unless that subsection has its own item in the bar
+            const on = active === n.id || (!!n.children?.includes(active ?? '') && !NAV.some((m) => m.id === active));
             if (!n.children) return <a href={sectionUrl(n.id!)} aria-current={on ? 'page' : undefined}>{section(n.id!).name}</a>;
             return (
               <span class:list={['nav-dd', { on }]}>

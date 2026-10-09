@@ -23,6 +23,7 @@ const noticias = defineCollection({
     views: z.number().default(0), // WordPress `post_views_count`, for "Lo más leído"
     pdfUrl: z.string().optional(),
     pdfTitle: z.string().optional(),
+    push: z.object({ title: z.string().default(''), body: z.string().default('') }).optional(), // app push alert for this story
     draft: z.boolean().default(false),
     // Written by the staff panel (same fields as Noticias Xtra). Imported WordPress stories leave them at the defaults.
     place: z.string().default(''), // dateline, e.g. "San Juan" (imported WordPress stories have none)

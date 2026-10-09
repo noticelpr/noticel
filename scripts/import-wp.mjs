@@ -71,6 +71,8 @@ const posts = items
       views: Number(meta.post_views_count || 0),
       pdfUrl: meta.pdf_url || undefined,
       pdfTitle: meta.pdf_title || undefined,
+      // App push alert (WordPress _notification_title / _notification_body; the send switch goes back to 0 after sending)
+      push: meta._notification_title || meta._notification_body ? { title: strip(meta._notification_title || ''), body: strip(meta._notification_body || '') } : undefined,
       body,
     };
   })

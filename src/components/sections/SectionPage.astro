@@ -36,25 +36,25 @@ const markets = box === 'economia' ? (await getMarkets()).list.filter((q) => q.g
 const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 ---
 <Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`}>
-  <main class="wrap sp-page" id="main">
-    <header class="sp-head">
-      {parent && <p class="sp-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
-      <div class="sp-titlerow">
-        <h1 class="sp-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
+  <main class="wrap ncs-page" id="main">
+    <header class="ncs-head">
+      {parent && <p class="ncs-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
+      <div class="ncs-titlerow">
+        <h1 class="ncs-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
         {subs.length > 0 && <nav class="sec-subs" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>}
       </div>
     </header>
 
     {box === 'deportes' && (
-      <section class="sp-box" aria-label="Ligas y marcadores">
-        <div class="sp-leagues">{LEAGUES.map((l) => <a href={url(`ligas/${l.id}`)}><LeagueBadge id={l.id} size="sm" />{l.name}</a>)}</div>
+      <section class="ncs-box" aria-label="Ligas y marcadores">
+        <div class="ncs-leagues">{LEAGUES.map((l) => <a href={url(`ligas/${l.id}`)}><LeagueBadge id={l.id} size="sm" />{l.name}</a>)}</div>
         {games.length > 0 && (
-          <div class="sp-scores">
+          <div class="ncs-scores">
             {games.map((g) => (
-              <a class="sp-game" href={url(g.id ? `ligas/juego/${g.id}` : `ligas/${g.league}`)}>
-                <span class="sp-game-h">{league(g.league)?.name} · {g.status === 'en-vivo' ? (g.note ?? 'En vivo') : g.status === 'final' ? 'Final' : 'Próximo'}{g.demo && <i class="sp-demo">DEMO</i>}</span>
-                <span class="sp-team"><b>{g.away}</b><em>{g.awayScore ?? ''}</em></span>
-                <span class="sp-team"><b>{g.home}</b><em>{g.homeScore ?? ''}</em></span>
+              <a class="ncs-game" href={url(g.id ? `ligas/juego/${g.id}` : `ligas/${g.league}`)}>
+                <span class="ncs-game-h">{league(g.league)?.name} · {g.status === 'en-vivo' ? (g.note ?? 'En vivo') : g.status === 'final' ? 'Final' : 'Próximo'}{g.demo && <i class="sp-demo">DEMO</i>}</span>
+                <span class="ncs-team"><b>{g.away}</b><em>{g.awayScore ?? ''}</em></span>
+                <span class="ncs-team"><b>{g.home}</b><em>{g.homeScore ?? ''}</em></span>
               </a>
             ))}
           </div>
@@ -62,37 +62,37 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
       </section>
     )}
     {markets.length > 0 && (
-      <section class="sp-tape" aria-label="Mercados">
-        <span class="sp-tape-h">Mercados</span>
-        <div class="sp-tape-row">
-          {markets.map((q) => { const p = pctOf(q); return <span class="sp-tape-i"><b>{q.name}</b> {curOf(q)}{fmtPrice(q)}{q.suf ?? ''} <em class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</em></span>; })}
+      <section class="ncs-tape" aria-label="Mercados">
+        <span class="ncs-tape-h">Mercados</span>
+        <div class="ncs-tape-row">
+          {markets.map((q) => { const p = pctOf(q); return <span class="ncs-tape-i"><b>{q.name}</b> {curOf(q)}{fmtPrice(q)}{q.suf ?? ''} <em class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '▲' : '▼'} {Math.abs(p).toFixed(2)}%</em></span>; })}
         </div>
       </section>
     )}
     {box === 'opiniones' && COLUMNISTS.length > 0 && (
-      <section class="sp-box" aria-labelledby="sp-col-h">
-        <div class="sp-box-h"><h2 id="sp-col-h">Nuestros columnistas</h2></div>
-        <div class="sp-cols">{COLUMNISTS.map((c) => <a href={url(`opinion/${c.slug}`)}><span class="sp-av">{initials(c.name.replace(/^Lcd[oa]\.?\s*/u, ''))}</span>{c.name}</a>)}</div>
+      <section class="ncs-box" aria-labelledby="sp-col-h">
+        <div class="ncs-box-h"><h2 id="sp-col-h">Nuestros columnistas</h2></div>
+        <div class="ncs-cols">{COLUMNISTS.map((c) => <a href={url(`opinion/${c.slug}`)}><span class="ncs-av">{initials(c.name.replace(/^Lcd[oa]\.?\s*/u, ''))}</span>{c.name}</a>)}</div>
       </section>
     )}
     {box === 'el-tiempo' && (
-      <section class="sp-tape sp-wx" aria-label="Pronóstico oficial">
-        <span class="sp-tape-h">Pronóstico</span>
-        <span class="sp-wx-t">Pronóstico, avisos y advertencias oficiales del Servicio Nacional de Meteorología en San Juan</span>
+      <section class="ncs-tape ncs-wx" aria-label="Pronóstico oficial">
+        <span class="ncs-tape-h">Pronóstico</span>
+        <span class="ncs-wx-t">Pronóstico, avisos y advertencias oficiales del Servicio Nacional de Meteorología en San Juan</span>
         <a href={SITE.forecastUrl} rel="noopener" target="_blank">Ver el pronóstico ↗</a>
         <a href="https://www.nhc.noaa.gov/" rel="noopener" target="_blank">Huracanes ↗</a>
       </section>
     )}
     {events.length > 0 && (
-      <section class="sp-box" aria-labelledby="sp-ev-h">
-        <div class="sp-box-h"><h2 id="sp-ev-h">Próximos eventos</h2></div>
-        <ul class="sp-events">{events.map((e) => { const d = dateTile(e.date); return <li><span class="sp-ev-d"><small>{d.top}</small><b>{d.big}</b></span><span><b>{e.title}</b><small>{e.kind} · {e.venue}, {e.city}</small></span></li>; })}</ul>
+      <section class="ncs-box" aria-labelledby="sp-ev-h">
+        <div class="ncs-box-h"><h2 id="sp-ev-h">Próximos eventos</h2></div>
+        <ul class="ncs-events">{events.map((e) => { const d = dateTile(e.date); return <li><span class="ncs-ev-d"><small>{d.top}</small><b>{d.big}</b></span><span><b>{e.title}</b><small>{e.kind} · {e.venue}, {e.city}</small></span></li>; })}</ul>
       </section>
     )}
 
-    {lead && <div class="sp-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
+    {lead && <div class="ncs-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
 
-    <div class="home-grid sp-grid">
+    <div class="home-grid ncs-grid">
       <div class="home-main">
         {list.length === 0 && <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>}
         {rows.length > 0 && (
@@ -100,7 +100,7 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
             <div class="sec-h"><h2>{page === 1 ? `Más de ${name}` : 'Noticias'}</h2></div>
             {rows.map((r, i) => (
               <>
-                <div class="bb-row4 sp-row">{r.map((s) => <StoryCard story={s} />)}</div>
+                <div class="bb-row4 ncs-row">{r.map((s) => <StoryCard story={s} />)}</div>
                 {i === 1 && <AdSlot size="infeed" />}
               </>
             ))}
