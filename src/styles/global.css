@@ -4708,6 +4708,7 @@ body.staff .mh-site:hover{color:#5CC4F5;border-color:#5CC4F5}
 /* Staff pages: a slim bar (logo left, panel name beside it, buttons right) instead of the site's tall centered header */
 body.staff .masthead .wrap{min-height:0;padding-top:10px;padding-bottom:10px;gap:14px}
 body.staff .masthead .logo{position:static;transform:none}
-body.staff .masthead .logo img{height:42px}
+body.staff .masthead .logo img{height:84px} /* same size as the home page's logo */
 body.staff .mh-staff{padding-left:14px;font-size:16px}
-@media (max-width:760px){body.staff .masthead .logo img{height:34px}body.staff .mh-staff{font-size:14px;padding-left:10px}}
+@media (max-width:999px){body.staff .masthead .logo img{height:50px}}
+@media (max-width:760px){body.staff .masthead .logo img{height:46px}body.staff .mh-staff{font-size:14px;padding-left:10px}}
