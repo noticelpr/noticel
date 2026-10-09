@@ -1,23 +1,16 @@
 ---
 // Category (section) pages at the same address WordPress uses: /category/deportes/, /category/deportes/beisbol/,
 // /category/deportes/page/2/. Like WordPress, a category also lists its subcategories' stories.
-// Design: Noticias Xtra's section pages. Deportes, Entretenimiento, El Tiempo, Economía and Opiniones have their own
-// special page (src/components/sections/); every other category, subcategory and page 2+ uses Generic.astro.
-import Generic from '../../components/sections/Generic.astro';
-import Deportes from '../../components/sections/Deportes.astro';
-import Entretenimiento from '../../components/sections/Entretenimiento.astro';
-import Clima from '../../components/sections/Clima.astro';
-import Economia from '../../components/sections/Economia.astro';
-import Opinion from '../../components/sections/Opinion.astro';
-import { getStories, CATEGORY_INFO, CATEGORY_PAGE_SIZE, SECTIONS, withChildren, childrenOf, parentOf, sectionOf } from '../../lib/site';
-
-const SPECIAL = { deportes: Deportes, entretenimiento: Entretenimiento, 'el-tiempo': Clima, economia: Economia, opiniones: Opinion } as const;
+// One design for every section and subsection (src/components/sections/SectionPage.astro).
+import SectionPage from '../../components/sections/SectionPage.astro';
+import { getStories, topOrder, sectionTop, CATEGORY_INFO, CATEGORY_PAGE_SIZE, SECTIONS, withChildren, parentOf, sectionOf } from '../../lib/site';
 
 export async function getStaticPaths() {
   const all = await getStories();
   return Object.keys(CATEGORY_INFO).flatMap((slug) => {
     const slugs = withChildren(slug);
-    const list = all.filter((s) => s.data.categories.some((c) => slugs.includes(c)));
+    // Pinned and editor-picked stories first, then the newest (Noticias Xtra's section order)
+    const list = sectionTop(topOrder(all.filter((s) => s.data.categories.some((c) => slugs.includes(c)))));
     const pages = Math.max(1, Math.ceil(list.length / CATEGORY_PAGE_SIZE));
     return Array.from({ length: pages }, (_, i) => ({
       params: { path: i === 0 ? CATEGORY_INFO[slug].path : `${CATEGORY_INFO[slug].path}/page/${i + 1}` },
@@ -27,9 +20,7 @@ export async function getStaticPaths() {
 }
 
 const { slug, page, pages, list } = Astro.props;
-const Special = page === 1 ? SPECIAL[slug as keyof typeof SPECIAL] : undefined;
 // The menu item to light up: the category itself if it's in the menu, else its section
-const inMenu = SECTIONS.some((s) => s.id === slug);
-const active = inMenu ? slug : sectionOf([slug, parentOf(slug) ?? slug]);
+const active = SECTIONS.some((s) => s.id === slug) ? slug : sectionOf([slug, parentOf(slug) ?? slug]);
 ---
-{Special ? <Special /> : <Generic slug={slug} list={list} page={page} pages={pages} subs={childrenOf(slug)} active={active} />}
+<SectionPage slug={slug} list={list} page={page} pages={pages} active={active} />

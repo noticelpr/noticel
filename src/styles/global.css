@@ -4376,21 +4376,26 @@ footer{background:#000;border-top:4px solid var(--green)}
 
 /* ===== NotiCel: the card strip under the menu, as a black band with dark cards ===== */
 .nc-strip{background:#000;padding:10px 0 14px;border-bottom:1px solid #1F1F1F}
-.nc-strip .hs-card{background:#141416;border:0;border-left:3px solid var(--green);border-radius:4px;color:#fff;height:72px}
-.nc-strip .hs-item>.hs-card{height:72px}
+.nc-strip{padding:6px 0 8px}
+.nc-strip .hs-card{background:#141416;border:0;border-left:3px solid var(--green);border-radius:3px;color:#fff;height:50px;padding:5px 10px;gap:10px}
+.nc-strip .hs-item>.hs-card{height:50px}
+.nc-strip .hs-text strong{font-size:12.5px;line-height:15px;-webkit-line-clamp:2}
+.nc-strip .hs-label{font-size:9.5px}
+.nc-strip .hs-mkt-ico,.nc-strip .hs-dm-img{width:34px;height:34px}
+.nc-strip .hs-op .hs-text{max-width:240px}
 .nc-strip .hs-item:hover>.hs-card,.nc-strip .hs-item:focus-within>.hs-card,.nc-strip .hs-card:hover{border-color:var(--blue);background:#1C1C1F;box-shadow:none}
 .nc-strip .hs-label{color:var(--green);text-transform:uppercase;letter-spacing:.06em;font-weight:700;font-size:10.5px}
 .nc-strip .hs-label em{color:#BDBDC2}
 .nc-strip .hs-text strong{color:#fff}
 .nc-strip .hs-text small,.nc-strip .hs-mkt-n b{color:#BDBDC2}
-.nc-strip .hs-thumb{border-radius:4px;width:56px;height:56px}
+.nc-strip .hs-thumb{border-radius:3px;width:40px;height:40px}
 .nc-strip .sc-arrow{background:#141416;color:#fff}
 
 
 /* ===== NotiCel home page, option 4 (inspired by BBC News): headline left, photo center, two stories right ===== */
 .bb-top{padding-top:26px}
 .bb-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr);gap:28px;align-items:start}
-.bb-lead h1{font-size:clamp(28px,2.6vw,40px);line-height:1.1;margin:6px 0 12px;letter-spacing:-.01em}
+.bb-lead h1,.bb-lead h2{font-size:clamp(28px,2.6vw,40px);line-height:1.1;margin:6px 0 12px;letter-spacing:-.01em}
 .bb-dek{font-size:17px;line-height:1.5;color:var(--muted);margin:0 0 10px}
 .bb-more{list-style:none;margin:16px 0 0;padding:0}
 .bb-more li{border-top:1px solid var(--line);padding:12px 0;font-weight:700;font-size:16px;line-height:1.3}
@@ -4417,4 +4422,64 @@ footer{background:#000;border-top:4px solid var(--green)}
 .bb-center-two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
 .bb-center-two .bb-side-item + .bb-side-item{border-top:0;padding-top:0}
 .bb-center-two h3{font-size:16px}
-@media (max-width:760px){.bb-center{order:-1}.bb-center-two{grid-template-columns:1fr}}
+@media (max-width:760px){.bb-center-two{grid-template-columns:1fr}}
+
+/* Phones: the main photo goes on top of the main headline (the center photo hides) */
+.bb-lead-photo{display:none}
+@media (max-width:760px){.bb-lead-photo{display:block;margin-bottom:12px}.bb-lead-photo .ph{aspect-ratio:16/10;border-radius:4px}.bb-photo{display:none}.bb-center-two{margin-top:0;border-top:0;padding-top:0}}
+
+/* ===== NotiCel section pages (one design for all) ===== */
+.sp-page{padding-top:22px}
+.sp-head{margin-bottom:18px}
+.sp-crumb{margin:0 0 4px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sp-crumb a{color:var(--purple)}
+.sp-title{margin:0 0 12px;font-size:clamp(30px,3.4vw,44px);line-height:1.05;display:flex;align-items:center;gap:14px}
+.sp-title::before{content:"";width:8px;height:.9em;background:var(--green);border-radius:2px}
+.sp-title small{font-size:18px;color:var(--muted);font-weight:600}
+.sp-top{margin-bottom:30px;padding-bottom:28px;border-bottom:1px solid var(--line)}
+.sp-row + .sp-row{margin-top:26px}
+.sp-box{border:1px solid var(--line);border-radius:6px;padding:16px 18px;margin-bottom:24px;background:var(--card)}
+.sp-box-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sp-box-h h2,.sp-wx h2{margin:0;font-size:18px}
+.sp-box-h a{font-size:13px;color:var(--muted)}
+.sp-leagues{display:flex;flex-wrap:wrap;gap:8px}
+.sp-leagues a{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px;font-weight:600;font-size:14px}
+.sp-leagues a:hover{border-color:var(--purple);color:var(--purple)}
+.sp-scores{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-top:14px}
+.sp-game{display:grid;gap:4px;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:4px;padding:8px 10px}
+.sp-game:hover{border-color:var(--purple)}
+.sp-game-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sp-game-h .sp-demo{font-style:normal;font-size:9px;padding:1px 4px}
+.sp-team{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.sp-team em{font-style:normal;font-weight:800;font-variant-numeric:tabular-nums}
+.sp-mk{width:100%;border-collapse:collapse;font-size:15px}
+.sp-mk th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:6px 0;border-bottom:2px solid var(--ink)}
+.sp-mk td{padding:9px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.sp-mk th:not(:first-child),.sp-mk td:not(:first-child){text-align:right}
+.sp-mk td.up{color:#13804A;font-weight:700}
+.sp-mk td.down{color:var(--red);font-weight:700}
+.sp-cols{display:flex;flex-wrap:wrap;gap:10px 18px}
+.sp-cols a{display:inline-flex;align-items:center;gap:10px;font-weight:600}
+.sp-av{width:40px;height:40px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+.sp-wx{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;border-left:4px solid var(--blue)}
+.sp-wx p{margin:6px 0 0;color:var(--muted)}
+.sp-wx-links{display:flex;flex-wrap:wrap;gap:8px}
+.sp-events{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.sp-events li{display:flex;gap:12px;align-items:center}
+.sp-events li>span:last-child{display:grid}
+.sp-events small{color:var(--muted);font-size:13px}
+.sp-ev-d{display:grid;justify-items:center;width:48px;padding:4px 0;border-radius:6px;background:var(--ink);color:#fff;flex:none}
+.sp-ev-d small{color:var(--green);font-size:11px;font-weight:800;text-transform:uppercase}
+.sp-ev-d b{font-size:20px;line-height:1}
+
+/* NotiCel: clean main column, no boxes (like the top of the page), even spacing between blocks */
+.home-main > section,.home-main > .home-row,.home-main > .sp-panel,.home-sections > div:not(.ad-slot) > .sec-block{background:none !important;border:0 !important;box-shadow:none !important;padding:0 !important;border-radius:0 !important}
+[data-theme="dark"] .home-main > section{background:none !important}
+.home-main{gap:40px}
+.home-main .bb-row4{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.home-main .sec-h{margin:0 0 16px}
+.bb-top{padding-bottom:8px}
+.bb-most{margin-top:32px}
+.home-grid{padding-top:36px;border-top:1px solid var(--line);margin-top:28px}
+@media (max-width:760px){.home-main .bb-row4{grid-template-columns:1fr}.home-main{gap:32px}}
+.sp-box-h span{font-size:13px;color:var(--muted)}

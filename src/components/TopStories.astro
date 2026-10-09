@@ -1,0 +1,54 @@
+---
+// The top of the home page and of every section page (NotiCel, 2026-10-08; inspired by BBC News' front page):
+// the main headline on the left in large type, its photo in the middle with two stories under it, two stories on the
+// right. Phones: the photo first, then the main headline, then the other stories.
+import Ph from './Ph.astro';
+import Label from './Label.astro';
+import Time from './Time.astro';
+import { storyUrl, type Story } from '../lib/site';
+
+interface Props { lead: Story; more?: Story[]; center?: Story[]; right?: Story[]; h1?: boolean }
+const { lead, more = [], center = [], right = [], h1 = true } = Astro.props;
+const H = h1 ? 'h1' : 'h2';
+---
+<div class="bb-hero">
+  <div class="bb-lead">
+    <a class="bb-lead-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
+      <Ph sectionId={lead.data.section} image={lead.data.image} league={lead.data.league} sizes="100vw" />
+    </a>
+    <Label story={lead} />
+    <a href={storyUrl(lead)}><H class="hl">{lead.data.title}</H></a>
+    {lead.data.description && <p class="bb-dek">{lead.data.description}</p>}
+    <Time date={lead.data.date} />
+    {more.length > 0 && <ul class="bb-more">{more.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}</ul>}
+  </div>
+  <div class="bb-center">
+    <a class="bb-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
+      <Ph sectionId={lead.data.section} image={lead.data.image} league={lead.data.league} sizes="(max-width:1100px) 60vw, 620px" priority />
+    </a>
+    {center.length > 0 && (
+      <div class="bb-center-two">
+        {center.map((s) => (
+          <article class="bb-side-item">
+            <a href={storyUrl(s)} tabindex="-1" aria-hidden="true"><Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} sizes="300px" /></a>
+            <Label story={s} />
+            <a href={storyUrl(s)}><h3 class="hl">{s.data.title}</h3></a>
+            <Time date={s.data.date} />
+          </article>
+        ))}
+      </div>
+    )}
+  </div>
+  {right.length > 0 && (
+    <div class="bb-side">
+      {right.map((s) => (
+        <article class="bb-side-item">
+          <a href={storyUrl(s)} tabindex="-1" aria-hidden="true"><Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} sizes="320px" /></a>
+          <Label story={s} />
+          <a href={storyUrl(s)}><h3 class="hl">{s.data.title}</h3></a>
+          <Time date={s.data.date} />
+        </article>
+      ))}
+    </div>
+  )}
+</div>

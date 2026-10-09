@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { SITE, SECTIONS, NAV, section, url, sectionUrl } from '../lib/site';
+import { SITE, SECTIONS, NAV, CATEGORIES, section, url, sectionUrl } from '../lib/site';
 import { getBreaking } from '../lib/breaking';
 import AdSlot from '../components/AdSlot.astro';
 import Logo from '../components/Logo.astro';
@@ -43,7 +43,7 @@ const TABS = [
 ];
 ---
 <!doctype html>
-<html lang="es" data-theme={active === 'deportes' ? 'dark' : undefined} data-force-dark={active === 'deportes' ? '' : undefined}>
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -212,7 +212,7 @@ const TABS = [
       {/* Drop-downs live outside the menu bar so its sideways scrolling (phones) never cuts them off */}
       {NAV.map((n, i) => n.children && (
         <div class="nav-dd-menu" id={`dd-${i}`} hidden>
-          {n.children.map((c) => <a href={sectionUrl(c)} aria-current={active === c ? 'page' : undefined}>{section(c).name}</a>)}
+          {n.children.map((c) => <a href={sectionUrl(c)} aria-current={active === c ? 'page' : undefined}>{CATEGORIES[c] ?? c}</a>)}
         </div>
       ))}
     </nav>}

@@ -34,6 +34,9 @@ const signIndex = SIGNS.findIndex((s) => s.id === signOfTheDay().id);
 const sign = SIGNS[signIndex];
 const signText = horoscope(signIndex);
 
+// NotiCel: the newest Gobierno story and the newest column, each with its own card
+const gov = stories.find((s) => s.data.section === 'gobierno' && s.id !== trendStory?.id && s.id !== latest?.id);
+const column = stories.find((s) => s.data.section === 'opiniones');
 // "Para ti": default is the newest story outside the trending one; the browser swaps it for
 // one from the reader's most-read section (stored only in their own browser).
 const forYou = stories.find((s) => s.id !== trendStory?.id && s.id !== latest?.id && s.data.section !== 'opiniones') ?? stories[0];
@@ -102,6 +105,33 @@ const mkt = MKT_KEYS.map((k) => mktAll.find((q) => q.key === k)).filter((q): q i
               {forYouMore.length ? forYouMore.map((s) => <li><a href={storyUrl(s)}>{s.data.title}</a></li>) : <li><a href={sectionUrl(forYou.data.section)}>Ver la sección</a></li>}
             </ul>
             <p class="hs-pop-foot">Elegido según las secciones que más lees. Se guarda solo en tu navegador.</p>
+          </div>
+        </div>
+      )}
+
+      {gov && (
+        <div class="hs-item">
+          <a class="hs-card" href={storyUrl(gov)}>
+            <div class="hs-text"><span class="hs-label">Gobierno</span><strong>{gov.data.title}</strong></div>
+            <span class="hs-thumb"><Ph sectionId={gov.data.section} image={gov.data.image} sizes="120px" /></span>
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Gobierno</p>
+            <ul class="hs-pop-list plain">{stories.filter((s) => s.data.section === 'gobierno' && s.id !== gov.id).slice(0, 5).map((s) => <li><a href={storyUrl(s)}>{s.data.title}</a></li>)}</ul>
+            <a class="hs-pop-more" href={sectionUrl('gobierno')}>Todo Gobierno <Fragment set:html={chev} /></a>
+          </div>
+        </div>
+      )}
+
+      {column && (
+        <div class="hs-item">
+          <a class="hs-card hs-op" href={storyUrl(column)}>
+            <div class="hs-text"><span class="hs-label">Opinión · <em>{column.data.author}</em></span><strong>{column.data.title}</strong></div>
+          </a>
+          <div class="hs-pop">
+            <p class="hs-pop-h">Opiniones</p>
+            <ul class="hs-pop-list plain">{stories.filter((s) => s.data.section === 'opiniones' && s.id !== column.id).slice(0, 5).map((s) => <li><a href={storyUrl(s)}>{s.data.title} <small>· {s.data.author}</small></a></li>)}</ul>
+            <a class="hs-pop-more" href={sectionUrl('opiniones')}>Todas las opiniones <Fragment set:html={chev} /></a>
           </div>
         </div>
       )}

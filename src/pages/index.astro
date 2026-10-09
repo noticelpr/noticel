@@ -1,7 +1,7 @@
 ---
 // Home page, option 4 (chosen 2026-10-08, inspired by BBC News' front page): the main headline on the left in large
 // type, its photo in the middle, two more stories with photos on the right; a row of four; Lo más leído in two
-// columns; then Última hora, Destacadas, videos and each section as a row of four (most-read sections first).
+// columns; then Última hora, Destacadas, videos and each section as a row of three (most-read sections first).
 // Right column below the top: Noticias Xtra's sidebar (Tendencias, lottery, Foro…). Each story appears once at the top.
 import Markets from '../components/economia/Markets.astro';
 import Base from '../layouts/Base.astro';
@@ -12,6 +12,7 @@ import Ph from '../components/Ph.astro';
 import Label from '../components/Label.astro';
 import Time from '../components/Time.astro';
 import HomeStrip from '../components/HomeStrip.astro';
+import TopStories from '../components/TopStories.astro';
 import AdSlot from '../components/AdSlot.astro';
 import GamesTeaser from '../components/GamesTeaser.astro';
 import { getStories, topOrder, pinTop, mostRead, inCategory, url, SITE, SECTIONS, VIDEOS, VIDEO_SOURCES, storyUrl, sectionUrl } from '../lib/site';
@@ -32,7 +33,7 @@ const leadMore = take(related.length ? related : ordered, 2); // two short headl
 const center = take(ordered, 2); // two more main stories under the photo
 const right = take(ordered, 2);
 const row4 = take(ordered, 4);
-const breaking = take(stories.filter((s) => inCategory(s, 'ultima-hora')), 4);
+const breaking = take(stories.filter((s) => inCategory(s, 'ultima-hora')), 3);
 const top10 = mostRead(stories, 10);
 const featured = take(ordered.filter((s) => s.data.featured), 6);
 const restStories = stories.filter((s) => !used.has(s.id));
@@ -41,49 +42,14 @@ const viewsOf = (id: string) => stories.filter((s) => s.data.section === id).red
 const sectionIds = SECTIONS.map((s) => s.id)
   .filter((id) => id !== 'noticias' && restStories.some((s) => s.data.section === id))
   .sort((a, b) => Number(a === 'opiniones') - Number(b === 'opiniones') || viewsOf(b) - viewsOf(a));
-const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) => s.data.section === id).slice(0, 4) }));
+const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) => s.data.section === id).slice(0, 3) }));
 ---
 <Base active="home">
   <HomeStrip />
   {!lead && <div class="wrap"><div class="empty"><p>Muy pronto publicaremos las primeras noticias.</p></div></div>}
   {lead && (
     <section class="wrap bb-top" id="main">
-      <div class="bb-hero">
-        <div class="bb-lead">
-          <Label story={lead} />
-          <a href={storyUrl(lead)}><h1 class="hl">{lead.data.title}</h1></a>
-          {lead.data.description && <p class="bb-dek">{lead.data.description}</p>}
-          <Time date={lead.data.date} />
-          {leadMore.length > 0 && <ul class="bb-more">{leadMore.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}</ul>}
-        </div>
-        <div class="bb-center">
-          <a class="bb-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
-            <Ph sectionId={lead.data.section} image={lead.data.image} league={lead.data.league} sizes="(max-width:760px) 100vw, 620px" priority />
-          </a>
-          {center.length > 0 && (
-            <div class="bb-center-two">
-              {center.map((s) => (
-                <article class="bb-side-item">
-                  <a href={storyUrl(s)} tabindex="-1" aria-hidden="true"><Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} sizes="300px" /></a>
-                  <Label story={s} />
-                  <a href={storyUrl(s)}><h3 class="hl">{s.data.title}</h3></a>
-                  <Time date={s.data.date} />
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-        <div class="bb-side">
-          {right.map((s) => (
-            <article class="bb-side-item">
-              <a href={storyUrl(s)} tabindex="-1" aria-hidden="true"><Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} sizes="320px" /></a>
-              <Label story={s} />
-              <a href={storyUrl(s)}><h3 class="hl">{s.data.title}</h3></a>
-              <Time date={s.data.date} />
-            </article>
-          ))}
-        </div>
-      </div>
+      <TopStories lead={lead} more={leadMore} center={center} right={right} />
       {row4.length > 0 && <div class="bb-row4">{row4.map((s) => <StoryCard story={s} />)}</div>}
       {top10.length > 0 && (
         <section class="bb-most" aria-labelledby="bb-most-h">
@@ -106,7 +72,7 @@ const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) =
       {featured.length > 0 && (
         <section>
           <div class="sec-h"><h2>Destacadas</h2></div>
-          <div class="bb-row4">{featured.slice(0, 4).map((s) => <StoryCard story={s} />)}</div>
+          <div class="bb-row4">{featured.slice(0, 3).map((s) => <StoryCard story={s} />)}</div>
         </section>
       )}
 

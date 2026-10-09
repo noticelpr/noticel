@@ -1,0 +1,119 @@
+---
+// Every NotiCel section and subsection page (2026-10-08): the same top block as the home page (headline left, photo
+// center, stories right), then the rest as rows of three with page numbers, beside Noticias Xtra's sidebar.
+// A few sections add their own box, in NotiCel's style: Deportes (leagues and scores), Economía (markets table),
+// Opiniones (columnists), El Tiempo (official forecast) and Entretenimiento (upcoming events).
+import Base from '../../layouts/Base.astro';
+import TopStories from '../TopStories.astro';
+import StoryCard from '../StoryCard.astro';
+import Sidebar from '../Sidebar.astro';
+import AdSlot from '../AdSlot.astro';
+import GamesTeaser from '../GamesTeaser.astro';
+import LeagueBadge from '../deportes/LeagueBadge.astro';
+import { SITE, SECTION_LIVE, CATEGORIES, url, categoryUrl, parentOf, subsectionsOf, type Story } from '../../lib/site';
+import { LEAGUES, league } from '../../lib/leagues';
+import { scores } from '../../lib/scores';
+import { getMarkets, fmtPrice, curOf, pctOf } from '../../lib/markets';
+import { COLUMNISTS, initials } from '../../lib/columnists';
+import { upcomingEvents, dateTile } from '../../lib/events';
+
+interface Props { slug: string; list: Story[]; page: number; pages: number; active: string }
+const { slug, list, page, pages, active } = Astro.props;
+const name = CATEGORIES[slug] ?? slug;
+const parent = parentOf(slug);
+const subs = subsectionsOf(slug);
+const pageUrl = (n: number) => (n === 1 ? categoryUrl(slug) : `${categoryUrl(slug)}page/${n}/`);
+// Page 1: top block (7 stories) and then rows of four; page 2+: rows of four only
+const first = page === 1 ? list : [];
+const [lead, ...after] = first;
+const more = after.slice(0, 2), center = after.slice(2, 4), right = after.slice(4, 6);
+const rest = page === 1 ? after.slice(6) : list;
+const rows = Array.from({ length: Math.ceil(rest.length / 3) }, (_, i) => rest.slice(i * 3, i * 3 + 3));
+// Section boxes (page 1 only)
+const box = page === 1 ? slug : '';
+const games = box === 'deportes' ? scores(undefined, 8) : [];
+const markets = box === 'economia' ? (await getMarkets()).list.filter((q) => q.group === 'pr' || q.group === 'mp').slice(0, 8) : [];
+const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
+---
+<Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`}>
+  <main class="wrap sp-page" id="main">
+    <header class="sp-head">
+      {parent && <p class="sp-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
+      <h1 class="sp-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
+      {subs.length > 0 && <nav class="sec-subs" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>}
+    </header>
+
+    {box === 'deportes' && (
+      <section class="sp-box" aria-label="Ligas y marcadores">
+        <div class="sp-leagues">{LEAGUES.map((l) => <a href={url(`ligas/${l.id}`)}><LeagueBadge id={l.id} size="sm" />{l.name}</a>)}</div>
+        {games.length > 0 && (
+          <div class="sp-scores">
+            {games.map((g) => (
+              <a class="sp-game" href={url(g.id ? `ligas/juego/${g.id}` : `ligas/${g.league}`)}>
+                <span class="sp-game-h">{league(g.league)?.name} · {g.status === 'en-vivo' ? (g.note ?? 'En vivo') : g.status === 'final' ? 'Final' : 'Próximo'}{g.demo && <i class="sp-demo">DEMO</i>}</span>
+                <span class="sp-team"><b>{g.away}</b><em>{g.awayScore ?? ''}</em></span>
+                <span class="sp-team"><b>{g.home}</b><em>{g.homeScore ?? ''}</em></span>
+              </a>
+            ))}
+          </div>
+        )}
+      </section>
+    )}
+    {markets.length > 0 && (
+      <section class="sp-box" aria-labelledby="sp-mk-h">
+        <div class="sp-box-h"><h2 id="sp-mk-h">Mercados</h2><span>Cierre más reciente</span></div>
+        <table class="sp-mk">
+          <thead><tr><th>Valor</th><th>Precio</th><th>Cambio</th></tr></thead>
+          <tbody>{markets.map((q) => { const p = pctOf(q); return <tr><td>{q.name}</td><td>{curOf(q)}{fmtPrice(q)}{q.suf ?? ''}</td><td class:list={[p >= 0 ? 'up' : 'down']}>{p >= 0 ? '+' : ''}{p.toFixed(2)}%</td></tr>; })}</tbody>
+        </table>
+      </section>
+    )}
+    {box === 'opiniones' && COLUMNISTS.length > 0 && (
+      <section class="sp-box" aria-labelledby="sp-col-h">
+        <div class="sp-box-h"><h2 id="sp-col-h">Nuestros columnistas</h2></div>
+        <div class="sp-cols">{COLUMNISTS.map((c) => <a href={url(`opinion/${c.slug}`)}><span class="sp-av">{initials(c.name.replace(/^Lcd[oa]\.?\s*/u, ''))}</span>{c.name}</a>)}</div>
+      </section>
+    )}
+    {box === 'el-tiempo' && (
+      <section class="sp-box sp-wx">
+        <div><h2>Pronóstico oficial para Puerto Rico</h2><p>El Servicio Nacional de Meteorología en San Juan publica el pronóstico, los avisos y las advertencias oficiales.</p></div>
+        <div class="sp-wx-links"><a class="btn" href={SITE.forecastUrl} rel="noopener" target="_blank">Ver el pronóstico ↗</a><a class="btn" href="https://www.nhc.noaa.gov/" rel="noopener" target="_blank">Centro Nacional de Huracanes ↗</a></div>
+      </section>
+    )}
+    {events.length > 0 && (
+      <section class="sp-box" aria-labelledby="sp-ev-h">
+        <div class="sp-box-h"><h2 id="sp-ev-h">Próximos eventos</h2></div>
+        <ul class="sp-events">{events.map((e) => { const d = dateTile(e.date); return <li><span class="sp-ev-d"><small>{d.top}</small><b>{d.big}</b></span><span><b>{e.title}</b><small>{e.kind} · {e.venue}, {e.city}</small></span></li>; })}</ul>
+      </section>
+    )}
+
+    {lead && <div class="sp-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
+
+    <div class="home-grid sp-grid">
+      <div class="home-main">
+        {list.length === 0 && <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>}
+        {rows.length > 0 && (
+          <section class="bb-sec">
+            <div class="sec-h"><h2>{page === 1 ? `Más de ${name}` : 'Noticias'}</h2></div>
+            {rows.map((r, i) => (
+              <>
+                <div class="bb-row4 sp-row">{r.map((s) => <StoryCard story={s} />)}</div>
+                {i === 1 && <AdSlot size="infeed" />}
+              </>
+            ))}
+          </section>
+        )}
+        {pages > 1 && (
+          <nav class="sec-pager" aria-label="Páginas">
+            {page > 1 && <a href={pageUrl(page - 1)} aria-label="Página anterior">←</a>}
+            {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (n === page ? <span aria-current="page">{n}</span> : <a href={pageUrl(n)}>{n}</a>))}
+            {page < pages && <a href={pageUrl(page + 1)} aria-label="Página siguiente">→</a>}
+          </nav>
+        )}
+        {rows.length < 2 && <AdSlot size="infeed" />}
+        <GamesTeaser />
+      </div>
+      <Sidebar live={SECTION_LIVE[slug]} />
+    </div>
+  </main>
+</Base>

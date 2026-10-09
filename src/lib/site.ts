@@ -66,11 +66,12 @@ export const SECTIONS = [
 
 export type SectionId = (typeof SECTIONS)[number]['id'];
 
-/* The menu bar: main sections, and small drop-downs for subsections. `children` open from a ▾ next to the item;
-   an item without an `id` is a drop-down only ("Más"). Every section keeps its own page either way. */
-export const NAV: Array<{ id?: SectionId; label?: string; children?: SectionId[] }> = [
-  { id: 'noticias', children: ['politica'] },
-  { id: 'gobierno' },
+/* The menu bar: main sections, and small drop-downs for subsections. `children` are category slugs (any NotiCel
+   category, src/data/categories.json) that open from a ▾ next to the item; an item without an `id` is a drop-down only
+   ("Más"). Every section and subsection keeps its own page either way. Noticias' list follows WordPress (noticias/…). */
+export const NAV: Array<{ id?: SectionId; label?: string; children?: string[] }> = [
+  { id: 'noticias', children: ['educacion', 'energia', 'estados-unidos', 'gobierno', 'judicatura', 'la-calle', 'legislatura', 'mundo', 'politica', 'tribunales'] },
+  { id: 'gobierno', children: ['politica'] },
   { id: 'legislatura' },
   { id: 'tribunales' },
   { id: 'policiacas' },
@@ -82,6 +83,8 @@ export const NAV: Array<{ id?: SectionId; label?: string; children?: SectionId[]
   { id: 'estados-unidos' },
   { label: 'Más', children: ['entretenimiento', 'vida-y-bienestar'] },
 ];
+/** Subsections a section page shows as buttons: its WordPress subcategories plus its drop-down in the menu. */
+export const subsectionsOf = (slug: string) => [...new Set([...childrenOf(slug), ...(NAV.find((n) => n.id === slug)?.children ?? [])])].filter((c) => c !== slug);
 
 /* Default photo for each section, used when a story has no image of its own.
    All are free to use (public domain or Creative Commons) and must keep their credit. */
