@@ -1,13 +1,14 @@
 ---
-// Right-column promo for the Dominó game (on every page that uses the Sidebar)
+// Right-column promo for the featured game (on every page that uses the Sidebar). NotiCel features the Crucigrama
+// del día (the publisher's choice, 2026-10-08); the file keeps Noticias Xtra's name so the sidebar matches its copy.
 import { url } from '../lib/site';
 ---
-<a class="dmx" href={url('juegos')}>
-  <img src={url('images/juegos/domino.svg')} alt="" loading="lazy" />
+<a class="dmx" href={url('juegos/crucigrama')}>
+  <img src={url('images/juegos/crucigrama.svg')} alt="" loading="lazy" />
   <span class="dmx-body">
     <span class="dmx-tag">Juegos NotiCel</span>
-    <strong>¿Echamos una mano de dominó?</strong>
-    <span>Mano a mano o en parejas de cuatro, contra la computadora. Partida a 100.</span>
-    <span class="dmx-btn">Ir a Juegos NotiCel ›</span>
+    <strong>¿Te atreves con el crucigrama de hoy?</strong>
+    <span>Un crucigrama boricua nuevo cada día. Juega gratis en tu celular o tu computadora.</span>
+    <span class="dmx-btn">Jugar el crucigrama ›</span>
   </span>
 </a>

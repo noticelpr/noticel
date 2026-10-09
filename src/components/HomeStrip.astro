@@ -1,6 +1,6 @@
 ---
 // Home page card strip (portal style): Tendencia, Para ti, Marcador destacado, a season countdown,
-// Mercados (rotating prices), Juegos NotiCel (Dominó + every game) and Horóscopo. (Weather lives in the right column: WeatherBox.)
+// Mercados (rotating prices) and Juegos NotiCel (the Crucigrama del día + every game). (Weather lives in the right column: WeatherBox.)
 // Computers (1000px+): all cards fit in one row, and hovering (or tabbing to) a card opens a panel
 // with more. Phones: the row swipes and tapping a card opens its page.
 import Ph from './Ph.astro';
@@ -180,20 +180,20 @@ const mkt = MKT_KEYS.map((k) => mktAll.find((q) => q.key === k)).filter((q): q i
         </div>
       )}
 
-      {/* Juegos NotiCel: promotes Dominó; the panel lists every other game with its drawn cover */}
+      {/* Juegos NotiCel: promotes the Crucigrama del día; the panel lists every other game with its drawn cover */}
       <div class="hs-item">
-        <a class="hs-card hs-domino" href={url('juegos/domino')}>
-          <div class="hs-text"><span class="hs-label">Juegos NotiCel</span><strong>Dominó</strong><small>y {GAMES.length - 1} juegos más</small></div>
-          <img class="hs-dm-img" src={url('images/juegos/domino.svg')} alt="" />
+        <a class="hs-card hs-domino" href={url('juegos/crucigrama')}>
+          <div class="hs-text"><span class="hs-label">Juegos NotiCel</span><strong>Crucigrama</strong><small>y {GAMES.length - 1} juegos más</small></div>
+          <img class="hs-dm-img" src={url('images/juegos/crucigrama.svg')} alt="" />
         </a>
         <div class="hs-pop hs-pop-games">
           <p class="hs-pop-h">Juegos NotiCel · gratis</p>
-          <a class="hs-feat" href={url('juegos/domino')}>
-            <img src={url('images/juegos/domino.svg')} alt="" />
-            <span><b>Dominó</b><small>¿Echamos una mano? Mano a mano o en parejas; gana quien llegue a 100.</small></span>
+          <a class="hs-feat" href={url('juegos/crucigrama')}>
+            <img src={url('images/juegos/crucigrama.svg')} alt="" />
+            <span><b>Crucigrama del día</b><small>Un crucigrama boricua nuevo cada día. ¿Lo completas hoy?</small></span>
           </a>
           <ul class="hs-glist">
-            {GAMES.filter((x) => x.id !== 'domino').map((x) => (
+            {GAMES.filter((x) => x.id !== 'crucigrama').map((x) => (
               <li><a href={url(`juegos/${x.id}`)}><img src={url(`images/juegos/${x.id}.svg`)} alt="" loading="lazy" /><span>{x.name}</span></a></li>
             ))}
           </ul>
