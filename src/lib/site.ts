@@ -66,6 +66,23 @@ export const SECTIONS = [
 
 export type SectionId = (typeof SECTIONS)[number]['id'];
 
+/* The menu bar: main sections, and small drop-downs for subsections. `children` open from a ▾ next to the item;
+   an item without an `id` is a drop-down only ("Más"). Every section keeps its own page either way. */
+export const NAV: Array<{ id?: SectionId; label?: string; children?: SectionId[] }> = [
+  { id: 'noticias', children: ['politica'] },
+  { id: 'gobierno' },
+  { id: 'legislatura' },
+  { id: 'tribunales' },
+  { id: 'policiacas' },
+  { id: 'economia' },
+  { id: 'deportes' },
+  { id: 'opiniones' },
+  { id: 'el-tiempo' },
+  { id: 'mundo' },
+  { id: 'estados-unidos' },
+  { label: 'Más', children: ['entretenimiento', 'vida-y-bienestar'] },
+];
+
 /* Default photo for each section, used when a story has no image of its own.
    All are free to use (public domain or Creative Commons) and must keep their credit. */
 type Photo = { src: string; caption: string; credit: string; creditUrl: string };

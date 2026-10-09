@@ -56,7 +56,7 @@ const MKT_KEYS = ['BPOP', 'FBP', 'EVTC', 'GSPC', 'CL', 'BTC'];
 const mktAll = (await getMarkets()).list;
 const mkt = MKT_KEYS.map((k) => mktAll.find((q) => q.key === k)).filter((q): q is NonNullable<typeof q> => !!q);
 ---
-<div class="hs-band"><div class="wrap"><div class="sc hs" data-sc>
+<div class="hs-band nc-strip"><div class="wrap"><div class="sc hs" data-sc>
   <div class="sc-rail">
     <button type="button" class="sc-arrow prev" aria-label="Ver tarjetas anteriores" hidden>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
@@ -106,58 +106,6 @@ const mkt = MKT_KEYS.map((k) => mktAll.find((q) => q.key === k)).filter((q): q i
         </div>
       )}
 
-      {g && (
-        <div class="hs-item">
-          <a class="hs-card hs-game" href={url(g.id ? `deportes/juego/${g.id}` : `deportes/${g.league}`)}>
-            <div class="hs-text">
-              <span class="hs-label"><em class:list={{ live: g.status === 'en-vivo' }}>{gStatus(g)}</em>{g.demo && <i class="sp-demo">DEMO</i>}</span>
-              {[[g.away, g.awayScore], [g.home, g.homeScore]].map(([name, score]) => (
-                <span class="hs-team notranslate" translate="no"><TeamLogo league={g.league} name={name as string} size={18} />{name}{g.status !== 'programado' && <b>{score}</b>}</span>
-              ))}
-            </div>
-          </a>
-          <div class="hs-pop">
-            <p class="hs-pop-h">Marcadores{allGames.some((x) => x.demo) && <span class="sp-demo">DEMO</span>}</p>
-            <ul class="hs-scores">
-              {otherGames.map((x) => (
-                <li>
-                  <a href={url(x.id ? `deportes/juego/${x.id}` : `deportes/${x.league}`)}>
-                    <span class="hs-sc-lg">{league(x.league)?.name}</span>
-                    <span class="hs-sc-t notranslate" translate="no"><TeamLogo league={x.league} name={x.away} size={18} /><span>{x.away}</span>{x.status !== 'programado' && <b>{x.awayScore}</b>}</span>
-                    <span class="hs-sc-t notranslate" translate="no"><TeamLogo league={x.league} name={x.home} size={18} /><span>{x.home}</span>{x.status !== 'programado' && <b>{x.homeScore}</b>}</span>
-                    <span class:list={['hs-sc-st', { live: x.status === 'en-vivo' }]}>{gStatus(x)}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <a class="hs-pop-more" href={sectionUrl('deportes')}>NotiCel Deportes <Fragment set:html={chev} /></a>
-          </div>
-        </div>
-      )}
-
-      {upcoming.length > 0 && (
-        <div class="hs-item">
-          <a class="hs-card hs-count" href={url(`ligas/${upcoming[0].l.id}`)} data-rotate>
-            <div class="hs-slides">
-              {upcoming.map((u, k) => (
-                <div class:list={['hs-slide', { on: k === 0 }]} data-href={url(`ligas/${u.l.id}`)} aria-hidden={k === 0 ? undefined : 'true'}>
-                  <div class="hs-text"><span class="hs-label">Cuenta regresiva</span><strong>{daysText(u.days)}</strong><small>para {u.l.name}</small></div>
-                  <LeagueBadge id={u.l.id} size="md" />
-                </div>
-              ))}
-            </div>
-            {upcoming.length > 1 && <span class="hs-dots" aria-hidden="true">{upcoming.map((_, k) => <i class:list={{ on: k === 0 }} />)}</span>}
-          </a>
-          <div class="hs-pop">
-            <p class="hs-pop-h">Próximas temporadas</p>
-            <ul class="hs-pop-list plain">
-              {upcoming.map((u) => <li><a href={url(`ligas/${u.l.id}`)}><b>{daysText(u.days)}</b> · {u.l.full} arranca el {startText(u.start!)}</a></li>)}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Mercados: rotates through key prices; the panel lists the main ones (data: src/lib/markets.ts) */}
       {mkt.length > 0 && (
         <div class="hs-item">
           <a class="hs-card hs-mkt" href={`${sectionUrl('economia')}#mercados`} data-rotate>
@@ -207,18 +155,6 @@ const mkt = MKT_KEYS.map((k) => mktAll.find((q) => q.key === k)).filter((q): q i
         </div>
       </div>
 
-      {/* Horóscopo sits last, at the right end of the row */}
-      <div class="hs-item">
-        <a class="hs-card" href={url('horoscopo')}>
-          <span class="hs-sign hs-zodiac" aria-hidden="true">{sign.symbol}{'︎'}</span>
-          <div class="hs-text"><span class="hs-label">Horóscopo · {sign.name}</span><strong>{signText}</strong></div>
-        </a>
-        <div class="hs-pop">
-          <p class="hs-pop-h"><span class="hs-zodiac">{sign.symbol}{'︎'}</span> {sign.name} · {sign.dates}</p>
-          <p class="hs-quote">{signText}</p>
-          <div class="hs-signs">{SIGNS.map((s) => <a href={url(`horoscopo#${s.id}`)}><span class="hs-zodiac">{s.symbol}{'︎'}</span>{s.name}</a>)}</div>
-        </div>
-      </div>
     </div>
     <button type="button" class="sc-arrow next" aria-label="Ver más tarjetas" hidden>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>

@@ -4352,3 +4352,79 @@ footer{background:#000;border-top:4px solid var(--green)}
 .sec-pager a,.sec-pager span{border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-weight:600}
 .sec-pager span{background:var(--purple-bg);border-color:var(--purple-bg);color:#fff}
 .pg-draft{background:var(--soft);border-left:4px solid var(--green);padding:10px 14px;font-size:14px}
+
+/* ===== NotiCel: menu drop-downs (Noticias ▾ Política; Más ▾ Entretenimiento, Vida y Bienestar) ===== */
+.nav-dd{flex:none;display:inline-flex;align-items:center;border-bottom:3px solid transparent;margin-bottom:-3px}
+.nav-dd.on{border-bottom-color:#fff}
+.nav-dd>a,.nav-dd-label{font-family:var(--head);font-weight:600;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:#fff;opacity:.88;padding:13px 2px 11px 8px;white-space:nowrap}
+.nav-dd>a:hover,.nav-dd.on>a,.nav-dd.on .nav-dd-label{opacity:1}
+.nav-dd-btn{display:grid;place-items:center;width:24px;height:30px;border:0;background:transparent;color:#fff;opacity:.85;cursor:pointer;margin-right:4px}
+.nav-dd-btn:hover,.nav-dd-btn[aria-expanded="true"]{opacity:1;color:var(--green)}
+.nav-dd-btn[aria-expanded="true"] svg{transform:rotate(180deg)}
+.nav-dd-menu{position:fixed;z-index:60;min-width:210px;background:#000;border:1px solid #2C2C31;border-top:3px solid var(--green);padding:6px 0;box-shadow:0 14px 30px rgba(0,0,0,.35)}
+.nav-dd-menu[hidden]{display:none}
+.nav-dd-menu a{display:block;padding:10px 16px;color:#fff;font-family:var(--head);font-weight:600;font-size:14px}
+.nav-dd-menu a:hover,.nav-dd-menu a[aria-current="page"]{background:#161616;color:var(--green)}
+
+/* ===== NotiCel: logo in the middle of the header (wide screens) ===== */
+@media (min-width:1000px){
+  .masthead .wrap{position:relative;min-height:96px}
+  .masthead .logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+  .masthead .search{flex:0 1 300px;margin:0}
+  .masthead .mh-right{margin-left:auto}
+}
+
+/* ===== NotiCel: the card strip under the menu, as a black band with dark cards ===== */
+.nc-strip{background:#000;padding:10px 0 14px;border-bottom:1px solid #1F1F1F}
+.nc-strip .hs-card{background:#141416;border:0;border-left:3px solid var(--green);border-radius:4px;color:#fff;height:72px}
+.nc-strip .hs-item>.hs-card{height:72px}
+.nc-strip .hs-item:hover>.hs-card,.nc-strip .hs-item:focus-within>.hs-card,.nc-strip .hs-card:hover{border-color:var(--blue);background:#1C1C1F;box-shadow:none}
+.nc-strip .hs-label{color:var(--green);text-transform:uppercase;letter-spacing:.06em;font-weight:700;font-size:10.5px}
+.nc-strip .hs-label em{color:#BDBDC2}
+.nc-strip .hs-text strong{color:#fff}
+.nc-strip .hs-text small,.nc-strip .hs-mkt-n b{color:#BDBDC2}
+.nc-strip .hs-thumb{border-radius:4px;width:56px;height:56px}
+.nc-strip .sc-arrow{background:#141416;color:#fff}
+
+/* ===== NotiCel home page: big photo + "Lo último", three headlines, Última hora band, Lo más leído ===== */
+.nc-top{padding-top:22px}
+.nc-hero{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:24px}
+.nc-lead{position:relative;display:block;background:#000;color:#fff;border-radius:6px;overflow:hidden}
+.nc-lead .ph{aspect-ratio:16/9;border-radius:0}
+.nc-cap{position:absolute;inset:auto 0 0 0;padding:90px 28px 24px;background:linear-gradient(transparent,rgba(0,0,0,.9))}
+.nc-cap .badge{background:var(--green);color:#000;padding:3px 9px;border-radius:2px;text-transform:uppercase;letter-spacing:.08em;font-size:12px}
+.nc-cap h1{color:#fff;font-size:clamp(26px,3.2vw,44px);line-height:1.08;margin:10px 0 8px;max-width:24ch}
+.nc-cap p{margin:0;font-size:17px;color:#E2E2E6;max-width:62ch}
+.nc-lead:hover .hl{text-decoration-color:var(--green)}
+.nc-latest{border:1px solid var(--line);border-radius:6px;padding:16px 18px;background:var(--card)}
+.nc-box-h{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.nc-box-h::before{content:"";width:12px;height:12px;background:var(--green)}
+.nc-tl{list-style:none;margin:0;padding:0;border-left:2px solid var(--line)}
+.nc-tl li{position:relative;padding:0 0 14px 16px}
+.nc-tl li::before{content:"";position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--blue)}
+.nc-tl-t{display:block;font-size:12px;font-weight:700;color:var(--purple)}
+.nc-tl a{font-weight:600;line-height:1.35;font-size:15px}
+.nc-more{display:inline-block;margin-top:4px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--purple)}
+.nc-subs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:22px}
+.nc-sub{border-top:3px solid var(--ink);padding-top:10px}
+.nc-sub h3{font-size:18px;line-height:1.25;margin:4px 0 6px}
+.nc-band{background:#000;color:#fff;margin:32px 0 8px;padding:24px 0 28px;border-top:4px solid var(--green)}
+.nc-band-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
+.nc-band-h h2{margin:0;font-size:24px;display:flex;align-items:center;gap:10px;color:#fff}
+.nc-band-h h2::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--red)}
+.nc-band-h a{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
+.nc-rail{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:thin;padding-bottom:6px}
+.nc-rcard{scroll-snap-align:start;color:#fff}
+.nc-rcard .ph{aspect-ratio:3/2;border-radius:4px}
+.nc-rcard h3{font-size:16px;line-height:1.3;margin:10px 0 4px;color:#fff}
+.nc-rcard .time{color:#A1A1A8}
+.nc-most{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:6px;background:var(--card)}
+.nc-most li{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:16px;border-left:1px solid var(--line)}
+.nc-most li:first-child{border-left:0}
+.nc-most b{font-family:"Oswald",var(--head);font-size:40px;line-height:.9;color:var(--blue)}
+.nc-most a{font-weight:600;line-height:1.3;font-size:15px}
+@media (max-width:1100px){.nc-most{grid-template-columns:repeat(2,minmax(0,1fr))}.nc-most li{border-left:0;border-top:1px solid var(--line)}}
+@media (max-width:900px){.nc-hero{grid-template-columns:1fr}.nc-subs{grid-template-columns:1fr}}
+@media (max-width:600px){.nc-cap{position:static;background:#000;padding:14px 16px 18px}.nc-most{grid-template-columns:1fr}}
+.nc-lead .ph{aspect-ratio:auto;height:100%;min-height:420px}
+@media (max-width:900px){.nc-lead .ph{min-height:0;aspect-ratio:16/10;height:auto}}
