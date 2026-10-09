@@ -4386,45 +4386,32 @@ footer{background:#000;border-top:4px solid var(--green)}
 .nc-strip .hs-thumb{border-radius:4px;width:56px;height:56px}
 .nc-strip .sc-arrow{background:#141416;color:#fff}
 
-/* ===== NotiCel home page: big photo + "Lo último", three headlines, Última hora band, Lo más leído ===== */
-.nc-top{padding-top:22px}
-.nc-hero{display:grid;grid-template-columns:minmax(0,2fr) minmax(280px,1fr);gap:24px}
-.nc-lead{position:relative;display:block;background:#000;color:#fff;border-radius:6px;overflow:hidden}
-.nc-lead .ph{aspect-ratio:16/9;border-radius:0}
-.nc-cap{position:absolute;inset:auto 0 0 0;padding:90px 28px 24px;background:linear-gradient(transparent,rgba(0,0,0,.9))}
-.nc-cap .badge{background:var(--green);color:#000;padding:3px 9px;border-radius:2px;text-transform:uppercase;letter-spacing:.08em;font-size:12px}
-.nc-cap h1{color:#fff;font-size:clamp(26px,3.2vw,44px);line-height:1.08;margin:10px 0 8px;max-width:24ch}
-.nc-cap p{margin:0;font-size:17px;color:#E2E2E6;max-width:62ch}
-.nc-lead:hover .hl{text-decoration-color:var(--green)}
-.nc-latest{border:1px solid var(--line);border-radius:6px;padding:16px 18px;background:var(--card)}
-.nc-box-h{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:13px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
-.nc-box-h::before{content:"";width:12px;height:12px;background:var(--green)}
-.nc-tl{list-style:none;margin:0;padding:0;border-left:2px solid var(--line)}
-.nc-tl li{position:relative;padding:0 0 14px 16px}
-.nc-tl li::before{content:"";position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--blue)}
-.nc-tl-t{display:block;font-size:12px;font-weight:700;color:var(--purple)}
-.nc-tl a{font-weight:600;line-height:1.35;font-size:15px}
-.nc-more{display:inline-block;margin-top:4px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--purple)}
-.nc-subs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:22px}
-.nc-sub{border-top:3px solid var(--ink);padding-top:10px}
-.nc-sub h3{font-size:18px;line-height:1.25;margin:4px 0 6px}
-.nc-band{background:#000;color:#fff;margin:32px 0 8px;padding:24px 0 28px;border-top:4px solid var(--green)}
-.nc-band-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
-.nc-band-h h2{margin:0;font-size:24px;display:flex;align-items:center;gap:10px;color:#fff}
-.nc-band-h h2::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--red)}
-.nc-band-h a{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
-.nc-rail{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:thin;padding-bottom:6px}
-.nc-rcard{scroll-snap-align:start;color:#fff}
-.nc-rcard .ph{aspect-ratio:3/2;border-radius:4px}
-.nc-rcard h3{font-size:16px;line-height:1.3;margin:10px 0 4px;color:#fff}
-.nc-rcard .time{color:#A1A1A8}
-.nc-most{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:6px;background:var(--card)}
-.nc-most li{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:16px;border-left:1px solid var(--line)}
-.nc-most li:first-child{border-left:0}
-.nc-most b{font-family:"Oswald",var(--head);font-size:40px;line-height:.9;color:var(--blue)}
-.nc-most a{font-weight:600;line-height:1.3;font-size:15px}
-@media (max-width:1100px){.nc-most{grid-template-columns:repeat(2,minmax(0,1fr))}.nc-most li{border-left:0;border-top:1px solid var(--line)}}
-@media (max-width:900px){.nc-hero{grid-template-columns:1fr}.nc-subs{grid-template-columns:1fr}}
-@media (max-width:600px){.nc-cap{position:static;background:#000;padding:14px 16px 18px}.nc-most{grid-template-columns:1fr}}
-.nc-lead .ph{aspect-ratio:auto;height:100%;min-height:420px}
-@media (max-width:900px){.nc-lead .ph{min-height:0;aspect-ratio:16/10;height:auto}}
+
+/* ===== NotiCel home page, option 4 (inspired by BBC News): headline left, photo center, two stories right ===== */
+.bb-top{padding-top:26px}
+.bb-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr);gap:28px;align-items:start}
+.bb-lead h1{font-size:clamp(28px,2.6vw,40px);line-height:1.1;margin:6px 0 12px;letter-spacing:-.01em}
+.bb-dek{font-size:17px;line-height:1.5;color:var(--muted);margin:0 0 10px}
+.bb-more{list-style:none;margin:16px 0 0;padding:0}
+.bb-more li{border-top:1px solid var(--line);padding:12px 0;font-weight:700;font-size:16px;line-height:1.3}
+.bb-photo .ph{aspect-ratio:4/3;border-radius:4px}
+.bb-side{display:grid;gap:18px}
+.bb-side-item .ph{aspect-ratio:16/9;border-radius:4px;margin-bottom:8px}
+.bb-side-item h3{font-size:17px;line-height:1.25;margin:4px 0 6px}
+.bb-side-item + .bb-side-item{border-top:1px solid var(--line);padding-top:18px}
+.bb-row4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px}
+.bb-top>.bb-row4{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
+.bb-most{margin-top:30px;padding-top:22px;border-top:1px solid var(--line)}
+.bb-most h2{margin:0 0 14px;font-size:24px}
+.bb-most ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 32px}
+.bb-most li{display:grid;grid-template-columns:44px 1fr;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.bb-most b{font-family:var(--head);font-weight:800;font-size:32px;line-height:1;color:var(--blue)}
+.bb-most a{font-weight:600;font-size:16px;line-height:1.3}
+.bb-sec{margin-bottom:8px}
+.bb-live{display:flex;align-items:center;gap:10px}
+.bb-live::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--red)}
+@media (max-width:1100px){.bb-hero{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)}.bb-side{grid-column:1/-1;grid-template-columns:1fr 1fr}.bb-side-item + .bb-side-item{border-top:0;padding-top:0}.bb-row4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.bb-hero{grid-template-columns:1fr}.bb-photo{order:-1}.bb-side{grid-template-columns:1fr}.bb-most ol{grid-template-columns:1fr}}
+.bb-photo{align-self:stretch;display:block}
+.bb-photo .ph{aspect-ratio:auto;height:100%;min-height:340px}
+@media (max-width:760px){.bb-photo .ph{aspect-ratio:4/3;height:auto;min-height:0}}
