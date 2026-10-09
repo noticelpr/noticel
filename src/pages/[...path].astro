@@ -106,9 +106,9 @@ const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
         </>)}
         <div class="body">{bodyHtml !== undefined ? <Fragment set:html={bodyHtml.replace(DOC, '')} /> : <Content />}</div>
         {docs.length > 0 && <section class="doc-attach" aria-label="Documentos"><h2 class="doc-attach-h">{docs.length === 1 ? 'Documento' : 'Documentos'}</h2><Fragment set:html={docs.join('')} /></section>}
-        {/* NotiCel: the story's PDF document (WordPress pdf_url) and its topics */}
+        {/* NotiCel: the story's PDF document (WordPress pdf_url). Its topics (tags) are not shown, by the publisher's
+            choice; search still uses them. */}
         {d.pdfUrl && <p><a class="tool" href={d.pdfUrl} target="_blank" rel="noopener">📄 {d.pdfTitle || 'Ver documento (PDF)'}</a></p>}
-        {d.tags.length > 0 && <p class="art-tags" aria-label="Temas">{d.tags.map((t) => <a href={url(`buscar?q=${encodeURIComponent(t)}`)}>{t}</a>)}</p>}
         <AdSlot size="infeed" />
 
         {d.correction && <p class="sources"><strong>Corrección:</strong> {d.correction} <a href={url('normas-editoriales')}>Nuestra política de correcciones</a></p>}
