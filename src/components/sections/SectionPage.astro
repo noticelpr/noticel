@@ -45,14 +45,14 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 ---
 <Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`} topAd={slug !== 'opiniones'}>
   <main class="wrap ncs-page" id="main">
-    <header class="ncs-head">
+    {slug !== 'opiniones' && <header class="ncs-head">
       {parent && <p class="ncs-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
       <div class="ncs-titlerow">
         <h1 class="ncs-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
         {slug === 'opiniones' && <AdSlot size="leaderboard" class="ncs-head-ad" quiet />}
         {subs.length > 0 && <nav class="sec-subs" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>}
       </div>
-    </header>
+    </header>}
 
     {box === 'deportes' && (
       <section class="ncs-box" aria-label="Ligas y marcadores">
@@ -91,6 +91,17 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 
     <div class="home-grid ncs-grid">
       <div class="home-main">
+        {/* Opiniones: the page title sits in the left column, so the columnist list starts right under the menu */}
+        {slug === 'opiniones' && (
+        <header class="ncs-head ncs-head-in">
+          {parent && <p class="ncs-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
+          <div class="ncs-titlerow">
+            <h1 class="ncs-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
+            {slug === 'opiniones' && <AdSlot size="leaderboard" class="ncs-head-ad" quiet />}
+            {subs.length > 0 && <nav class="sec-subs" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>}
+          </div>
+        </header>
+        )}
         {box === 'opiniones' && <OpinionTop columns={list} today={opToday} />}
         {list.length === 0 && <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>}
         {rows.length > 0 && (
