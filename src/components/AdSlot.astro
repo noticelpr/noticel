@@ -13,7 +13,7 @@ const { size, sticky = false, class: extra, quiet = false } = Astro.props;
 const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '300 × 250', halfpage: '300 × 600', infeed: '728 × 90' };
 ---
 {SITE.features.ads && (
-  <div class:list={['ad-slot', `ad-${size}`, { 'ad-sticky': sticky }, extra]} role="complementary" aria-label="Publicidad" data-ad-size={size} data-quiet={quiet ? '' : undefined} hidden={quiet}>
+  <div class:list={['ad-slot', `ad-${size}`, { 'ad-sticky': sticky }, extra]} role="complementary" aria-label="Publicidad" data-ad-size={size} data-quiet={quiet ? '' : undefined} data-test-site={SITE.testSite ? '' : undefined} hidden={quiet}>
     <span class="ad-label">Publicidad</span>
     <a class="ad-box" href={url('publicidad')}>
       <strong>Espacio publicitario</strong>
@@ -51,7 +51,9 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
   const seenSoFar = localViews();
   const notDone = (c: Campaign & { preview?: boolean; delivered?: number }) => !c.views || (c.delivered ?? (c.preview ? seenSoFar[c.id] ?? 0 : 0)) < c.views;
   const remote = hasBackend() ? await liveCampaigns() : [];
-  const demoAds = isDemo() ? DEMO_CAMPAIGNS.map((c) => ({ ...c, demo: true })) : [];
+  // Sample ads show in demo mode and on the whole test site (SITE.testSite), so every space looks filled; off on the real site
+  const testSite = !!document.querySelector('[data-ad-size][data-test-site]');
+  const demoAds = isDemo() || testSite ? DEMO_CAMPAIGNS.map((c) => ({ ...c, demo: true })) : [];
   const live = [...CAMPAIGNS, ...demoAds, ...remote, ...approvedHere()].filter((c) => c.start <= today && today <= c.end && c.creatives.length && notDone(c) && (!c.regions || c.regions === 'all' || c.regions === where));
   // Each space only shows images of its shape (wide banners, 300×250, 300×600); if a campaign has none, it skips the space
   const RATIO: Record<AdSize, number[]> = { leaderboard: [728 / 90, 320 / 100], infeed: [728 / 90, 320 / 100], rectangle: [300 / 250], halfpage: [300 / 600] };
