@@ -4830,3 +4830,5 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .home-grid.nx-home{margin-top:0;border-top:0;padding-top:14px}
 .nx-home .right > :first-child{margin-top:0}
 @media (max-width:760px){.home-grid.nx-home{padding-top:10px}}
+/* Home page: the top stories sit on the page itself, with no outline box around them */
+.nx-home .home-main > .home-hero,[data-theme="dark"] .nx-home .home-main > .home-hero{border:0 !important;border-radius:0 !important;padding:0 !important;box-shadow:none !important;background:none !important}
