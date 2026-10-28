@@ -4763,3 +4763,6 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .op-side-t:hover b{color:var(--blue-ink,#007BB6)}
 /* Columnist list: room for the circles' rings (the list scrolls inside itself, which cut the rings off at the edge) */
 .op-side-list{padding:3px 4px 3px 5px;margin:0 -4px 0 -5px}
+/* Top banner: breathing room above and below (it sat right on top of the home page's black card strip) */
+.ad-top{margin:14px auto 18px}
+@media (max-width:760px){.ad-top{margin:10px auto 12px}}
