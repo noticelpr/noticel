@@ -4849,3 +4849,7 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .home-hero .lead-ad .ad-box{width:var(--lead-ad-w,100%);max-width:728px;height:auto;aspect-ratio:728/90;margin:0 auto}
 .home-hero .lead-ad .ad-rot,.home-hero .lead-ad .ad-rot img{width:var(--lead-ad-w,100%);max-width:728px;height:auto;margin:0 auto}
 .home-hero .lead-ad .ad-label{margin-bottom:4px}
+/* Opiniones: tighter spacing above the column of the day and between it and the latest columns */
+.ncs-grid:has(.op-hero){margin-top:10px;padding-top:18px}
+.home-main:has(> .op-hero){row-gap:22px}
+.home-main > .op-hero{margin-bottom:0}
