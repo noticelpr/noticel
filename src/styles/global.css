@@ -4844,3 +4844,8 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
    stays white) */
 .lead-media:hover .lead-over h2,.lead-media:focus-visible .lead-over h2{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
 .op-top a:hover .hl,.op-col:hover .hl{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+/* Home page main story: bigger title on the photo; section label in NotiCel green; black shade (was NX purple) */
+.lead-over{background:linear-gradient(180deg,transparent,rgba(0,0,0,.5) 35%,rgba(0,0,0,.9))}
+.lead-over h1,.lead-over h2{margin:10px 0 0;color:#fff;font-size:clamp(30px,3.3vw,48px);line-height:1.08;font-weight:800;letter-spacing:-.01em;text-shadow:0 1px 8px rgba(0,0,0,.35)}
+.lead-over .badge{background:var(--green);color:#000;font-weight:800;padding:3px 10px}
+@media (max-width:760px){.lead-over h1,.lead-over h2{font-size:26px}}
