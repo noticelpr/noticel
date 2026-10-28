@@ -97,7 +97,7 @@ while (queue.length) {
       <AdSlot size="infeed" />
 
       {F.videos && (
-        <section class="vx-dark">
+        <section>
           <div class="sec-h"><h2>Videos</h2><a href={url('videos')}>Ver todos</a></div>
           <div class="vx-home">
             <div class="vx-player">
@@ -136,6 +136,25 @@ while (queue.length) {
     <Sidebar foro extras />
   </div>
   <script>
+    // The ad under "Más titulares" shows only when the empty space at the bottom of the main story's column is tall
+    // enough for it, so it never pushes anything down (the space changes with the screen width)
+    const fitLeadAd = () => {
+      const lead = document.querySelector<HTMLElement>('.home-hero .lead'), ad = lead?.querySelector<HTMLElement>('.lead-ad');
+      if (!lead || !ad) return;
+      const last = [...lead.children].filter((e) => e !== ad && e.tagName !== 'SCRIPT' && e.getBoundingClientRect().height > 0).pop();
+      const free = last ? lead.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom : 0;
+      // Room for the banner after its "Publicidad" label and a small gap; the banner shrinks to the room (never under
+      // 50px tall, so it stays readable), and keeps its 728×90 shape
+      const room = free - 30;
+      const w = Math.min(lead.clientWidth, 728, (room * 728) / 90);
+      const fits = room >= 50;
+      ad.classList.toggle('fits', fits);
+      ad.style.setProperty('--lead-ad-w', fits ? `${Math.floor(w)}px` : '');
+    };
+    fitLeadAd();
+    addEventListener('load', fitLeadAd);
+    addEventListener('resize', fitLeadAd);
+    document.fonts?.ready.then(fitLeadAd);
     // Old WordPress searches (noticel.com/?s=palabra) open the new search page
     const s = new URLSearchParams(location.search).get('s');
     if (s) location.replace(`${document.body.dataset.base}buscar/?q=${encodeURIComponent(s)}`);

@@ -4818,15 +4818,6 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 }
 .pt-dot{font-style:normal}
 @media (max-width:760px){.pt-dot{display:none}.pt-day span{display:block}}
-/* Home page Videos: always on a black backdrop, day and night (the owner's request, 2026-10-28) */
-.home-main > section.vx-dark,[data-theme="dark"] .home-main > section.vx-dark{background:#000 !important;color:#fff;padding:18px 18px 16px;border-radius:8px;border:0;border-bottom:4px solid var(--green)}
-.vx-dark{--ink:#FFFFFF;--muted:#A1A1A8;--line:#2C2C31;--card:#000}
-.vx-dark .sec-h{border-bottom-color:#2C2C31}
-.vx-dark .sec-h h2{color:#fff}
-.vx-dark .sec-h a{color:var(--green)}
-.vx-dark .vsrc,.vx-dark .vsrc a{color:#A1A1A8}
-.vx-dark .vsrc a{text-decoration:underline}
-.vx-dark .hl,.vx-dark h3{color:#fff}
 /* Home page (NX layout): no white band under the card strip; the stories start right under it */
 .home-grid.nx-home{margin-top:0;border-top:0;padding-top:14px}
 .nx-home .right > :first-child{margin-top:0}
@@ -4849,3 +4840,12 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .lead-over h1,.lead-over h2{margin:10px 0 0;color:#fff;font-size:clamp(30px,3.3vw,48px);line-height:1.08;font-weight:800;letter-spacing:-.01em;text-shadow:0 1px 8px rgba(0,0,0,.35)}
 .lead-over .badge{background:var(--green);color:#000;font-weight:800;padding:3px 10px}
 @media (max-width:760px){.lead-over h1,.lead-over h2{font-size:26px}}
+/* Home page: ad in the empty space under "Más titulares" (the owner's request, 2026-10-28). It sits in the space
+   left at the bottom of the main story's column, never pushing anything; it only shows when that space is tall
+   enough (the script in index.astro measures it), sized to the column's width */
+.home-hero .lead{position:relative}
+.home-hero .lead-ad{display:none !important;position:absolute;left:0;right:0;bottom:0;margin:0}
+.home-hero .lead-ad.fits{display:block !important}
+.home-hero .lead-ad .ad-box{width:var(--lead-ad-w,100%);max-width:728px;height:auto;aspect-ratio:728/90;margin:0 auto}
+.home-hero .lead-ad .ad-rot,.home-hero .lead-ad .ad-rot img{width:var(--lead-ad-w,100%);max-width:728px;height:auto;margin:0 auto}
+.home-hero .lead-ad .ad-label{margin-bottom:4px}
