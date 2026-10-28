@@ -3,7 +3,7 @@
 :root{
   --p-purple:#007BB6; --p-purple-bg:#000000; --p-blue:#009DE9; --p-red:#D7263D;
   --p-card:#FFFFFF; --p-soft:#F3F4F6; --p-bg:#FFFFFF;
-  --p-head:"Inter",system-ui,sans-serif; --p-body:"Inter",system-ui,sans-serif;
+  --p-head:"Poppins",system-ui,sans-serif; --p-body:"Noto Sans",system-ui,sans-serif;
   --p-gap:20px; --p-gap-lg:32px; --p-mh-h:0px;
 }
 /* Night mode: the panel follows the site's dark colors (it used to keep white boxes with light text) */
@@ -62,7 +62,7 @@
   .item{grid-template-columns:112px 1fr;gap:12px;padding:10px 0}
   .item h3{font-size:15px}
 }
-.cm{margin-top:var(--p-gap-lg);border:1px solid #D7D3CA;border-radius:12px;padding:16px 18px;background:var(--p-card)}
+.cm{margin-top:var(--p-gap-lg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--p-card)}
 .cm-err{font-size:13px;color:var(--p-red)}
 .rv{display:inline-flex;align-items:center;gap:1px;padding:1px;border-radius:999px;background:var(--p-soft)}
 .rv button{display:grid;place-items:center;width:26px;height:24px;border:0;border-radius:999px;background:transparent;font-size:11px;line-height:1;color:var(--muted);cursor:pointer}

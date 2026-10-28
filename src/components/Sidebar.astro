@@ -30,7 +30,7 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
   {/* Clima and Lotería were removed from the home page (the owner's request, 2026-10-28) */}
   {top.length > 0 && (
     <section class="tr-box">
-      <h2 class="tr-h"><svg width="22" height="22" viewBox="0 0 24 24" fill="#B9A7F5" stroke="var(--purple)" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>Tendencias</h2>
+      <h2 class="tr-h"><svg width="22" height="22" viewBox="0 0 24 24" fill="var(--green)" stroke="var(--ink)" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>Tendencias</h2>
       <ol class="tr-list">
         {top.map((s, i) => (
           <li>
