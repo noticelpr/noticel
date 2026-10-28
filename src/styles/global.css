@@ -4766,3 +4766,4 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 /* Top banner: breathing room above and below (it sat right on top of the home page's black card strip) */
 .ad-top{margin:14px auto 18px}
 @media (max-width:760px){.ad-top{margin:10px auto 12px}}
+.ad-after-strip{margin:18px auto 4px}

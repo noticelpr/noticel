@@ -44,8 +44,10 @@ const sectionIds = SECTIONS.map((s) => s.id)
   .sort((a, b) => Number(a === 'opiniones') - Number(b === 'opiniones') || viewsOf(b) - viewsOf(a));
 const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) => s.data.section === id).slice(0, 3) }));
 ---
-<Base active="home">
+<Base active="home" topAd={false}>
   <HomeStrip />
+  {/* Home page: the first banner goes under the card strip (the owner's request, 2026-10-28) */}
+  <div class="wrap"><AdSlot size="leaderboard" class="ad-top ad-after-strip" quiet /></div>
   {!lead && <div class="wrap"><div class="empty"><p>Muy pronto publicaremos las primeras noticias.</p></div></div>}
   {lead && (
     <section class="wrap bb-top" id="main">
