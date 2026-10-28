@@ -4826,3 +4826,7 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .vx-dark .vsrc,.vx-dark .vsrc a{color:#A1A1A8}
 .vx-dark .vsrc a{text-decoration:underline}
 .vx-dark .hl,.vx-dark h3{color:#fff}
+/* Home page (NX layout): no white band under the card strip; the stories start right under it */
+.home-grid.nx-home{margin-top:0;border-top:0;padding-top:14px}
+.nx-home .right > :first-child{margin-top:0}
+@media (max-width:760px){.home-grid.nx-home{padding-top:10px}}
