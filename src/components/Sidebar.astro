@@ -27,8 +27,6 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
 ---
 <aside class="right">
   {live && <LiveBox source={live} />}
-  {/* Home page: the ad box goes first in the right column, instead of a wide banner (the owner's request, 2026-10-28) */}
-  {extras && <AdSlot size="rectangle" class="ad-right-top" />}
   {/* Clima and Lotería only on the home page */}
   {extras && <WeatherBox />}
   {extras && <LotteryBox />}

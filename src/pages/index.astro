@@ -1,7 +1,8 @@
 ---
-// Home page, option 4 (chosen 2026-10-08, inspired by BBC News' front page): the main headline on the left in large
-// type, its photo in the middle, two more stories with photos on the right; a row of four; Lo más leído in two
-// columns; then Última hora, Destacadas, videos and each section as a row of three (most-read sections first).
+// Home page: the day's front page ("Portada", 2026-10-28): an edition line with today's date, the main story as the
+// star (very large headline, summary, big photo), "También en portada" on the right with the ad box; a row of four;
+// Lo más leído in two columns; then Última hora, Destacadas, videos and each section as a row of three (most-read
+// sections first).
 // Right column below the top: Noticias Xtra's sidebar (Tendencias, lottery, Foro…). Each story appears once at the top.
 import MarketsBar from '../components/MarketsBar.astro';
 import Base from '../layouts/Base.astro';
@@ -12,7 +13,7 @@ import Ph from '../components/Ph.astro';
 import Label from '../components/Label.astro';
 import Time from '../components/Time.astro';
 import HomeStrip from '../components/HomeStrip.astro';
-import TopStories from '../components/TopStories.astro';
+import PortadaTop from '../components/PortadaTop.astro';
 import AdSlot from '../components/AdSlot.astro';
 import GamesTeaser from '../components/GamesTeaser.astro';
 import { getStories, topOrder, pinTop, mostRead, inCategory, url, SITE, SECTIONS, VIDEOS, VIDEO_SOURCES, storyUrl, sectionUrl } from '../lib/site';
@@ -30,8 +31,8 @@ const take = (list: typeof stories, n: number) => {
 };
 const related = (lead?.data.related ?? []).map((id) => stories.find((s) => s.id === id)).filter((s): s is (typeof stories)[number] => !!s);
 const leadMore = take(related.length ? related : ordered, 2); // two short headlines under the main one
-const center = take(ordered, 2); // two more main stories under the photo
-const right = take(ordered, 2);
+const side = take(ordered, 4); // "También en portada"
+
 const row4 = take(ordered, 4);
 const breaking = take(stories.filter((s) => inCategory(s, 'ultima-hora')), 3);
 const top10 = mostRead(stories, 10);
@@ -49,7 +50,7 @@ const sectionRows = sectionIds.map((id) => ({ id, list: restStories.filter((s) =
   {!lead && <div class="wrap"><div class="empty"><p>Muy pronto publicaremos las primeras noticias.</p></div></div>}
   {lead && (
     <section class="wrap bb-top" id="main">
-      <TopStories lead={lead} more={leadMore} center={center} right={right} />
+      <PortadaTop lead={lead} related={leadMore} side={side} />
       {row4.length > 0 && <div class="bb-row4">{row4.map((s) => <StoryCard story={s} />)}</div>}
       {top10.length > 0 && (
         <section class="bb-most" aria-labelledby="bb-most-h">

@@ -1,0 +1,60 @@
+---
+// Home page top as the day's front page ("Portada", the owner's request, 2026-10-28): an edition line with today's
+// date, the main story of the day as the star (very large headline, summary, big photo, related headlines), and
+// "También en portada" on the right (the next stories, numbered) with the ad box under it.
+import Ph from './Ph.astro';
+import Label from './Label.astro';
+import Time from './Time.astro';
+import AdSlot from './AdSlot.astro';
+import { storyUrl, longDate, type Story } from '../lib/site';
+
+interface Props { lead: Story; related?: Story[]; side?: Story[] }
+const { lead, related = [], side = [] } = Astro.props;
+const d = lead.data;
+const today = longDate(new Date());
+---
+<section class="pt" aria-labelledby="pt-h">
+  <header class="pt-ed">
+    <h1 id="pt-h" class="pt-name">Portada</h1>
+    <p class="pt-day"><span>Lo principal de hoy</span><i class="pt-dot" aria-hidden="true"> · </i><time data-pt-today>{today}</time></p>
+  </header>
+  <div class="pt-grid">
+    <article class="pt-lead">
+      <Label story={lead} />
+      <a href={storyUrl(lead)}><h2 class="pt-title hl">{d.title}</h2></a>
+      {d.description && <p class="pt-dek">{d.description}</p>}
+      <p class="pt-meta">{d.author && <b>{d.author}</b>}<Time date={d.date} /></p>
+      <a class="pt-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
+        <Ph sectionId={d.section} image={d.image} league={d.league} sizes="(max-width:900px) 100vw, 820px" priority />
+      </a>
+      {d.imageCaption && <p class="pt-cap">{d.imageCaption}</p>}
+      {related.length > 0 && (
+        <ul class="pt-rel" aria-label="Relacionadas">
+          {related.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}
+        </ul>
+      )}
+    </article>
+    <aside class="pt-side" aria-labelledby="pt-side-h">
+      <h2 id="pt-side-h" class="pt-side-h">También en portada</h2>
+      <ol class="pt-list">
+        {side.map((s, i) => (
+          <li>
+            <span class="pt-n" aria-hidden="true">{i + 1}</span>
+            <span class="pt-item">
+              <Label story={s} />
+              <a href={storyUrl(s)} class="hl">{s.data.title}</a>
+              <Time date={s.data.date} />
+            </span>
+            {i < 2 && <a class="pt-thumb" href={storyUrl(s)} tabindex="-1" aria-hidden="true"><Ph sectionId={s.data.section} image={s.data.image} league={s.data.league} sizes="120px" /></a>}
+          </li>
+        ))}
+      </ol>
+      <AdSlot size="rectangle" class="pt-ad" />
+    </aside>
+  </div>
+</section>
+<script>
+  // The page is built ahead of time: show the reader's real date (Puerto Rico time) in the edition line
+  const el = document.querySelector<HTMLElement>('[data-pt-today]');
+  if (el) el.textContent = new Date().toLocaleDateString('es-PR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+</script>
