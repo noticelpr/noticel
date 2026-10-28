@@ -4817,6 +4817,12 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 }
 .pt-dot{font-style:normal}
 @media (max-width:760px){.pt-dot{display:none}.pt-day span{display:block}}
-/* Home page (NX layout): the Portada edition line at the top of the main column */
-.nx-home .pt-ed{margin-bottom:-14px}
-@media (max-width:760px){.nx-home .pt-ed{margin-bottom:-10px}}
+/* Home page Videos: always on a black backdrop, day and night (the owner's request, 2026-10-28) */
+.home-main > section.vx-dark,[data-theme="dark"] .home-main > section.vx-dark{background:#000 !important;color:#fff;padding:18px 18px 16px;border-radius:8px;border:0;border-bottom:4px solid var(--green)}
+.vx-dark{--ink:#FFFFFF;--muted:#A1A1A8;--line:#2C2C31;--card:#000}
+.vx-dark .sec-h{border-bottom-color:#2C2C31}
+.vx-dark .sec-h h2{color:#fff}
+.vx-dark .sec-h a{color:var(--green)}
+.vx-dark .vsrc,.vx-dark .vsrc a{color:#A1A1A8}
+.vx-dark .vsrc a{text-decoration:underline}
+.vx-dark .hl,.vx-dark h3{color:#fff}

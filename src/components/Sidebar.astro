@@ -1,10 +1,8 @@
 ---
-// Right column: optional live video box (section pages, see SECTION_LIVE), Clima and Lotería (home page only), Tendencias (numbered photos), ad, Lo último, newsletter, and a tall ad
+// Right column: optional live video box (section pages, see SECTION_LIVE), Tendencias (numbered photos), ad, Lo último, newsletter, and a tall ad
 // that stays in view while scrolling so the column never leaves an empty gap.
 import Ph from './Ph.astro';
 import Time from './Time.astro';
-import WeatherBox from './WeatherBox.astro';
-import LotteryBox from './LotteryBox.astro';
 import AdSlot from './AdSlot.astro';
 import DominoBox from './DominoBox.astro';
 import LiveBox from './LiveBox.astro';
@@ -29,9 +27,7 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
   {live && <LiveBox source={live} />}
   {/* Home page: the ad box goes first in the right column, like Noticias Xtra's home page */}
   {extras && <AdSlot size="rectangle" />}
-  {/* Clima and Lotería only on the home page */}
-  {extras && <WeatherBox />}
-  {extras && <LotteryBox />}
+  {/* Clima and Lotería were removed from the home page (the owner's request, 2026-10-28) */}
   {top.length > 0 && (
     <section class="tr-box">
       <h2 class="tr-h"><svg width="22" height="22" viewBox="0 0 24 24" fill="#B9A7F5" stroke="var(--purple)" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" /></svg>Tendencias</h2>

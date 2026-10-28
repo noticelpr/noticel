@@ -1,7 +1,7 @@
 ---
 // Home page, Noticias Xtra's layout in NotiCel's colors (the owner's request, 2026-10-28): main column on the left,
-// right column (Sidebar) for the whole height of the page, so there are no empty gaps. On top, the edition line
-// ("Portada · Lo principal de hoy · date"). How the top stories are picked: docs/como-funciona-la-portada.md.
+// right column (Sidebar) for the whole height of the page, so there are no empty gaps.
+// How the top stories are picked: docs/como-funciona-la-portada.md.
 import MarketsBar from '../components/MarketsBar.astro';
 import Base from '../layouts/Base.astro';
 import StoryCard from '../components/StoryCard.astro';
@@ -12,9 +12,8 @@ import Ph from '../components/Ph.astro';
 import Label from '../components/Label.astro';
 import HomeStrip from '../components/HomeStrip.astro';
 import AdSlot from '../components/AdSlot.astro';
-import LocalScores from '../components/deportes/LocalScores.astro';
 import GamesTeaser from '../components/GamesTeaser.astro';
-import { getStories, topOrder, pinTop, longDate, url, SITE, SECTIONS, VIDEOS, VIDEO_SOURCES, storyUrl, sectionUrl, type SectionId } from '../lib/site';
+import { getStories, topOrder, pinTop, url, SITE, SECTIONS, VIDEOS, VIDEO_SOURCES, storyUrl, sectionUrl, type SectionId } from '../lib/site';
 
 const stories = await getStories();
 const F = SITE.features;
@@ -53,16 +52,12 @@ while (queue.length) {
   const j = queue.findIndex((b) => shown(b) === shown(a));
   rows.push(j >= 0 ? [a, queue.splice(j, 1)[0]] : [a]);
 }
-const today = longDate(new Date());
 ---
 <Base active="home" topAd={false}>
   <HomeStrip />
   <div class="wrap home-grid nx-home" id="main">
     <main class="home-main">
-      <header class="pt-ed">
-        <h1 class="pt-name">Portada</h1>
-        <p class="pt-day"><span>Lo principal de hoy</span><i class="pt-dot" aria-hidden="true"> · </i><time data-pt-today>{today}</time></p>
-      </header>
+      <h1 class="sr">NotiCel: las noticias principales de hoy</h1>
       {!lead && <div class="empty"><p>Muy pronto publicaremos las primeras noticias.</p></div>}
       {lead && (
         <div class="home-hero">
@@ -101,11 +96,8 @@ const today = longDate(new Date());
 
       <AdSlot size="infeed" />
 
-      {/* BSN, Doble A and La Pro scores (DEMO until real scores are connected) */}
-      <LocalScores />
-
       {F.videos && (
-        <section>
+        <section class="vx-dark">
           <div class="sec-h"><h2>Videos</h2><a href={url('videos')}>Ver todos</a></div>
           <div class="vx-home">
             <div class="vx-player">
@@ -144,9 +136,6 @@ const today = longDate(new Date());
     <Sidebar foro extras />
   </div>
   <script>
-    // The page is built ahead of time: show the reader's real date (Puerto Rico time) in the edition line
-    const el = document.querySelector<HTMLElement>('[data-pt-today]');
-    if (el) el.textContent = new Date().toLocaleDateString('es-PR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' });
     // Old WordPress searches (noticel.com/?s=palabra) open the new search page
     const s = new URLSearchParams(location.search).get('s');
     if (s) location.replace(`${document.body.dataset.base}buscar/?q=${encodeURIComponent(s)}`);
