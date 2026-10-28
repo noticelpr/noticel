@@ -8,6 +8,9 @@
 //   Optional guest access in demo mode (sample items, labeled; src/lib/demo.ts reads the nc_demo cookie):
 //   GUEST_PASSWORD (Secret) and GUEST_UNTIL (Text, UTC time when it stops working, e.g. 2026-10-20T13:00:00Z).
 // Without SITE_PASSWORD the site stays closed. On the day the new site replaces WordPress, delete this file.
+//
+// OPEN since 2026-10-28 (the owner's choice): anyone with the address sees the site, still hidden from Google.
+// To lock it again with the passwords above, add LOCKED (Text) = 1 in the same Cloudflare settings and redeploy.
 
 const COOKIE = 'nc_clave';
 const DOOR = '/entrar';
@@ -31,6 +34,13 @@ const guestUntil = (env) => (env.GUEST_PASSWORD && env.GUEST_UNTIL ? Date.parse(
 export async function onRequest({ request: req, env, next }) {
   const url = new URL(req.url);
   const h = new Headers({ 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store' });
+  if (env.LOCKED !== '1') { // open site: no password page; old /entrar links go to the home page
+    if (url.pathname === '/robots.txt') return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain' } }); // search engines: stay out of the test copy
+    if (url.pathname.replace(/\/$/, '') === DOOR) return new Response(null, { status: 302, headers: { Location: '/' } });
+    const res = await next();
+    const out = new Response(res.body, res); out.headers.set('X-Robots-Tag', 'noindex, nofollow'); // a test copy: never in Google
+    return out;
+  }
   if (!env.SITE_PASSWORD) return new Response(PLAIN(url.hostname), { status: 503, headers: h }); // closed until a password is set
   const good = await token(env.SITE_PASSWORD);
   const until = guestUntil(env), guestOpen = until > Date.now();
