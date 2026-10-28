@@ -27,6 +27,8 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
 ---
 <aside class="right">
   {live && <LiveBox source={live} />}
+  {/* Home page: the ad box goes first in the right column, instead of a wide banner (the owner's request, 2026-10-28) */}
+  {extras && <AdSlot size="rectangle" class="ad-right-top" />}
   {/* Clima and Lotería only on the home page */}
   {extras && <WeatherBox />}
   {extras && <LotteryBox />}
@@ -46,7 +48,7 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
       <a class="tr-more" href={sectionUrl('noticias')}>Ver más noticias <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></a>
     </section>
   )}
-  <AdSlot size="rectangle" />
+  {!extras && <AdSlot size="rectangle" />}
   <DominoBox />
   {latest.length > 0 && (
     <section class="lu-box">
