@@ -4761,3 +4761,5 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .op-side-t small{font-size:12.5px;color:var(--muted)}
 .op-side-t .op-side-n{color:var(--blue-ink,#007BB6);font-weight:700}
 .op-side-t:hover b{color:var(--blue-ink,#007BB6)}
+/* Columnist list: room for the circles' rings (the list scrolls inside itself, which cut the rings off at the edge) */
+.op-side-list{padding:3px 4px 3px 5px;margin:0 -4px 0 -5px}

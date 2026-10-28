@@ -6,7 +6,7 @@ import { COLUMNISTS, initials, columnsBy } from '../../lib/columnists';
 
 const stories = await getStories();
 const clean = (n: string) => n.replace(/^Lcd[oa]\.?\s*/u, '');
-const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
+const TONES = ['#009DE9', '#92D000', 'var(--ink)', '#5CC4F5']; // var(--ink): dark ring by day, light at night (a white ring vanished on the white page)
 const writers = COLUMNISTS
   .map((c) => { const mine = columnsBy(stories, c).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()); return { c, last: mine[0], count: mine.length }; })
   .filter((w) => w.last).sort((a, b) => b.last.data.date.valueOf() - a.last.data.date.valueOf());
