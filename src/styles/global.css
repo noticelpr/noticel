@@ -4817,3 +4817,6 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 }
 .pt-dot{font-style:normal}
 @media (max-width:760px){.pt-dot{display:none}.pt-day span{display:block}}
+/* Home page (NX layout): the Portada edition line at the top of the main column */
+.nx-home .pt-ed{margin-bottom:-14px}
+@media (max-width:760px){.nx-home .pt-ed{margin-bottom:-10px}}
