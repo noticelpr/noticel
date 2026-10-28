@@ -32,18 +32,24 @@ const box = page === 1 ? slug : '';
 const first = page === 1 ? list : [];
 const [lead, ...after] = first;
 const more = after.slice(0, 2), center = after.slice(2, 4), right = after.slice(4, 6);
-const rest = box === 'opiniones' ? list : page === 1 ? after.slice(6) : list;
+// Opiniones, page 1: the newest column, plus any other column from that same day, go in the black box at the top;
+// they join "Las columnas más recientes" only once a newer day's column takes their place
+const prDay = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+const byDate = box === 'opiniones' ? [...list].sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()) : [];
+const opToday = byDate.length ? byDate.filter((s) => prDay(s.data.date) === prDay(byDate[0].data.date)) : [];
+const rest = box === 'opiniones' ? byDate.filter((s) => !opToday.includes(s)) : page === 1 ? after.slice(6) : list;
 const rows = Array.from({ length: Math.ceil(rest.length / 3) }, (_, i) => rest.slice(i * 3, i * 3 + 3));
 // Section boxes (page 1 only)
 const games = box === 'deportes' ? scores(undefined, 8) : [];
 const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 ---
-<Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`}>
+<Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`} topAd={slug !== 'opiniones'}>
   <main class="wrap ncs-page" id="main">
     <header class="ncs-head">
       {parent && <p class="ncs-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
       <div class="ncs-titlerow">
         <h1 class="ncs-title">{name}{page > 1 && <small> · página {page}</small>}</h1>
+        {slug === 'opiniones' && <AdSlot size="leaderboard" class="ncs-head-ad" quiet />}
         {subs.length > 0 && <nav class="sec-subs" aria-label={`Secciones de ${name}`}>{subs.map((s) => <a href={categoryUrl(s)}>{CATEGORIES[s]}</a>)}</nav>}
       </div>
     </header>
@@ -85,7 +91,7 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 
     <div class="home-grid ncs-grid">
       <div class="home-main">
-        {box === 'opiniones' && <OpinionTop columns={list} />}
+        {box === 'opiniones' && <OpinionTop columns={list} today={opToday} />}
         {box === 'opiniones' && <AdSlot size="leaderboard" />}
         {list.length === 0 && <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>}
         {rows.length > 0 && (

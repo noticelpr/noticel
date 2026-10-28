@@ -15,8 +15,9 @@ interface Props {
   article?: { published: Date; section: string };
   noindex?: boolean; // internal pages: ask search engines not to list them
   staff?: boolean; // staff panel pages: compact header, no section menu, news bar, ads or big footer
+  topAd?: boolean; // false: the page places its own first banner (Opiniones puts it beside the page title)
 }
-const { title, description = SITE.description, active, image, article, noindex: noindexProp, staff = false } = Astro.props;
+const { title, description = SITE.description, active, image, article, noindex: noindexProp, staff = false, topAd = true } = Astro.props;
 // The test copy is never indexed (SITE.testSite), so Google doesn't see a second copy of NotiCel's stories
 const noindex = noindexProp || SITE.testSite;
 const fullTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
@@ -274,7 +275,7 @@ const TABS = [
       </div>
     )}
     {/* Top banner (Valla digital / Banner exclusivo): appears only when an ad fills it */}
-    {!staff && <div class="wrap"><AdSlot size="leaderboard" class="ad-top" quiet /></div>}
+    {!staff && topAd && <div class="wrap"><AdSlot size="leaderboard" class="ad-top" quiet /></div>}
 
     <slot />
 

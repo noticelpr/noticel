@@ -116,12 +116,22 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
     }
   }
 
+  // Wide spaces: computers get the 728×90 picture and phones the 320×100 one (both used to rotate everywhere, so a
+  // phone picture showed stretched on computers). A campaign with only one of the two still shows it.
+  const narrow = matchMedia('(max-width:760px)').matches;
+  const artFor = (c: Campaign, size: AdSize) => {
+    const ok = c.creatives.filter((cr) => fits(cr, size));
+    if (size !== 'leaderboard' && size !== 'infeed') return ok;
+    const want = narrow ? 320 / 100 : 728 / 90;
+    const best = ok.filter((cr) => { const [w, h] = sizeOf(cr); return !w || !h || Math.abs(w / h - want) / want < 0.15; });
+    return best.length ? best : ok;
+  };
   document.querySelectorAll<HTMLElement>('[data-ad-size]').forEach((slot) => {
     const size = slot.dataset.adSize as AdSize;
     const camps = takeover ? [takeover] : live.filter((c) => c.sizes.includes(size));
     // Each campaign appears `weight` times per round, interleaved; start at a random spot so every client gets first view
     const rounds = Math.max(1, ...camps.map((c) => c.weight ?? 1));
-    const pool = Array.from({ length: rounds }, (_, r) => camps.filter((c) => r < (c.weight ?? 1)).flatMap((c) => c.creatives.filter((cr) => fits(cr, size)).map((cr) => ({ c, cr })))).flat();
+    const pool = Array.from({ length: rounds }, (_, r) => camps.filter((c) => r < (c.weight ?? 1)).flatMap((c) => artFor(c, size).map((cr) => ({ c, cr })))).flat();
     const quiet = slot.hasAttribute('data-quiet');
     if (pool.length) {
       const start = Math.floor(Math.random() * pool.length);

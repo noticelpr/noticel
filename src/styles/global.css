@@ -4738,3 +4738,14 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .op-side-list{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;min-height:0}
 .op-side-item{padding:9px 0}
 .op-side-q{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* Opiniones: more columns from the same day, inside the black box under the main one */
+.op-also{list-style:none;margin:14px 0 0;padding:12px 0 0;border-top:1px solid #2C2C31;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px 20px}
+.op-also li{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.op-also .op-av{width:32px;height:32px;font-size:12px;box-shadow:0 0 0 2px var(--ring)}
+.op-also-t{display:block;font-family:var(--serif);font-style:italic;font-weight:700;font-size:15.5px;line-height:1.3;color:#fff}
+.op-also-t:hover{text-decoration:underline;text-decoration-color:var(--green)}
+.op-also small{display:block;margin-top:3px;font-size:12px;color:#A1A1A8}
+/* Opiniones: first banner beside the page title */
+.ncs-head-ad{margin:0 0 0 auto;flex:none}
+.ncs-head-ad .ad-label{text-align:left}
+@media (max-width:1100px){.ncs-head-ad{margin:10px 0 0;flex-basis:100%}}
