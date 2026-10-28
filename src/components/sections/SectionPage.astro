@@ -7,6 +7,7 @@ import Base from '../../layouts/Base.astro';
 import TopStories from '../TopStories.astro';
 import OpinionTop from './OpinionTop.astro';
 import OpinionFeed from './OpinionFeed.astro';
+import OpinionSide from './OpinionSide.astro';
 import StoryCard from '../StoryCard.astro';
 import Sidebar from '../Sidebar.astro';
 import AdSlot from '../AdSlot.astro';
@@ -79,12 +80,13 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
       </section>
     )}
 
-    {box === 'opiniones' && <OpinionTop columns={list} />}
     {lead && box !== 'opiniones' && <div class="ncs-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
-    {lead && <AdSlot size="leaderboard" class="ad-under-top" />}
+    {lead && slug !== 'opiniones' && <AdSlot size="leaderboard" class="ad-under-top" />}
 
     <div class="home-grid ncs-grid">
       <div class="home-main">
+        {box === 'opiniones' && <OpinionTop columns={list} />}
+        {box === 'opiniones' && <AdSlot size="leaderboard" />}
         {list.length === 0 && <div class="empty"><p>Todavía no hay noticias de {name} en esta versión del sitio.</p><a class="btn" href={url()}>Ir a la portada</a></div>}
         {rows.length > 0 && (
           <section class="bb-sec">
@@ -105,10 +107,10 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
           </nav>
         )}
         {rows.length < 2 && <AdSlot size="infeed" />}
-        <GamesTeaser />
+        {slug !== 'opiniones' && <GamesTeaser />}
       </div>
       <div class="ncs-right">
-        <Sidebar live={SECTION_LIVE[slug]} />
+        {slug === 'opiniones' ? <OpinionSide /> : <Sidebar live={SECTION_LIVE[slug]} />}
       </div>
     </div>
   </main>

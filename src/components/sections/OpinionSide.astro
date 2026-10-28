@@ -1,0 +1,32 @@
+---
+// Opiniones page, right column (2026-10-28, the owner's request): only the columnist list, most recent writer first,
+// with how many columns each has and their latest one. Replaces the usual sidebar (Tendencias, Lo último, games).
+import { url, storyUrl, shortDate, getStories } from '../../lib/site';
+import { COLUMNISTS, initials, columnsBy } from '../../lib/columnists';
+
+const stories = await getStories();
+const clean = (n: string) => n.replace(/^Lcd[oa]\.?\s*/u, '');
+const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
+const writers = COLUMNISTS
+  .map((c) => { const mine = columnsBy(stories, c).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()); return { c, last: mine[0], count: mine.length }; })
+  .filter((w) => w.last).sort((a, b) => b.last.data.date.valueOf() - a.last.data.date.valueOf());
+---
+{writers.length > 0 && (
+  <aside class="op-side" aria-labelledby="op-side-h">
+    <div class="op-voices-h"><h2 id="op-side-h">Nuestras voces</h2><span class="op-count">{writers.length} columnistas</span></div>
+    <ul class="op-side-list">
+      {writers.map(({ c, last, count }, i) => (
+        <li class="op-side-item">
+          <a class="op-item-av" href={url(`opinion/${c.slug}`)} aria-label={c.name}>
+            <span class="op-av" style={`--ring:${TONES[i % TONES.length]}`}>{initials(clean(c.name))}</span>
+          </a>
+          <span class="op-item-t">
+            <a class="op-item-name" href={url(`opinion/${c.slug}`)}><b>{c.name}</b><small>{count} {count === 1 ? 'columna' : 'columnas'}</small></a>
+            <a class="op-side-q hl" href={storyUrl(last)}>“{last.data.title}”</a>
+            <time datetime={last.data.date.toISOString()}>{shortDate(last.data.date)}</time>
+          </span>
+        </li>
+      ))}
+    </ul>
+  </aside>
+)}

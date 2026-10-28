@@ -4712,3 +4712,23 @@ body.staff .masthead .logo img{height:84px} /* same size as the home page's logo
 body.staff .mh-staff{padding-left:14px;font-size:16px}
 @media (max-width:999px){body.staff .masthead .logo img{height:50px}}
 @media (max-width:760px){body.staff .masthead .logo img{height:46px}body.staff .mh-staff{font-size:14px;padding-left:10px}}
+/* Opiniones (2026-10-28): compact column of the day; on wide screens the columnist list lives in the right column
+   (OpinionSide), so the faces row under the star only shows on phones and tablets */
+.op-hero{align-items:start;margin-bottom:22px}
+.op-star{padding:16px 20px 16px 14px;gap:2px 12px;border-bottom-width:4px}
+.op-star-q{font-size:64px}
+.op-star-title{font-size:clamp(19px,1.7vw,24px);margin:8px 0 6px}
+.op-star-dek{font-size:14.5px;-webkit-line-clamp:2;margin-bottom:10px}
+.op-star-who .op-av{width:36px;height:36px;font-size:13px;box-shadow:0 0 0 2px var(--ring)}
+.op-star-who b{font-size:14.5px}
+.op-star-who small{font-size:12.5px}
+@media (min-width:1021px){.op-hero{grid-template-columns:minmax(0,1fr)}.op-hero .op-voices{display:none}}
+.op-side{position:sticky;top:70px;display:flex;flex-direction:column;border-top:4px solid var(--ink);padding-top:8px}
+.op-side-list{list-style:none;margin:0;padding:0;display:grid}
+.op-side-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;min-width:0}
+.op-side-item+.op-side-item{border-top:1px solid var(--line)}
+.op-side-item .op-av{width:40px;height:40px;font-size:14px;box-shadow:0 0 0 2px var(--ring)}
+.op-side-q{display:block;margin-top:3px;font-family:var(--serif);font-style:italic;font-size:14px;line-height:1.35}
+.op-side-item time{display:block;margin-top:3px;font-size:12px;color:var(--muted)}
+.op-side .op-item-name b{white-space:normal}
+@media (max-width:1020px){.op-side{display:none}}
