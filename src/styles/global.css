@@ -4916,3 +4916,14 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .fc-pic .ph{aspect-ratio:4/3;border-radius:6px}
 .fc-pic img{width:100%;height:100%;object-fit:cover}
 .fc-text{display:grid;gap:5px;min-width:0}
+/* Home page Videos: same look as the NotiCel Fact Check box and the markets bar (black, rounded, green bottom edge),
+   day and night */
+.home-main > section.vx-dark,[data-theme="dark"] .home-main > section.vx-dark{background:#000 !important;color:#fff;padding:16px 18px 14px !important;border-radius:12px !important;border:0 !important;border-bottom:4px solid var(--green) !important}
+.vx-dark{--ink:#FFFFFF;--muted:#A1A1A8;--line:#2C2C31;--card:#000}
+.vx-dark .sec-h{border-bottom-color:#2C2C31}
+.vx-dark .sec-h h2{color:#fff}
+.vx-dark .sec-h a{color:var(--green)}
+.vx-dark .vsrc,.vx-dark .vsrc a{color:#A1A1A8}
+.vx-dark .vsrc a{text-decoration:underline}
+.vx-dark .hl,.vx-dark h3{color:#fff}
+.vx-dark a:hover .hl,.vx-dark a.hl:hover{color:var(--green)}
