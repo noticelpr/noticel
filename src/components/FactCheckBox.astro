@@ -2,7 +2,7 @@
 // "NotiCel Fact Check" (2026-10-29, the owner's request): right column, under Tendencias. The newest stories of
 // noticel.com's NotiCel Fact Check category (category/mas/noticel-factcheck), plus any story the newsroom marks as a
 // fact check in the panel (Escribir → NotiCel Fact Check), with its verdict when it has one. Never invented.
-import { getStories, storyUrl, url, inCategory, categoryUrl } from '../lib/site';
+import { getStories, storyUrl, inCategory, categoryUrl } from '../lib/site';
 
 const VERDICT: Record<string, string> = { cierto: 'Cierto', impreciso: 'Impreciso', enganoso: 'Engañoso', falso: 'Falso', 'sin-evidencia': 'Sin evidencia' };
 const checks = (await getStories()).filter((s) => s.data.factCheck || inCategory(s, 'noticel-factcheck')).slice(0, 4);
@@ -25,6 +25,5 @@ const checks = (await getStories()).filter((s) => s.data.factCheck || inCategory
   )}
   <p class="fc-foot">
     {checks.length > 0 && <a class="fc-send" href={categoryUrl('noticel-factcheck')}>Ver todos ›</a>}
-    <a class="fc-send" href={url('contacto')}>¿Viste algo dudoso? Envíanoslo ›</a>
   </p>
 </section>
