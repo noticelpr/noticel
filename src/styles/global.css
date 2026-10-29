@@ -4901,3 +4901,12 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .fc-empty{margin:0 0 8px;font-size:14px;line-height:1.45;color:#C9C9CE}
 .fc-send{display:inline-block;margin-top:4px;font-weight:800;font-size:13.5px;color:var(--green)}
 .fc-send:hover{text-decoration:underline}
+.fc-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 14px;margin:6px 0 0}
+/* Home page markets bar: same look as the NotiCel Fact Check box (black, rounded, green bottom edge) */
+.nx-home .home-main > .ncs-tape,[data-theme="dark"] .nx-home .home-main > .ncs-tape{background:#000 !important;color:#fff;border:0;border-radius:12px;border-bottom:4px solid var(--green);padding:10px 14px}
+.nx-home .ncs-tape-i{color:#C9C9CE}
+.nx-home .ncs-tape-i b{color:#fff}
+.nx-home .ncs-tape-i em.up{color:var(--green)}
+.nx-home .ncs-tape-i em.down{color:#FF7A8A}
+.nx-home .ncs-tape .ncs-tape-h:hover{background:#fff !important;color:#000 !important}
+.nx-home .home-main > .ncs-tape{padding:12px 16px !important;border-radius:12px !important;border:0 !important;border-bottom:4px solid var(--green) !important;font-size:14px}

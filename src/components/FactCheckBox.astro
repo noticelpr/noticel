@@ -1,11 +1,11 @@
 ---
-// "NotiCel Fact Check" (2026-10-29, the owner's request): right column, under Tendencias. The newest stories the
-// newsroom marked as fact checks (panel → Escribir → NotiCel Fact Check), each with its verdict. Never invented:
-// until there is one, the box says what it is and invites readers to send what they want checked.
-import { getStories, storyUrl, url } from '../lib/site';
+// "NotiCel Fact Check" (2026-10-29, the owner's request): right column, under Tendencias. The newest stories of
+// noticel.com's NotiCel Fact Check category (category/mas/noticel-factcheck), plus any story the newsroom marks as a
+// fact check in the panel (Escribir → NotiCel Fact Check), with its verdict when it has one. Never invented.
+import { getStories, storyUrl, url, inCategory, categoryUrl } from '../lib/site';
 
 const VERDICT: Record<string, string> = { cierto: 'Cierto', impreciso: 'Impreciso', enganoso: 'Engañoso', falso: 'Falso', 'sin-evidencia': 'Sin evidencia' };
-const checks = (await getStories()).filter((s) => s.data.factCheck).slice(0, 4);
+const checks = (await getStories()).filter((s) => s.data.factCheck || inCategory(s, 'noticel-factcheck')).slice(0, 4);
 ---
 <section class="fc-box" aria-labelledby="fc-h">
   <h2 class="fc-h" id="fc-h"><span class="fc-mark" aria-hidden="true">✓</span>NotiCel <b>Fact Check</b></h2>
@@ -14,7 +14,7 @@ const checks = (await getStories()).filter((s) => s.data.factCheck).slice(0, 4);
       {checks.map((s) => (
         <li>
           <a href={storyUrl(s)}>
-            <span class={`fc-v fc-${s.data.factCheck}`}>{VERDICT[s.data.factCheck!]}</span>
+            {s.data.factCheck && <span class={`fc-v fc-${s.data.factCheck}`}>{VERDICT[s.data.factCheck]}</span>}
             <span class="fc-claim hl">{s.data.factClaim ? `«${s.data.factClaim}»` : s.data.title}</span>
           </a>
         </li>
@@ -23,5 +23,8 @@ const checks = (await getStories()).filter((s) => s.data.factCheck).slice(0, 4);
   ) : (
     <p class="fc-empty">Verificamos lo que circula en las redes y en la calle: frases, videos, cifras y rumores. Te decimos si es cierto, engañoso o falso, y por qué.</p>
   )}
-  <a class="fc-send" href={url('contacto')}>¿Viste algo dudoso? Envíanoslo ›</a>
+  <p class="fc-foot">
+    {checks.length > 0 && <a class="fc-send" href={categoryUrl('noticel-factcheck')}>Ver todos ›</a>}
+    <a class="fc-send" href={url('contacto')}>¿Viste algo dudoso? Envíanoslo ›</a>
+  </p>
 </section>
