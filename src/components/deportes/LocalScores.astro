@@ -39,7 +39,7 @@ const day = (g: Game) => new Date(g.date).toLocaleDateString('es-PR', { day: 'nu
             const aWin = g.status === 'final' && (g.awayScore ?? 0) > (g.homeScore ?? 0);
             const hWin = g.status === 'final' && (g.homeScore ?? 0) > (g.awayScore ?? 0);
             return (
-              <a class:list={['ls-game', { live: g.status === 'en-vivo' }]} href={url(g.id ? `deportes/juego/${g.id}` : `deportes/${g.league}`)}>
+              <a class:list={['ls-game', { live: g.status === 'en-vivo' }]} href={url(g.id ? `ligas/juego/${g.id}` : `ligas/${g.league}`)}>
                 <span class="ls-meta">
                   <span class:list={['ls-st', { live: g.status === 'en-vivo' }]}>{g.status === 'en-vivo' && <i class="sc-dot" />}{status(g)}</span>
                   <span>{g.demo ? <i class="sp-demo">DEMO</i> : day(g)}</span>

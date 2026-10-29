@@ -21,7 +21,7 @@ const status = (g: (typeof games)[number]) => g.status === 'en-vivo' ? (g.note ?
   <section class="hx-box">
     <div class="hx-h"><h2>Marcadores</h2><a href={sectionUrl('deportes')}>Deportes ›</a></div>
     <ul class="hx-games">{games.map((g) => (
-      <li><a href={url(g.id ? `deportes/juego/${g.id}` : `deportes/${g.league}`)} class="notranslate" translate="no">
+      <li><a href={url(g.id ? `ligas/juego/${g.id}` : `ligas/${g.league}`)} class="notranslate" translate="no">
         <span class="hx-g-lg">{league(g.league)?.name}{g.demo && <i class="sp-demo">DEMO</i>}<em class:list={{ live: g.status === 'en-vivo' }}>{status(g)}</em></span>
         {[[g.away, g.awayScore], [g.home, g.homeScore]].map(([n, sc]) => (
           <span class="hx-g-t"><TeamLogo league={g.league} name={n as string} size={18} /><span>{n}</span>{g.status !== 'programado' && <b>{sc}</b>}</span>

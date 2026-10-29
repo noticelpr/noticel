@@ -21,7 +21,7 @@ export type Game = {
   status: 'final' | 'en-vivo' | 'programado';
   note?: string; // e.g. "4to parcial", "7ma entrada"
   venue?: string;
-  // Optional, for the game page (/deportes/juego/<id>/)
+  // Optional, for the game page (/ligas/juego/<id>/)
   id?: string; // e.g. "bsn-2027-05-10-vaqueros-santeros"
   demo?: boolean;
   awayFull?: string; // e.g. "Vaqueros de Bayamón"

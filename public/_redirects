@@ -1,0 +1,11 @@
+# Cloudflare Pages redirects. Old WordPress feed addresses (readers, news apps and Google News use them) keep working.
+/feed /rss.xml 301
+/feed/ /rss.xml 301
+/feed/rss /rss.xml 301
+/feed/rss/ /rss.xml 301
+/rss /rss.xml 301
+/rss/ /rss.xml 301
+# Old WordPress tag pages open a search for that topic; old home page numbers open the home page
+/tag/:tag/ /buscar/?q=:tag 302
+/tag/:tag /buscar/?q=:tag 302
+/page/* / 301

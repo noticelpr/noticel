@@ -81,7 +81,7 @@ export const NAV: Array<{ id?: SectionId; label?: string; children?: string[] }>
   { id: 'el-tiempo' },
   { id: 'mundo' },
   { id: 'estados-unidos' },
-  { label: 'Más', children: ['entretenimiento', 'vida-y-bienestar'] },
+  { label: 'Más', children: ['entretenimiento', 'vida-y-bienestar', 'noticel-factcheck'] },
 ];
 /** Subsections a section page shows as buttons: its WordPress subcategories plus its drop-down in the menu. */
 export const subsectionsOf = (slug: string) => [...new Set([...childrenOf(slug), ...(NAV.find((n) => n.id === slug)?.children ?? [])])].filter((c) => c !== slug);

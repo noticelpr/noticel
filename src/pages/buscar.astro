@@ -14,7 +14,8 @@ import { url } from '../lib/site';
   </main>
   <script>
     const box = document.getElementById('results')!;
-    const q = (new URLSearchParams(location.search).get('q') ?? '').trim();
+    // Old WordPress tag links arrive as /buscar/?q=tema-con-guiones (see public/_redirects): hyphens become spaces
+    const q = (new URLSearchParams(location.search).get('q') ?? '').replace(/-/g, ' ').trim();
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
     for (const id of ['q', 'pageq']) { const i = document.getElementById(id) as HTMLInputElement | null; if (i) i.value = q; }
     if (!q) (document.getElementById('pageq') as HTMLInputElement).focus();

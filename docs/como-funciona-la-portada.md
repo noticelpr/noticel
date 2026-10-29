@@ -34,7 +34,8 @@ Con esa fila, la portada se llena de arriba hacia abajo. **Cada noticia sale una
 
 - Anuncio, videos de NotiCel en YouTube y la barra de mercados.
 - **Cajas por sección**, de dos en dos: primero las secciones más leídas (según las visitas), **Opiniones al final**. Estas cajas no repiten lo que ya salió arriba.
-- La columna de la derecha: anuncio, Tendencias (lo más leído), juegos, Lo último, boletín, Foro, marcadores de deportes (DEMO por ahora) y más anuncios.
+- La columna de la derecha: anuncio, Tendencias (lo más leído), NotiCel Fact Check, Lo último, juegos, boletín, Foro, marcadores de deportes (DEMO por ahora) y más anuncios.
+- **En el celular** todo va en una sola columna: la principal, un anuncio, Tendencias, NotiCel Fact Check, más noticias, Lo último, videos, mercados y las secciones (con un anuncio después de cada fila).
 
 ## 4. Qué hace el editor para cambiar la portada
 

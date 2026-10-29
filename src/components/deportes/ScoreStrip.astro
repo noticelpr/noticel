@@ -10,7 +10,7 @@ import TeamLogo from './TeamLogo.astro';
 interface Props { only?: string; title?: boolean; theme?: string }
 const { only } = Astro.props;
 const games = scores(only);
-const link = (g: Game) => url(g.id ? `deportes/juego/${g.id}` : `deportes/${g.league}`);
+const link = (g: Game) => url(g.id ? `ligas/juego/${g.id}` : `ligas/${g.league}`);
 
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
 function status(g: Game): { text: string; live?: boolean } {

@@ -52,6 +52,7 @@ const TABS = [
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE.name}: últimas noticias`} href={url('rss.xml')} />
     <meta name="theme-color" content="#000000" />
     <link rel="icon" type="image/png" href={url('favicon.png')} />
     <link rel="apple-touch-icon" href={url('apple-touch-icon.png')} />

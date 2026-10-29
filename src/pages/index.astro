@@ -45,6 +45,14 @@ const sectionIds = SECTIONS.map((s) => s.id)
 // Section boxes sit side by side in pairs. To avoid blank space under a shorter box, each section is paired with the
 // next one (in order) that shows the same number of stories (a box shows up to 4). No match: a full-width row.
 const shown = (id: string) => Math.min(4, restStories.filter((s) => s.data.section === id).length);
+// For search engines: NotiCel as a news organization, and the site's search box (structured data on the home page).
+// Only accounts we know are NotiCel's go in sameAs (add Facebook, Instagram, X when their exact addresses are confirmed).
+const ld = JSON.stringify([
+  { '@context': 'https://schema.org', '@type': 'NewsMediaOrganization', name: SITE.name, url: new URL(url(), Astro.site).toString(),
+    logo: new URL(url('logo.png'), Astro.site).toString(), slogan: 'La verdad como es', sameAs: [VIDEO_SOURCES.noticel.url] },
+  { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE.name, url: new URL(url(), Astro.site).toString(), inLanguage: 'es-PR',
+    potentialAction: { '@type': 'SearchAction', target: `${new URL(url('buscar/'), Astro.site)}?q={search_term_string}`, 'query-input': 'required name=search_term_string' } },
+]);
 const rows: SectionId[][] = [];
 const queue = [...sectionIds];
 while (queue.length) {
@@ -54,6 +62,7 @@ while (queue.length) {
 }
 ---
 <Base active="home" topAd={false}>
+  <script type="application/ld+json" set:html={ld} />
   <HomeStrip />
   <div class="wrap home-grid nx-home" id="main">
     <main class="home-main">

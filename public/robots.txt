@@ -1,0 +1,10 @@
+# NotiCel (for the real site, after the switch). The test copy serves its own "stay out" rules from
+# functions/_middleware.js, so this file only applies once that lock is removed on switch day.
+User-agent: *
+Allow: /
+Disallow: /redaccion/
+Disallow: /perfil
+Disallow: /guardadas
+
+Sitemap: https://noticel.com/sitemap.xml
+Sitemap: https://noticel.com/news-sitemap.xml

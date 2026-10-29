@@ -14,6 +14,7 @@ import Comments from '../components/Comments.astro';
 import GamesTeaser from '../components/GamesTeaser.astro';
 import DocViewer from '../components/DocViewer.astro';
 import { getStories, section, url, defaultPhoto, type Story , storyUrl , sectionUrl } from '../lib/site';
+import authorList from '../data/autores.json';
 import { columnistOf } from '../lib/columnists';
 
 export async function getStaticPaths() {
@@ -50,6 +51,9 @@ const more = stories
   .slice(0, 6);
 // Opinion columns: the byline shows the columnist's picture and links to their profile
 const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
+// The author's page at their old WordPress address (/author/<username>/), when they are in noticel.com's author list
+const plainName = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
+const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a) => plainName(a.name) === plainName(d.author));
 ---
 <Base title={d.title} description={d.description} active={d.section} image={d.image ?? fallback.src} article={{ published: d.date, section: s.name }}>
   <main class="wrap" id="main">
@@ -65,7 +69,7 @@ const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
         <div class="byline">
           {columnist?.photo && <a class="by-pic" href={url(`opinion/${columnist.slug}`)} tabindex="-1" aria-hidden="true"><img src={url(columnist.photo)} alt="" /></a>}
           <div class="by-who">
-            <strong>Por {columnist ? <a href={url(`opinion/${columnist.slug}`)}>{d.author}</a> : d.author}</strong>
+            <strong>Por {columnist ? <a href={url(`opinion/${columnist.slug}`)}>{d.author}</a> : authorPage ? <a href={url(`author/${authorPage.slug}`)}>{d.author}</a> : d.author}</strong>
             <span><Time date={d.date} />{d.place && <>, <span class="notranslate" translate="no">{d.place}</span></>} · {minutes} min de lectura</span>
           </div>
           <div class="by-actions" role="toolbar" aria-label="Herramientas de lectura y compartir">
@@ -278,7 +282,10 @@ const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
     headline: d.title,
     description: d.description,
     datePublished: d.date.toISOString(),
-    author: { '@type': 'Organization', name: d.author },
+    // People are "Person" (with their author or columnist page); NotiCel and news agencies stay "Organization"
+    author: ['NotiCel', 'EFE', 'Cybernews', 'AP', 'Associated Press', 'auspiciado'].includes(d.author) || !(authorPage || columnist)
+      ? { '@type': 'Organization', name: d.author }
+      : { '@type': 'Person', name: d.author, url: new URL(url(columnist ? `opinion/${columnist.slug}/` : `author/${authorPage!.slug}/`), Astro.site).toString() },
     publisher: { '@type': 'Organization', name: 'NotiCel' },
   })} />
 </Base>

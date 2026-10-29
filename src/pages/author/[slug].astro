@@ -1,0 +1,44 @@
+---
+// Author pages at noticel.com's WordPress addresses (/author/<username>/), so links and Google results keep working.
+// The list of authors comes from noticel.com's public author list (src/data/autores.json); each page shows the stories
+// of that author that are on the site, and links to their columnist profile when they write in Opiniones.
+import Base from '../../layouts/Base.astro';
+import StoryCard from '../../components/StoryCard.astro';
+import Sidebar from '../../components/Sidebar.astro';
+import AdSlot from '../../components/AdSlot.astro';
+import authors from '../../data/autores.json';
+import { getStories, url, sectionUrl } from '../../lib/site';
+import { columnistOf } from '../../lib/columnists';
+
+export function getStaticPaths() {
+  return (authors as Array<{ slug: string; name: string }>).map((a) => ({ params: { slug: a.slug }, props: { a } }));
+}
+const { a } = Astro.props as { a: { slug: string; name: string } };
+const plain = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
+const mine = (await getStories()).filter((s) => plain(s.data.author) === plain(a.name)).slice(0, 60);
+const col = columnistOf(a.name);
+---
+<Base title={`${a.name} · Autor`} description={`Noticias y artículos de ${a.name} en NotiCel.`}>
+  <main class="wrap" id="main">
+    <div class="crumbs"><a href={url()}>Portada</a> / <span>Autores</span></div>
+    <div class="art-grid">
+      <div>
+        <header class="au-head">
+          <span class="col-ini au-ini" aria-hidden="true">{a.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}</span>
+          <div>
+            <h1>{a.name}</h1>
+            <p class="pnl-muted">{mine.length ? `${mine.length} ${mine.length === 1 ? 'noticia' : 'noticias'} en NotiCel` : 'Autor en NotiCel'}</p>
+            {col && <a class="btn" href={url(`opinion/${col.slug}`)}>Ver su perfil de columnista</a>}
+          </div>
+        </header>
+        {mine.length > 0 ? (
+          <div class="cp-list">{mine.map((s) => <StoryCard story={s} variant="item" />)}</div>
+        ) : (
+          <div class="empty"><p>Pronto verás aquí sus noticias.</p><a class="btn" href={sectionUrl('noticias')}>Ver las últimas noticias</a></div>
+        )}
+        <AdSlot size="infeed" />
+      </div>
+      <Sidebar />
+    </div>
+  </main>
+</Base>

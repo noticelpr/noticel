@@ -4954,3 +4954,8 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
   .nx-home .sec-block .list > :nth-child(n+3){display:none}
 }
 @media (min-width:1021px){.ad-phone{display:none !important}}
+/* Author pages (/author/<username>/) */
+.au-head{display:flex;align-items:center;gap:16px;margin:8px 0 18px;padding-bottom:14px;border-bottom:3px solid var(--ink)}
+.au-head h1{margin:0;font-size:30px}
+.au-head .pnl-muted{margin:2px 0 8px;color:var(--muted)}
+.au-ini{flex:none;width:72px;height:72px;font-size:24px;background:#000;color:#fff;box-shadow:0 0 0 3px var(--blue)}
