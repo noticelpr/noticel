@@ -4870,3 +4870,15 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .cp-links{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
 .cp-links a{display:inline-block;padding:6px 14px;border-radius:999px;border:1px solid var(--line);font-weight:700;font-size:13.5px;color:var(--ink)}
 .cp-links a:hover{border-color:var(--green);color:#007BB6}
+/* Markets bar (MarketsBar.astro): NotiCel green label and gains; moves by itself like a ticker, stops under the mouse
+   (or a finger), and stays still for readers who turn off motion in their device settings */
+.ncs-tape .ncs-tape-h,[data-theme="dark"] .ncs-tape .ncs-tape-h{background:var(--green) !important;color:#000 !important;border-color:var(--green)}
+.ncs-tape .ncs-tape-h:hover{background:#000 !important;color:var(--green) !important}
+.ncs-tape-i em.up{color:#5E9400}
+[data-theme="dark"] .ncs-tape-i em.up{color:var(--green)}
+.ncs-ticker{overflow:hidden;min-width:0;flex:1;mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent)}
+.ncs-ticker-track{display:flex;width:max-content;animation:ncs-ticker 60s linear infinite}
+.ncs-ticker-set{display:flex;gap:22px;padding-right:22px}
+.ncs-ticker:hover .ncs-ticker-track,.ncs-ticker:focus-within .ncs-ticker-track,.ncs-ticker:active .ncs-ticker-track{animation-play-state:paused}
+@keyframes ncs-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ncs-ticker{overflow-x:auto;mask-image:none}.ncs-ticker-track{animation:none}.ncs-ticker-set[aria-hidden]{display:none}}
