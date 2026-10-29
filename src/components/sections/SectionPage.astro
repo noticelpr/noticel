@@ -87,7 +87,8 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
     )}
 
     {lead && box !== 'opiniones' && <div class="ncs-top"><TopStories lead={lead} more={more} center={center} right={right} h1={false} /></div>}
-    {lead && slug !== 'opiniones' && <AdSlot size="leaderboard" class="ad-under-top" />}
+    {/* No banner under the top stories on Opiniones and NotiCel Fact Check (the owner's request) */}
+    {lead && !['opiniones', 'noticel-factcheck'].includes(slug) && <AdSlot size="leaderboard" class="ad-under-top" />}
 
     <div class="home-grid ncs-grid">
       <div class="home-main">
