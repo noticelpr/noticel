@@ -48,7 +48,6 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
   {/* NotiCel Fact Check, right under Tendencias */}
   <FactCheckBox />
   {!extras && <AdSlot size="rectangle" />}
-  <DominoBox />
   {latest.length > 0 && (
     <section class="lu-box">
       <h2 class="lu-h">Lo último</h2>
@@ -59,6 +58,7 @@ const hhmm = (d: Date) => d.toLocaleTimeString('es-PR', { hour: 'numeric', minut
       </ol>
     </section>
   )}
+  <DominoBox />
   {newsletter && SITE.features.newsletter && (
     <div class="newsletter">
       <h3>Boletín NotiCel</h3>
