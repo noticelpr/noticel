@@ -85,7 +85,7 @@ while (queue.length) {
       {row.length > 0 && <div class="home-row">{row.map((s) => <StoryCard story={s} />)}</div>}
 
       {more.length > 0 && (
-        <section>
+        <section class="home-more">
           <div class="sec-h"><h2>Más noticias</h2><a href={sectionUrl('noticias')}>Ver todas</a></div>
           <div class="block">
             <StoryCard story={more[0]} variant="big" />
@@ -94,7 +94,7 @@ while (queue.length) {
         </section>
       )}
 
-      <AdSlot size="infeed" />
+      <AdSlot size="infeed" class="ad-mid" />
 
       {F.videos && (
         <section class="vx-dark">
@@ -119,6 +119,8 @@ while (queue.length) {
           <>
             {row.map((id) => <div class:list={{ 'sec-wide': row.length === 1 }}><SectionBlock sectionId={id} stories={restStories} /></div>)}
             {i === 1 && i < rows.length - 1 && <AdSlot size="infeed" class="ad-span" />}
+            {/* Phones: an ad after every row of sections, where computers have none (rows stack, so they're long) */}
+            {i !== 1 && i !== 3 && i < rows.length - 1 && <AdSlot size="infeed" class="ad-span ad-phone" />}
             {i === 3 && i < rows.length - 1 && <div class="ad-span"><GamesTeaser /></div>}
           </>
         ))}

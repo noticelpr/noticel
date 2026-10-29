@@ -4927,3 +4927,30 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .vx-dark .vsrc a{text-decoration:underline}
 .vx-dark .hl,.vx-dark h3{color:#fff}
 .vx-dark a:hover .hl,.vx-dark a.hl:hover{color:var(--green)}
+/* ===== Home page on phones and small tablets (2026-10-29): one flowing column. The right column's boxes are woven
+   into the stories instead of all landing at the very bottom: top story → ad → Tendencias → NotiCel Fact Check →
+   more stories → ad → Lo último → videos and markets → sections (shorter, an ad every two rows) → the rest ===== */
+.ad-phone{display:none}
+@media (max-width:1020px){
+  .home-grid.nx-home{display:flex;flex-direction:column;row-gap:24px}
+  .nx-home > .home-main,.nx-home > .right{display:contents}
+  .nx-home > .home-main > *,.nx-home > .right > *{order:50;min-width:0}
+  .nx-home .sr{order:1}
+  .nx-home .home-hero{order:2}
+  .nx-home .ad-right-first{order:3}
+  .nx-home .tr-box{order:4}
+  .nx-home .fc-box{order:5}
+  .nx-home .home-row{order:6}
+  .nx-home .home-more{order:7}
+  .nx-home .ad-mid{order:8}
+  .nx-home .lu-box{order:9}
+  .nx-home .vx-dark{order:10}
+  .nx-home .home-main > .ncs-tape{order:11}
+  .nx-home .home-sections{order:12}
+  .nx-home .promo{order:90}
+  .nx-home .ad-slot{margin-left:auto;margin-right:auto}
+  .ad-phone{display:block}
+  /* Sections: the big story plus two more on phones (the third one is in the section's page) */
+  .nx-home .sec-block .list > :nth-child(n+3){display:none}
+}
+@media (min-width:1021px){.ad-phone{display:none !important}}
