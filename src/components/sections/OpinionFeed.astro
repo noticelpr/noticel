@@ -3,6 +3,7 @@
 // writer's circle, name and date, the title as an italic quote with its summary, and a small photo on the right.
 import Ph from '../Ph.astro';
 import AdSlot from '../AdSlot.astro';
+import ColAvatar from './ColAvatar.astro';
 import { url, storyUrl, shortDate, type Story } from '../../lib/site';
 import { columnistOf, initials } from '../../lib/columnists';
 
@@ -21,7 +22,7 @@ const toneOf = (a: string) => { if (!tone.has(a)) tone.set(a, TONES[tone.size % 
       <>
         <li class="op-row">
           <a class="op-row-who" href={c ? url(`opinion/${c.slug}`) : href}>
-            <span class="op-av" style={`--ring:${toneOf(d.author)}`}>{initials(clean(d.author))}</span>
+            <ColAvatar name={d.author} ring={toneOf(d.author)} />
             <span><b>{d.author}</b><time datetime={d.date.toISOString()}>{shortDate(d.date)}</time></span>
           </a>
           <a class="op-row-main" href={href}>

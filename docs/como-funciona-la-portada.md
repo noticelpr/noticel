@@ -32,9 +32,9 @@ Con esa fila, la portada se llena de arriba hacia abajo. **Cada noticia sale una
 
 ## 3. Más abajo
 
-- Anuncio, marcadores de deportes (DEMO por ahora), videos de NotiCel en YouTube y la barra de mercados.
+- Anuncio, videos de NotiCel en YouTube y la barra de mercados.
 - **Cajas por sección**, de dos en dos: primero las secciones más leídas (según las visitas), **Opiniones al final**. Estas cajas no repiten lo que ya salió arriba.
-- La columna de la derecha: anuncio, clima, lotería, Tendencias (lo más leído), Foro y más anuncios.
+- La columna de la derecha: anuncio, Tendencias (lo más leído), juegos, Lo último, boletín, Foro, marcadores de deportes (DEMO por ahora) y más anuncios.
 
 ## 4. Qué hace el editor para cambiar la portada
 

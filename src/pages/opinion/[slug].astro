@@ -5,7 +5,7 @@ import StoryCard from '../../components/StoryCard.astro';
 import Sidebar from '../../components/Sidebar.astro';
 import AdSlot from '../../components/AdSlot.astro';
 import { getStories, url , sectionUrl } from '../../lib/site';
-import { COLUMNISTS, columnsBy, initials, type Columnist } from '../../lib/columnists';
+import { COLUMNISTS, columnsBy, initials, photoSrc, type Columnist } from '../../lib/columnists';
 
 export function getStaticPaths() {
   return COLUMNISTS.map((c) => ({ params: { slug: c.slug }, props: { c } }));
@@ -13,6 +13,15 @@ export function getStaticPaths() {
 const { c } = Astro.props as { c: Columnist };
 const cols = columnsBy(await getStories(), c);
 const others = COLUMNISTS.filter((o) => o.slug !== c.slug);
+// Contact and social links from the profile (panel → Columnistas); only the ones filled in show
+const handle = (v: string, site: string) => (/^https?:\/\//.test(v) ? v : `https://${site}/${v.replace(/^@/, '')}`);
+const links = [
+  c.email && { label: 'Correo', href: `mailto:${c.email}` },
+  c.x && { label: 'X', href: handle(c.x, 'x.com') },
+  c.instagram && { label: 'Instagram', href: handle(c.instagram, 'instagram.com') },
+  c.facebook && { label: 'Facebook', href: handle(c.facebook, 'facebook.com') },
+  c.website && { label: 'Sitio web', href: /^https?:\/\//.test(c.website) ? c.website : `https://${c.website}` },
+].filter(Boolean) as Array<{ label: string; href: string }>;
 const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' });
 ---
 <Base title={`${c.name} · Opinión`} active="opinion" description={c.bio ?? `Columnas de ${c.name} en NotiCel.`}>
@@ -21,7 +30,7 @@ const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', mo
     <div class="art-grid">
       <div>
         <section class="cp-head">
-          {c.photo ? <img class="cp-pic" src={url(c.photo)} alt={`Retrato de ${c.name}`} /> : <span class="cp-pic col-ini" aria-hidden="true">{initials(c.name)}</span>}
+          {c.photo ? <img class="cp-pic" src={photoSrc(c.photo)} alt={`Retrato de ${c.name}`} /> : <span class="cp-pic col-ini" aria-hidden="true">{initials(c.name)}</span>}
           <div class="cp-info">
             {c.role && <span class="col-role">{c.role}</span>}
             <h1>{c.name}{c.demo && <span class="sp-demo">EJEMPLO</span>}</h1>
@@ -30,6 +39,7 @@ const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', mo
               <li><b>{cols.length}</b> {cols.length === 1 ? 'columna' : 'columnas'}</li>
               {last && <li>Última: <b>{last}</b></li>}
             </ul>
+            {links.length > 0 && <ul class="cp-links">{links.map((l) => <li><a href={l.href} rel="noopener me" target={l.href.startsWith('mailto:') ? undefined : '_blank'}>{l.label}</a></li>)}</ul>}
             {c.demo && <p class="cp-note">Perfil de ejemplo: este espacio será para un columnista real.</p>}
           </div>
         </section>
@@ -50,7 +60,7 @@ const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', mo
           <div class="cp-others">
             {others.map((o) => (
               <a class="cp-other" href={url(`opinion/${o.slug}`)}>
-                {o.photo ? <img src={url(o.photo)} alt="" loading="lazy" /> : <span class="col-ini" aria-hidden="true">{initials(o.name)}</span>}
+                {o.photo ? <img src={photoSrc(o.photo)} alt="" loading="lazy" /> : <span class="col-ini" aria-hidden="true">{initials(o.name)}</span>}
                 <b>{o.name}</b>
                 {o.role && <small>{o.role}</small>}
               </a>

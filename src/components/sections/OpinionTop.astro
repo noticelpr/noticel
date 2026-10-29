@@ -3,6 +3,7 @@
 // then a card for every columnist (most recent writer first) with their latest column as a quote.
 import { url, storyUrl, shortDate, type Story } from '../../lib/site';
 import { COLUMNISTS, initials, columnistOf, type Columnist } from '../../lib/columnists';
+import ColAvatar from './ColAvatar.astro';
 
 // today: the newest column first, then any other column from the same day (all shown in the black box)
 interface Props { columns: Story[]; today?: Story[] }
@@ -28,7 +29,7 @@ const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
         {star.last.data.description && <p class="op-star-dek">{star.last.data.description}</p>}
         <div class="op-star-foot">
           <a class="op-star-who" href={star.c.slug ? url(`opinion/${star.c.slug}`) : storyUrl(star.last)}>
-            <span class="op-av" style={`--ring:${TONES[0]}`}>{initials(clean(star.c.name))}</span>
+            <ColAvatar name={star.c.name} ring={TONES[0]} />
             <span><b>{star.c.name}</b><small>{star.c.role ?? 'Columnista'} · {shortDate(star.last.data.date)}</small></span>
           </a>
           <a class="op-star-go" href={storyUrl(star.last)}>Leer la columna ›</a>
@@ -37,7 +38,7 @@ const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
           <ul class="op-also" aria-label="Más columnas de hoy">
             {alsoToday.map((s, i) => (
               <li>
-                <a class="op-also-who" href={writerUrl(s)}><span class="op-av" style={`--ring:${TONES[(i + 1) % TONES.length]}`}>{initials(clean(s.data.author))}</span></a>
+                <a class="op-also-who" href={writerUrl(s)}><ColAvatar name={s.data.author} ring={TONES[(i + 1) % TONES.length]} /></a>
                 <span><a class="op-also-t" href={storyUrl(s)}>“{s.data.title}”</a><small>{s.data.author} · {shortDate(s.data.date)}</small></span>
               </li>
             ))}
@@ -51,7 +52,7 @@ const TONES = ['#009DE9', '#92D000', '#FFFFFF', '#5CC4F5'];
         {writers.map(({ c, last, count }, i) => (
           <li class="op-item">
             <a class="op-item-av" href={url(`opinion/${c.slug}`)} aria-label={c.name}>
-              <span class="op-av" style={`--ring:${TONES[i % TONES.length]}`}>{initials(clean(c.name))}</span>
+              <ColAvatar name={c.name} ring={TONES[i % TONES.length]} />
             </a>
             <span class="op-item-t">
               <a class="op-item-name" href={url(`opinion/${c.slug}`)}><b>{c.name}</b><small>{count} {count === 1 ? 'columna' : 'columnas'}</small></a>

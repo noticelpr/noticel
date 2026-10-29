@@ -2,7 +2,7 @@
 // Opiniones page, right column (2026-10-28, the owner's request): only the columnist list, most recent writer first,
 // with their picture, name, role and how many columns each has. Replaces the usual sidebar (Tendencias, Lo último, games).
 import { url, getStories } from '../../lib/site';
-import { COLUMNISTS, initials, columnsBy } from '../../lib/columnists';
+import { COLUMNISTS, initials, columnsBy, photoSrc } from '../../lib/columnists';
 
 const stories = await getStories();
 const clean = (n: string) => n.replace(/^Lcd[oa]\.?\s*/u, '');
@@ -19,7 +19,7 @@ const writers = COLUMNISTS
         <li class="op-side-item">
           <a class="op-item-av" href={url(`opinion/${c.slug}`)} aria-label={c.name}>
             {c.photo
-              ? <img class="op-av op-av-img" style={`--ring:${TONES[i % TONES.length]}`} src={c.photo} alt="" width="44" height="44" loading="lazy" />
+              ? <img class="op-av op-av-img" style={`--ring:${TONES[i % TONES.length]}`} src={photoSrc(c.photo)} alt="" width="44" height="44" loading="lazy" />
               : <span class="op-av" style={`--ring:${TONES[i % TONES.length]}`}>{initials(clean(c.name))}</span>}
           </a>
           <a class="op-side-t" href={url(`opinion/${c.slug}`)}>

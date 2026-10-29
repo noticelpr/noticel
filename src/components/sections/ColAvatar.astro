@@ -1,0 +1,11 @@
+---
+// A columnist's circle: their photo when the profile has one (panel → Columnistas), otherwise their initials.
+import { columnistOf, initials, photoSrc } from '../../lib/columnists';
+interface Props { name: string; ring: string }
+const { name, ring } = Astro.props;
+const photo = columnistOf(name)?.photo;
+const clean = (n: string) => n.replace(/^Lcd[oa]\.?\s*/u, '');
+---
+{photo
+  ? <img class="op-av op-av-img" style={`--ring:${ring}`} src={photoSrc(photo)} alt="" loading="lazy" />
+  : <span class="op-av" style={`--ring:${ring}`}>{initials(clean(name))}</span>}

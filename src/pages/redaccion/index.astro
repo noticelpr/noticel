@@ -13,6 +13,7 @@ import CommentQueue from '../../components/CommentQueue.astro';
 import SalesDesk from '../../components/panel/SalesDesk.astro';
 import Writer from '../../components/panel/Writer.astro';
 import Tasks from '../../components/panel/Tasks.astro';
+import Columnists from '../../components/panel/Columnists.astro';
 import PhotoLibrary from '../../components/panel/PhotoLibrary.astro';
 import { getStories, url, CATEGORY_OPTIONS, SITE, mainCategory, inCategory } from '../../lib/site';
 import { hasBackend } from '../../lib/backend';
@@ -62,6 +63,7 @@ const TABS = [
   ['anuncios', 'Anuncios', '<path d="M3 11v2l13 5V6L3 11z"/><path d="M16 9a3 3 0 0 1 0 6"/>'],
   ['analitica', 'Analítica', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
   ['salud', 'Salud del sitio', '<path d="M3 12h4l2-5 4 10 2-5h6"/>'],
+  ['columnistas', 'Columnistas', '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M17 3l3 3-5 5"/>'],
   ['equipo', 'Equipo', '<circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0M16 4a3.5 3.5 0 0 1 0 7M22 20a7 7 0 0 0-4-6.3"/>'],
 ];
 ---
@@ -204,6 +206,11 @@ const TABS = [
           </ul></div>
         </section>
 
+        <!-- Columnistas -->
+        <section class="pnl-pane" data-pane="columnistas" hidden>
+          <Columnists />
+        </section>
+
         <!-- Equipo -->
         <section class="pnl-pane" data-pane="equipo" hidden>
           <h1 class="pnl-h">Equipo</h1>
@@ -253,8 +260,8 @@ const TABS = [
     type Staff = { name: string; role: 'admin' | 'editor' | 'ads' | 'reporter' };
     const ROLE_NAME = { admin: 'Administrador', editor: 'Editor', ads: 'Ventas', reporter: 'Periodista' };
     const ROLE_TABS: Record<Staff['role'], string[]> = {
-      admin: ['inicio', 'noticias', 'escribir', 'fotos', 'ventas', 'comentarios', 'anuncios', 'analitica', 'salud', 'equipo'],
-      editor: ['inicio', 'noticias', 'escribir', 'fotos', 'comentarios', 'analitica', 'salud'],
+      admin: ['inicio', 'noticias', 'escribir', 'fotos', 'ventas', 'comentarios', 'anuncios', 'analitica', 'salud', 'columnistas', 'equipo'],
+      editor: ['inicio', 'noticias', 'escribir', 'fotos', 'comentarios', 'analitica', 'salud', 'columnistas'],
       ads: ['inicio', 'ventas', 'anuncios', 'comentarios', 'analitica'],
       reporter: ['inicio', 'escribir', 'fotos'],
     };
@@ -657,7 +664,7 @@ const TABS = [
           ['Aprobar noticias', [true, true, false, false]], ['Escribir noticias', [true, true, false, true]], ['Publicar o programar', [true, true, false, false]],
           ['Clientes y propuestas', [true, false, true, false]], ['Moderar comentarios', [true, true, true, false]],
           ['Aprobar anuncios', [true, false, true, false]], ['Ver ingresos', [true, false, true, false]], ['Ver analítica', [true, true, false, false]],
-          ['Salud del sitio', [true, true, false, false]], ['Manejar el equipo', [true, false, false, false]],
+          ['Salud del sitio', [true, true, false, false]], ['Perfiles de columnistas', [true, true, false, false]], ['Manejar el equipo', [true, false, false, false]],
         ];
         $('[data-perms]').innerHTML = `<table class="pnl-table perms"><thead><tr><th></th><th>Admin</th><th>Editor</th><th>Ventas</th><th>Periodista</th></tr></thead><tbody>${can.map(([k, v]) => `<tr><th scope="row">${k}</th>${v.map((x) => `<td>${x ? '✓' : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
       },

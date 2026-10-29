@@ -1,0 +1,171 @@
+---
+// Panel → Columnistas (2026-10-29, the owner's request): create and edit columnist profiles (name, position, bio,
+// photo, contact and social links) and switch each one on (shows on the site) or off (hidden).
+// Saved in NotiCel's Supabase (supabase/columnistas.sql); the site reads the profiles that are on when it is built.
+// Without the database (preview or demo), changes stay on this device only.
+import { COLUMNISTS } from '../../lib/columnists';
+const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.role ?? 'Columnista', bio: c.bio ?? '', photo: c.photo ?? '', active: true, sort: i + 1 }));
+---
+<div class="cl" data-cl data-start={JSON.stringify(start)}>
+  <header class="cl-head">
+    <div>
+      <h1 class="pnl-h">Columnistas</h1>
+      <p class="pnl-muted">Crea y edita los perfiles de los columnistas. Con el interruptor decides quién sale en el sitio.</p>
+    </div>
+    <button type="button" class="adp-btn" data-cl-new>+ Nuevo columnista</button>
+  </header>
+  <p class="pnl-note" data-cl-note></p>
+  <p class="cl-missing" data-cl-missing hidden>Falta preparar la base de datos: en Supabase → SQL Editor, corre el archivo <b>supabase/columnistas.sql</b> (una sola vez).</p>
+  <ul class="cl-list" data-cl-list></ul>
+
+  <form class="cl-form" data-cl-form hidden novalidate>
+    <h2 class="pnl-h2" data-cl-form-h>Nuevo columnista</h2>
+    <div class="cl-grid">
+      <div class="cl-photo">
+        <span class="cl-pic" data-cl-pic aria-hidden="true"></span>
+        <label class="adp-btn ghost-dark cl-up">Subir foto<input type="file" accept="image/jpeg,image/png,image/webp" data-cl-file hidden /></label>
+        <input name="photo" placeholder="o pega el enlace de la foto" aria-label="Enlace de la foto" autocomplete="off" />
+        <button type="button" class="pnl-link" data-cl-nophoto>Quitar foto</button>
+      </div>
+      <div class="cl-fields">
+        <label>Nombre completo<input name="name" required maxlength="80" placeholder="Como firma sus columnas" /></label>
+        <p class="pnl-note">Tiene que ser igual al autor de sus columnas (por ejemplo, «Lcdo. Ramón Alejandro Pabón»), para que el sitio las junte en su perfil.</p>
+        <label>Cargo o posición<input name="role" maxlength="80" placeholder="Ej.: Abogado y analista político" /></label>
+        <label>Biografía<textarea name="bio" rows="5" maxlength="700" placeholder="Quién es, a qué se dedica y de qué escribe."></textarea></label>
+        <div class="cl-two">
+          <label>Correo público<input name="email" type="email" maxlength="80" placeholder="opcional" autocapitalize="off" /></label>
+          <label>Sitio web<input name="website" maxlength="120" placeholder="opcional" autocapitalize="off" /></label>
+          <label>X (Twitter)<input name="x" maxlength="80" placeholder="@usuario o enlace" autocapitalize="off" /></label>
+          <label>Instagram<input name="instagram" maxlength="80" placeholder="@usuario o enlace" autocapitalize="off" /></label>
+          <label>Facebook<input name="facebook" maxlength="120" placeholder="usuario o enlace" autocapitalize="off" /></label>
+          <label>Orden en la lista<input name="sort" type="number" min="0" max="999" placeholder="1" /></label>
+        </div>
+        <label class="adb-check"><input type="checkbox" name="active" checked /> Mostrar en el sitio</label>
+        <p class="cm-err" data-cl-err hidden></p>
+        <div class="cl-actions">
+          <button type="submit" class="adp-btn" data-cl-save>Guardar</button>
+          <button type="button" class="adp-btn ghost-dark" data-cl-cancel>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  import { hasBackend, listColumnists, saveColumnist, setColumnistActive, uploadColumnistPhoto, type ColumnistRow } from '../../lib/backend';
+  const root = document.querySelector<HTMLElement>('[data-cl]');
+  if (root) {
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const form = $<HTMLFormElement>('[data-cl-form]');
+    const f = (n: string) => form.elements.namedItem(n) as HTMLInputElement;
+    const LOCAL = 'nc-columnists';
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const initials = (n: string) => n.replace(/^Lcd[oa]\.?\s*/u, '').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    const pic = (c: { name: string; photo?: string | null }) => (c.photo ? `<img src="${esc(c.photo)}" alt="" />` : `<span>${esc(initials(c.name || '?'))}</span>`);
+    const toast = (m: string) => { const t = document.querySelector<HTMLElement>('[data-ptoast]'); if (!t) return; t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3800); };
+    let rows: ColumnistRow[] = [];
+    let editing: ColumnistRow | null = null;
+    const live = () => hasBackend();
+
+    const readLocal = (): ColumnistRow[] => { try { const v = JSON.parse(localStorage.getItem(LOCAL) || 'null'); if (Array.isArray(v)) return v; } catch { /* storage blocked */ } return JSON.parse(root.dataset.start || '[]'); };
+    const writeLocal = () => { try { localStorage.setItem(LOCAL, JSON.stringify(rows)); } catch { /* storage blocked */ } };
+
+    async function load() {
+      $('[data-cl-note]').textContent = live()
+        ? 'Los cambios salen en el sitio la próxima vez que el sitio se actualice (cuando se publica). Un columnista apagado deja de salir en Opiniones; sus columnas siguen publicadas.'
+        : 'VISTA PREVIA: sin la base de datos, los cambios se guardan solo en este dispositivo.';
+      if (!live()) { rows = readLocal(); return paint(); }
+      $('[data-cl-list]').innerHTML = '<li class="cl-empty">Cargando…</li>';
+      const r = await listColumnists();
+      $('[data-cl-missing]').hidden = r !== 'missing';
+      if (r === 'missing') { rows = readLocal(); return paint(); }
+      if (!r) { $('[data-cl-list]').innerHTML = '<li class="cl-empty">No se pudo cargar. Revisa tu conexión.</li>'; return; }
+      rows = r; paint();
+    }
+
+    function paint() {
+      const sorted = [...rows].sort((a, b) => Number(b.active) - Number(a.active) || (a.sort ?? 0) - (b.sort ?? 0) || a.name.localeCompare(b.name));
+      $('[data-cl-list]').innerHTML = sorted.map((c) => `
+        <li class="cl-card${c.active ? '' : ' off'}">
+          <span class="cl-pic">${pic(c)}</span>
+          <span class="cl-who"><b>${esc(c.name)}</b><small>${esc(c.role || 'Columnista')}</small>${c.bio ? `<span class="cl-bio">${esc(c.bio)}</span>` : '<span class="cl-bio cl-nobio">Sin biografía todavía</span>'}</span>
+          <label class="cl-switch" title="${c.active ? 'Sale en el sitio' : 'No sale en el sitio'}"><input type="checkbox" data-cl-on="${esc(c.slug)}" ${c.active ? 'checked' : ''} /><i aria-hidden="true"></i><span>${c.active ? 'En el sitio' : 'Apagado'}</span></label>
+          <button type="button" class="pnl-link" data-cl-edit="${esc(c.slug)}">Editar</button>
+        </li>`).join('') || '<li class="cl-empty">Todavía no hay columnistas. Crea el primero con «+ Nuevo columnista».</li>';
+    }
+
+    function open(c: ColumnistRow | null) {
+      editing = c;
+      $('[data-cl-form-h]').textContent = c ? `Editar: ${c.name}` : 'Nuevo columnista';
+      form.reset();
+      for (const k of ['name', 'role', 'bio', 'photo', 'email', 'website', 'x', 'instagram', 'facebook'] as const) f(k).value = (c?.[k] as string) ?? '';
+      f('sort').value = String(c?.sort ?? rows.length + 1);
+      f('active').checked = c ? c.active : true;
+      $('[data-cl-err]').hidden = true;
+      showPic();
+      form.hidden = false;
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      f('name').focus({ preventScroll: true });
+    }
+    const showPic = () => { $('[data-cl-pic]').innerHTML = pic({ name: f('name').value, photo: f('photo').value.trim() }); };
+
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-cl-new]')) open(null);
+      const ed = t.closest<HTMLElement>('[data-cl-edit]'); if (ed) open(rows.find((r) => r.slug === ed.dataset.clEdit) ?? null);
+      if (t.closest('[data-cl-cancel]')) { form.hidden = true; editing = null; }
+      if (t.closest('[data-cl-nophoto]')) { f('photo').value = ''; showPic(); }
+    });
+    form.addEventListener('input', (e) => { const n = (e.target as HTMLInputElement).name; if (n === 'photo' || n === 'name') showPic(); });
+
+    // The on/off switch on each card
+    root.addEventListener('change', async (e) => {
+      const box = (e.target as HTMLElement).closest<HTMLInputElement>('[data-cl-on]');
+      if (box) {
+        const c = rows.find((r) => r.slug === box.dataset.clOn); if (!c) return;
+        const on = box.checked;
+        if (live()) { box.disabled = true; const ok = await setColumnistActive(c.slug, on); box.disabled = false; if (!ok) { box.checked = !on; return toast('No se pudo cambiar. Revisa tu conexión.'); } }
+        c.active = on; if (!live()) writeLocal(); paint();
+        return toast(on ? `${c.name} sale en el sitio.` : `${c.name} quedó apagado: no sale en el sitio.`);
+      }
+      // Photo upload: square-ish picture, up to 5 MB
+      const file = (e.target as HTMLInputElement).closest<HTMLInputElement>('[data-cl-file]')?.files?.[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) return toast('La foto pesa más de 5 MB. Escoge una más liviana.');
+        if (!live()) { const fr = new FileReader(); fr.onload = () => { f('photo').value = String(fr.result); showPic(); }; return fr.readAsDataURL(file); }
+        toast('Subiendo la foto…');
+        const ext = (file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        const url = await uploadColumnistPhoto(`${slugify(f('name').value || 'columnista')}-${Date.now()}.${ext}`, file);
+        if (!url) return toast('No se pudo subir la foto. ¿Ya corriste supabase/columnistas.sql?');
+        f('photo').value = url; showPic(); toast('Foto lista. Recuerda guardar.');
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = f('name').value.trim().replace(/\s+/g, ' ');
+      const err = (m: string) => { const el = $('[data-cl-err]'); el.textContent = m; el.hidden = false; };
+      if (name.length < 3) return err('Escribe el nombre completo del columnista.');
+      const slug = editing?.slug ?? slugify(name);
+      if (!editing && rows.some((r) => r.slug === slug)) return err('Ya existe un columnista con ese nombre. Búscalo en la lista y edítalo.');
+      const v = (k: string) => f(k).value.trim() || null;
+      const row: ColumnistRow = { slug, name, role: v('role') ?? 'Columnista', bio: v('bio'), photo: v('photo'), email: v('email'), website: v('website'), x: v('x'), instagram: v('instagram'), facebook: v('facebook'), active: f('active').checked, sort: Number(f('sort').value) || 0 };
+      const btn = $<HTMLButtonElement>('[data-cl-save]'); btn.disabled = true;
+      const problem = live() ? await saveColumnist(row) : '';
+      btn.disabled = false;
+      if (problem) return err(problem);
+      rows = [...rows.filter((r) => r.slug !== slug), row];
+      if (!live()) writeLocal();
+      form.hidden = true; editing = null; paint();
+      toast(`Guardado: ${name}.`);
+    });
+
+    // Load the first time the tab opens
+    const pane = root.closest<HTMLElement>('[data-pane]');
+    let loaded = false;
+    const check = () => { if (pane && !pane.hidden && !loaded) { loaded = true; void load(); } };
+    if (pane) new MutationObserver(check).observe(pane, { attributes: true, attributeFilter: ['hidden'] });
+    check();
+  }
+</script>

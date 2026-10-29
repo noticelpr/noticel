@@ -240,3 +240,35 @@ export async function removeFromTeam(id: string): Promise<boolean> {
   const r = await staffApi(`staff?user_id=eq.${id}`, { method: 'DELETE' });
   return !!r?.ok;
 }
+
+// ---- Columnist profiles (panel → Columnistas); supabase/columnistas.sql: table "columnists", folder "columnistas" ----
+export type ColumnistRow = {
+  slug: string; name: string; role: string; bio?: string | null; photo?: string | null; email?: string | null;
+  x?: string | null; instagram?: string | null; facebook?: string | null; website?: string | null; active: boolean; sort: number;
+};
+/** Every profile, on and off (admins and editors). 'missing' = supabase/columnistas.sql hasn't been run yet. */
+export async function listColumnists(): Promise<ColumnistRow[] | 'missing' | null> {
+  const r = await staffApi('columnists?select=*&order=sort.asc,name.asc');
+  if (!r) return null;
+  if (r.status === 404 || r.status === 400) return 'missing';
+  return r.ok ? r.json() : null;
+}
+/** Creates or updates a profile (by its slug). Returns an error message, or '' when it was saved. */
+export async function saveColumnist(c: ColumnistRow): Promise<string> {
+  const r = await staffApi('columnists?on_conflict=slug', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ ...c, updated_at: new Date().toISOString() }) });
+  if (!r) return 'Tu sesión venció o no hay conexión. Sal y vuelve a entrar al panel.';
+  if (r.ok) return '';
+  return r.status === 401 || r.status === 403 ? 'Solo un administrador o editor puede cambiar columnistas.' : `No se pudo guardar (error ${r.status}).`;
+}
+/** Switches a profile on (shows on the site) or off (hidden). */
+export async function setColumnistActive(slug: string, active: boolean): Promise<boolean> {
+  const r = await staffApi(`columnists?slug=eq.${encodeURIComponent(slug)}`, { method: 'PATCH', body: JSON.stringify({ active, updated_at: new Date().toISOString() }) });
+  return !!r?.ok;
+}
+/** Uploads a columnist's photo to the public "columnistas" folder and returns its address, or null. */
+export async function uploadColumnistPhoto(name: string, file: Blob): Promise<string | null> {
+  const token = await freshToken(); if (!token) return null;
+  const base = BACKEND.url.replace(/\/$/, '');
+  const r = await fetch(`${base}/storage/v1/object/columnistas/${name}`, { method: 'POST', headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${token}`, 'Content-Type': file.type || 'image/jpeg' }, body: file }).catch(() => null);
+  return r?.ok ? `${base}/storage/v1/object/public/columnistas/${name}` : null;
+}
