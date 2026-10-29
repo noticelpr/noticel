@@ -146,6 +146,18 @@ const TOOLS = [
         <div class="pnl-card"><h2 class="pnl-h3">Corrección</h2>
           <textarea data-f="correction" rows="2" maxlength="300" placeholder="Solo si corriges algo ya publicado: qué se corrigió y cuándo"></textarea>
         </div>
+        <div class="pnl-card"><h2 class="pnl-h3">NotiCel Fact Check</h2>
+          <p class="pnl-muted pnl-small">Solo si esta noticia verifica algo que circula (una frase, un video, un rumor). Sale en la caja “NotiCel Fact Check” del sitio.</p>
+          <select data-f="factCheck" aria-label="Veredicto">
+            <option value="">No es un fact check</option>
+            <option value="cierto">Cierto</option>
+            <option value="impreciso">Impreciso</option>
+            <option value="enganoso">Engañoso</option>
+            <option value="falso">Falso</option>
+            <option value="sin-evidencia">Sin evidencia</option>
+          </select>
+          <textarea data-f="factClaim" rows="2" maxlength="200" placeholder="Lo que se verificó, en una frase (ej.: «La AEE subirá la luz 50% en enero»)"></textarea>
+        </div>
         <div class="pnl-card"><h2 class="pnl-h3">Antes de publicar</h2><ul class="pnl-checks" data-checks></ul></div>
         <div class="pnl-card"><h2 class="pnl-h3">Archivo</h2>
           <p class="pnl-muted pnl-small">La noticia como archivo del sitio (Markdown).</p>
@@ -238,6 +250,7 @@ const TOOLS = [
       title: string; description: string; section: string; league: string; place: string; author: string; date: string;
       image: string; imageUrl: string; imageCaption: string; imageCredit: string; breaking: boolean; trending: boolean; featured: boolean; live: boolean; pinned?: boolean; homeLead?: boolean; sectionLead?: boolean; sectionPinned?: boolean;
       sources: Src[]; related: string[]; correction: string; body: string; slug?: string;
+      factCheck?: string; factClaim?: string; // NotiCel Fact Check: verdict and the claim checked
       path?: string; cats?: string[]; // NotiCel: the story's address on the site and its other categories (kept from the story file)
       gallery?: Gal[]; // extra photos shown as a slideshow with the main one
       aiAssisted?: boolean; fmExtra?: string; // kept from an existing story file: the AI label and fields the editor doesn't show
@@ -372,12 +385,12 @@ const TOOLS = [
     let cur: Art | null = null, dirty = false, timer = 0;
     const blank = (): Art => ({ id: `A-${Date.now().toString(36)}`, status: 'draft', updated: Date.now(), owner: me()?.name ?? '', title: '', description: '', section: 'noticias', league: '',
       place: '', author: me()?.name ?? 'NotiCel', date: localNow(), image: '', imageUrl: '', imageCaption: '', imageCredit: '', breaking: false, trending: false, featured: false, live: false, pinned: false, homeLead: false, sectionLead: false, sectionPinned: false,
-      sources: [], related: [], correction: '', body: '' });
+      sources: [], related: [], correction: '', factCheck: '', factClaim: '', body: '' });
     const field = (k: string) => $<HTMLInputElement>(`[data-f="${k}"]`);
     function openEditor(a: Art) {
       cur = structuredClone(a);
       $('[data-gal-list]').dataset.sig = ''; ($('[data-wr-gal]') as HTMLDetailsElement).open = !!cur.gallery?.length;
-      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction'] as const).forEach((k) => (field(k).value = String(cur![k] ?? '')));
+      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => (field(k).value = String(cur![k] ?? '')));
       (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (field(k).checked = !!cur![k]));
       body.innerHTML = cur.body || '<p><br></p>';
       body.querySelectorAll<HTMLElement>('figure.wr-embed').forEach(paintEmbed);
@@ -390,7 +403,7 @@ const TOOLS = [
     function closeEditor() { if (dirty) void persist(); cur = null; $('[data-wr-editor]').hidden = true; $('[data-wr-list-view]').hidden = false; renderList(); }
     function readEditor() {
       if (!cur) return;
-      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction'] as const).forEach((k) => ((cur as any)[k] = field(k).value.trim()));
+      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => ((cur as any)[k] = field(k).value.trim()));
       (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (cur![k] = field(k).checked));
       const c = body.cloneNode(true) as HTMLElement; c.querySelectorAll('.wr-mv').forEach((x) => x.remove()); // the move controls aren't part of the story
       cur.body = c.innerHTML;
@@ -635,7 +648,7 @@ const TOOLS = [
     // The story file: from NotiCel's GitHub repository when it exists (newest), else from the site itself (redaccion/archivo/)
     const RAW = REPO ? `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/content/noticias/` : `${BASE}/redaccion/archivo/`;
     const MANAGED = new Set(['title', 'description', 'categories', 'path', 'place', 'date', 'author', 'image', 'imageCaption', 'imageCredit',
-      'breaking', 'topStory', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned', 'aiAssisted', 'draft', 'sources', 'related', 'correction', 'gallery']);
+      'breaking', 'topStory', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned', 'aiAssisted', 'draft', 'sources', 'related', 'correction', 'gallery', 'factCheck', 'factClaim']);
     const BROAD = ['noticias', 'ultima-hora', 'uncategorized']; // never the main category when a story has a more specific one
     const unq = (v: string) => { v = v.trim(); try { return v.startsWith('"') ? JSON.parse(v) : v.replace(/^'(.*)'$/, '$1'); } catch { return v; } };
     const inline = (t: string) => esc(t.replace(/\\([*_`[\]\\])/g, '$1'))
@@ -686,7 +699,7 @@ const TOOLS = [
         imageCaption: unq(fm.imageCaption || ''), imageCredit: unq(fm.imageCredit || ''),
         breaking: yes('breaking'), trending: false, featured: yes('topStory'), live: yes('live'), pinned: yes('pinned'), homeLead: yes('homeLead'), sectionLead: yes('sectionLead'), sectionPinned: yes('sectionPinned'),
         aiAssisted: yes('aiAssisted'), fmExtra: extra.join('\n').trim() || undefined,
-        sources, related, gallery, correction: unq(fm.correction || ''), body: mdToHtml(m[2]) };
+        sources, related, gallery, correction: unq(fm.correction || ''), factCheck: unq(fm.factCheck || ''), factClaim: unq(fm.factClaim || ''), body: mdToHtml(m[2]) };
     }
     /** A story on the site as an article of the team (opened before, or brought from its file now). */
     async function storyArt(id: string): Promise<Art | null> {
@@ -747,6 +760,7 @@ const TOOLS = [
         ...(a.sources.length ? ['sources:', ...a.sources.flatMap((s) => [`  - name: ${y(s.name)}`, ...(s.url ? [`    url: ${y(s.url)}`] : [])])] : []),
         ...(a.related.length ? ['related:', ...a.related.map((r) => `  - ${y(r)}`)] : []),
         ...(a.correction ? [`correction: ${y(a.correction)}`] : []),
+        ...(a.factCheck ? [`factCheck: ${y(a.factCheck)}`, ...(a.factClaim ? [`factClaim: ${y(a.factClaim)}`] : [])] : []),
         '---', '', md.body(a.body), ''].join('\n');
     }
     const slug = (a: Art) => `${new Date(a.date || Date.now()).toISOString().slice(0, 10)}-${a.title.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70) || 'noticia'}`;

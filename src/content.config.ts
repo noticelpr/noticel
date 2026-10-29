@@ -40,6 +40,9 @@ const noticias = defineCollection({
     sources: z.array(z.object({ name: z.string(), url: z.string().optional() })).default([]),
     related: z.array(z.string()).default([]), // ids of related stories
     correction: z.string().optional(),
+    // NotiCel Fact Check (panel → Escribir): the verdict and the claim that was checked
+    factCheck: z.enum(['cierto', 'impreciso', 'enganoso', 'falso', 'sin-evidencia']).optional(),
+    factClaim: z.string().optional(),
     trending: z.boolean().default(false), // editor's "tendencia": a U.S. or world story big enough to lead
     league: z.enum(LEAGUE_IDS).optional(), // sports stories only: bsn, doble-a, invernal... (src/lib/leagues.ts)
   }),

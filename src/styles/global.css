@@ -4882,3 +4882,22 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .ncs-ticker:hover .ncs-ticker-track,.ncs-ticker:focus-within .ncs-ticker-track,.ncs-ticker:active .ncs-ticker-track{animation-play-state:paused}
 @keyframes ncs-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.ncs-ticker{overflow-x:auto;mask-image:none}.ncs-ticker-track{animation:none}.ncs-ticker-set[aria-hidden]{display:none}}
+/* NotiCel Fact Check box (FactCheckBox.astro), right column under Tendencias */
+.fc-box{background:#000;color:#fff;border-radius:12px;padding:14px 16px 12px;border-bottom:4px solid var(--green)}
+.fc-h{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:18px;font-weight:600;color:#fff}
+.fc-h b{font-weight:800;color:var(--green)}
+.fc-mark{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--green);color:#000;font-size:15px;font-weight:900}
+.fc-list{list-style:none;margin:0;padding:0}
+.fc-list li+li{border-top:1px solid #2C2C31}
+.fc-list a{display:grid;gap:5px;padding:9px 0;color:#fff}
+.fc-list a:hover .hl{color:var(--green)}
+.fc-v{justify-self:start;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:3px}
+.fc-cierto{background:var(--green);color:#000}
+.fc-impreciso{background:#009DE9;color:#fff}
+.fc-enganoso{background:#E8590C;color:#fff}
+.fc-falso{background:#D7263D;color:#fff}
+.fc-sin-evidencia{background:#6B6A6A;color:#fff}
+.fc-claim{font-family:var(--head);font-weight:700;font-size:14.5px;line-height:1.3;color:#fff}
+.fc-empty{margin:0 0 8px;font-size:14px;line-height:1.45;color:#C9C9CE}
+.fc-send{display:inline-block;margin-top:4px;font-weight:800;font-size:13.5px;color:var(--green)}
+.fc-send:hover{text-decoration:underline}
