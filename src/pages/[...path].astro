@@ -33,8 +33,21 @@ const bodyHtml = story.rendered?.html;
 const docs = bodyHtml?.match(DOC) ?? [];
 // NotiCel: an ad space inside the story, after the third paragraph (only in stories long enough to have more after it)
 const cleanHtml = (bodyHtml ?? '').replace(DOC, '');
-const cut = (() => { let i = -1; for (let n = 0; n < 3; n++) { i = cleanHtml.indexOf('</p>', i + 1); if (i < 0) return -1; } return i + 4; })();
-const bodyParts = cut > 0 && cleanHtml.slice(cut).includes('<p') ? [cleanHtml.slice(0, cut), cleanHtml.slice(cut)] : [cleanHtml, ''];
+// Ads inside the story (2026-10-30, ads review): spaced by amount of text, so a short story gets one or none, a long one
+// keeps getting them, and no ad ends up right before the end
+// Only paragraphs at the top level count (never one inside a quote, embed, list or table, which a cut would break)
+const BOXES = ['blockquote', 'div', 'figure', 'ul', 'ol', 'table', 'section', 'aside'];
+const topLevel = (end: number) => BOXES.every((t) => (cleanHtml.slice(0, end).match(new RegExp(`<${t}[\\s>]`, 'gi')) ?? []).length === (cleanHtml.slice(0, end).match(new RegExp(`</${t}>`, 'gi')) ?? []).length);
+const paraEnds: number[] = []; for (let i = cleanHtml.indexOf('</p>'); i >= 0; i = cleanHtml.indexOf('</p>', i + 1)) if (topLevel(i + 4)) paraEnds.push(i + 4);
+// First after paragraph 3, then about every 1,500 characters of text (at least 4 paragraphs apart), at most 10, each
+// with at least two paragraphs after it
+const textLen = (a: number, b: number) => cleanHtml.slice(a, b).replace(/<[^>]+>/g, '').length;
+const adAfter: number[] = [];
+for (let n = 3, last = -1; n <= paraEnds.length - 2 && adAfter.length < 10; n++) {
+  const at = paraEnds[n - 1];
+  if (last < 0 || (n - last >= 4 && textLen(paraEnds[last - 1], at) >= 1500)) { adAfter.push(at); last = n; }
+}
+const bodyParts = [0, ...adAfter, cleanHtml.length].slice(1).map((end, i, all) => cleanHtml.slice(i ? all[i - 1] : 0, end));
 // Photo caption and credit: the story's own photo, or its section's default photo
 const fallback = defaultPhoto(d.section, d.league);
 const caption = d.image ? d.imageCaption ?? (d.place ? `${d.place}. Imagen de referencia.` : 'Imagen de referencia.') : `${fallback.caption} Imagen de archivo.`;
@@ -114,16 +127,20 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
         </>)}
         <div class="body">{bodyHtml !== undefined ? (
           <>
-            <Fragment set:html={bodyParts[0]} />
-            {bodyParts[1] && <AdSlot size="infeed" class="ad-in-story" />}
-            {bodyParts[1] && <Fragment set:html={bodyParts[1]} />}
+            {bodyParts.map((part, i) => (
+              <>
+                {i > 0 && <AdSlot size="infeed" class="ad-in-story" />}
+                <Fragment set:html={part} />
+              </>
+            ))}
           </>
         ) : <Content />}</div>
         {docs.length > 0 && <section class="doc-attach" aria-label="Documentos"><h2 class="doc-attach-h">{docs.length === 1 ? 'Documento' : 'Documentos'}</h2><Fragment set:html={docs.join('')} /></section>}
         {/* NotiCel: the story's PDF document (WordPress pdf_url). Its topics (tags) are not shown, by the publisher's
             choice; search still uses them. */}
         {d.pdfUrl && <p><a class="tool" href={d.pdfUrl} target="_blank" rel="noopener">📄 {d.pdfTitle || 'Ver documento (PDF)'}</a></p>}
-        <AdSlot size="infeed" />
+        {/* After the story: only when the story had no ad inside it (two ads back to back annoy readers) */}
+        {adAfter.length === 0 && <AdSlot size="infeed" />}
 
         {d.correction && <p class="sources"><strong>Corrección:</strong> {d.correction} <a href={url('normas-editoriales')}>Nuestra política de correcciones</a></p>}
         {d.sources.length > 0 && (
@@ -152,6 +169,8 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
 
         <div class="sec-h"><h2>Te puede interesar</h2></div>
         <div class="grid2">{more.map((x) => <StoryCard story={x} />)}</div>
+        {/* Phones: one ad after the related stories (on phones the right column, with its ads, only comes after the games) */}
+        <AdSlot size="rectangle" class="ad-phone" />
         <div style="margin-top:var(--gap-lg)"><GamesTeaser title="Tómate un break: Juegos NotiCel" /></div>
       </article>
       <Sidebar />

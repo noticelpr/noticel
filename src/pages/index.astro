@@ -122,6 +122,8 @@ while (queue.length) {
       )}
 
       <MarketsBar />
+      {/* Phones only: breaks up the longest stretch without ads (between Más noticias and the section boxes) */}
+      <AdSlot size="rectangle" class="ad-phone ad-after-markets" />
 
       <div class="home-sections">
         {rows.map((row, i) => (

@@ -5006,3 +5006,8 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .bb-hero > *{position:relative}
 .bb-hero .bb-fit-ad{display:none !important;position:absolute;left:0;right:0;margin:0}
 .bb-hero .bb-fit-ad.fits{display:block !important}
+/* Phones: the ad after the videos and markets bar goes between them and the section boxes (ads review 2026-10-30) */
+@media (max-width:1020px){
+  .nx-home .ad-after-markets{order:12}
+  .nx-home .home-sections{order:13}
+}
