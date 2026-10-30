@@ -4955,3 +4955,10 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .ncs-leagues::-webkit-scrollbar,.ncs-scores::-webkit-scrollbar{display:none}
 /* Story photo slideshow on phones: edge to edge, matching the page's real side margin (it stuck out a few pixels) */
 @media (max-width:760px){.gal-stage{margin:0 calc(-1 * var(--gutter, 12px))}}
+/* Big photo in the section boxes (home page and Economía): normal news-photo shape (16:9) instead of a short strip
+   that cut heads off; in a full-width box it is capped so it doesn't fill the screen. Faces sit a bit above center. */
+.home-sections .sec-block .big .ph,.eco .block .big .ph{aspect-ratio:16/9 !important;height:auto !important;max-height:420px}
+.ph img{object-position:center 30%}
+/* Story page main photo: Noticias Xtra's full-width rounded banner, in a normal photo shape (16:9) so it doesn't cut
+   the top and bottom off (the owner's request, 2026-10-30) */
+.art > .ph,.art .gal-slide{aspect-ratio:16/9 !important;height:auto !important}
