@@ -4962,3 +4962,31 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 /* Story page main photo: Noticias Xtra's full-width rounded banner, in a normal photo shape (16:9) so it doesn't cut
    the top and bottom off (the owner's request, 2026-10-30) */
 .art > .ph,.art .gal-slide{aspect-ratio:16/9 !important;height:auto !important}
+/* ===== Games in NotiCel's own look (2026-10-30, the owner: "the game section should look different on NotiCel"):
+   black, rounded, green edge and green buttons, like the Fact Check box and the markets bar (Noticias Xtra keeps its
+   blue/purple games) ===== */
+/* Games row (home page, story pages, sections) and the small games box */
+.gt,.home-main > section.gt,[data-theme="dark"] .home-main > section.gt,.ad-span .gt{background:#000 !important;border-radius:12px;border:0;border-bottom:4px solid var(--green);padding:14px 16px 12px !important;box-shadow:none}
+.gt-head{border-bottom:1px solid #2C2C31;padding-bottom:8px}
+.gt-head h2{color:#fff;display:flex;align-items:center;gap:8px}
+.gt-head h2::before{content:"";width:6px;height:18px;border-radius:2px;background:var(--green)}
+.gt-head a{color:var(--green)}
+.gt-tile{background:#161618;border:1px solid #2C2C31;border-radius:10px;color:#fff;transition:border-color .15s,transform .15s}
+.gt-tile:hover{background:#161618;border-color:var(--green);transform:translateY(-2px)}
+.gt-art{border-radius:7px;box-shadow:none}
+.gt-name{color:#fff}
+/* Games page (/juegos/) */
+.jh-hero{background:#000 !important;border-radius:14px;border-bottom:6px solid var(--green)}
+.jh-kicker{color:var(--green)}
+.jh-feat{background:#161618 !important;border:2px solid var(--green);border-radius:14px}
+.jh-feat-btn{background:var(--green);color:#000}
+.jh-feat:hover .jh-feat-btn{background:#fff}
+.jh-cat h2{color:var(--ink);display:flex;align-items:center;gap:8px}
+.jh-cat h2::before{content:"";width:6px;height:22px;border-radius:2px;background:var(--green)}
+.jh-card{border-radius:12px;border:1px solid var(--line);border-bottom:4px solid #000;box-shadow:none}
+.jh-card:hover{border-color:var(--green);box-shadow:0 10px 22px rgba(0,0,0,.12)}
+.jh-card-art{background:#000 !important;padding:10px}
+.jh-card-art img{border-radius:8px}
+.jh-card-play{background:#000;color:var(--green);border:1px solid #000}
+.jh-card:hover .jh-card-play{background:var(--green);color:#000;border-color:var(--green)}
+[data-theme="dark"] .jh-card{border-bottom-color:var(--green)}
