@@ -4959,14 +4959,8 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .au-head h1{margin:0;font-size:30px}
 .au-head .pnl-muted{margin:2px 0 8px;color:var(--muted)}
 .au-ini{flex:none;width:72px;height:72px;font-size:24px;background:#000;color:#fff;box-shadow:0 0 0 3px var(--blue)}
-/* Story page main photo: the whole photo at its own shape (it used to be trimmed to a short strip, cutting heads
-   and the bottom). Very tall photos are limited in height and get black side bands instead of being cut. */
-.art > .ph:has(img){height:auto !important;aspect-ratio:auto;background:#000;display:flex;justify-content:center}
-.art > .ph:has(img) img{position:static;width:100%;height:auto;max-height:78vh;object-fit:contain;object-position:center}
 /* Deportes: the leagues and scores rows still slide sideways (mouse wheel, trackpad or finger), with no visible bar */
 .ncs-leagues,.ncs-scores{scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior-x:contain}
 .ncs-leagues::-webkit-scrollbar,.ncs-scores::-webkit-scrollbar{display:none}
-/* Story page main photo, smaller (the owner's request): still whole, centered, at most 440px tall (300px on phones) */
-.art > .ph:has(img){background:transparent;border-radius:0}
-.art > .ph:has(img) img{width:auto;max-width:100%;max-height:440px;border-radius:8px}
-@media (max-width:760px){.art > .ph:has(img) img{max-height:300px}}
+/* Story photo slideshow on phones: edge to edge, matching the page's real side margin (it stuck out a few pixels) */
+@media (max-width:760px){.gal-stage{margin:0 calc(-1 * var(--gutter, 12px))}}
