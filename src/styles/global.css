@@ -4963,3 +4963,6 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
    and the bottom). Very tall photos are limited in height and get black side bands instead of being cut. */
 .art > .ph:has(img){height:auto !important;aspect-ratio:auto;background:#000;display:flex;justify-content:center}
 .art > .ph:has(img) img{position:static;width:100%;height:auto;max-height:78vh;object-fit:contain;object-position:center}
+/* Deportes: the leagues and scores rows still slide sideways (mouse wheel, trackpad or finger), with no visible bar */
+.ncs-leagues,.ncs-scores{scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior-x:contain}
+.ncs-leagues::-webkit-scrollbar,.ncs-scores::-webkit-scrollbar{display:none}
