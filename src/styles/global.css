@@ -4544,21 +4544,12 @@ footer{background:#000;border-top:4px solid var(--green)}
 .newsletter .btn{background:var(--blue);color:#fff}
 .newsletter .btn:hover{background:var(--green);color:#000}
 
-/* ===== Story page in the new design: tight headline, clean lines, readable text ===== */
-.art .crumbs{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
-.art .badge{text-transform:uppercase;letter-spacing:.06em;font-size:12px}
-.art h1{font-size:clamp(30px,3.2vw,46px);line-height:1.06;letter-spacing:-.02em;margin:6px 0 12px}
-.art .dek{font-size:calc(19px * var(--read-scale,1));line-height:1.45;color:var(--muted);margin:0 0 18px}
-.byline{border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
-.art .ph{border-radius:4px}
-.caption{border-left:3px solid var(--green);padding-left:10px;margin-top:8px}
-.art .body{font-size:calc(19px * var(--read-scale,1));line-height:1.75}
-.art .body p{margin:0 0 1.15em}
+/* Story page: Noticias Xtra's layout (2026-10-30, the owner: "copy Noticias Xtra's article page"), with NotiCel's
+   own colors and touches: green bar by the photo caption, black and green tip box */
+.caption{border-left:3px solid var(--green);padding-left:10px}
 .tip-cta{background:#000;color:#fff;border-radius:6px;border-left:6px solid var(--green)}
 .tip-cta b,.tip-cta svg,.tip-cta .tip-go{color:var(--green)}
 .tip-cta:hover{box-shadow:none;background:#141416}
-.art-more{grid-template-columns:repeat(3,minmax(0,1fr))}
-@media (max-width:760px){.art-more{grid-template-columns:1fr}}
 
 /* Header buttons like Noticias Xtra's: same height, the icons in a white pill */
 .masthead .mh-right{gap:10px}

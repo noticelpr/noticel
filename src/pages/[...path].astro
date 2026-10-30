@@ -15,7 +15,7 @@ import GamesTeaser from '../components/GamesTeaser.astro';
 import DocViewer from '../components/DocViewer.astro';
 import { getStories, section, url, defaultPhoto, type Story , storyUrl , sectionUrl } from '../lib/site';
 import authorList from '../data/autores.json';
-import { columnistOf } from '../lib/columnists';
+import { columnistOf, photoSrc } from '../lib/columnists';
 
 export async function getStaticPaths() {
   const stories = await getStories();
@@ -48,7 +48,7 @@ const related = d.related.map((id) => stories.find((x) => x.id === id)).filter((
 const more = stories
   .filter((x) => x.id !== story.id && !related.includes(x))
   .sort((a, b) => Number(b.data.section === d.section) - Number(a.data.section === d.section))
-  .slice(0, 6);
+  .slice(0, 4);
 // Opinion columns: the byline shows the columnist's picture and links to their profile
 const columnist = d.section === 'opiniones' ? columnistOf(d.author) : undefined;
 // The author's page at their old WordPress address (/author/<username>/), when they are in noticel.com's author list
@@ -67,7 +67,7 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
         <p class="dek">{d.description}</p>
         {/* One line: who and when on the left; reading tools and sharing on the right */}
         <div class="byline">
-          {columnist?.photo && <a class="by-pic" href={url(`opinion/${columnist.slug}`)} tabindex="-1" aria-hidden="true"><img src={url(columnist.photo)} alt="" /></a>}
+          {columnist?.photo && <a class="by-pic" href={url(`opinion/${columnist.slug}`)} tabindex="-1" aria-hidden="true"><img src={photoSrc(columnist.photo)} alt="" /></a>}
           <div class="by-who">
             <strong>Por {columnist ? <a href={url(`opinion/${columnist.slug}`)}>{d.author}</a> : authorPage ? <a href={url(`author/${authorPage.slug}`)}>{d.author}</a> : d.author}</strong>
             <span><Time date={d.date} />{d.place && <>, <span class="notranslate" translate="no">{d.place}</span></>} · {minutes} min de lectura</span>
@@ -151,7 +151,7 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
         <Comments storyId={story.id} />
 
         <div class="sec-h"><h2>Te puede interesar</h2></div>
-        <div class="bb-row4 art-more">{more.map((x) => <StoryCard story={x} />)}</div>
+        <div class="grid2">{more.map((x) => <StoryCard story={x} />)}</div>
         <div style="margin-top:var(--gap-lg)"><GamesTeaser title="Tómate un break: Juegos NotiCel" /></div>
       </article>
       <Sidebar />
