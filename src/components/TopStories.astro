@@ -25,7 +25,7 @@ const H = h1 ? 'h1' : 'h2';
     <Time date={lead.data.date} />
     {more.length > 0 && <ul class="bb-more">{more.map((s) => <li><a href={storyUrl(s)} class="hl">{s.data.title}</a></li>)}</ul>}
     {/* Wide screens: an ad fills the space under the left column's headlines (hidden on phones) */}
-    <AdSlot size="rectangle" class="bb-lead-ad" />
+    <AdSlot size="rectangle" class="bb-lead-ad bb-fit-ad" />
   </div>
   <div class="bb-center">
     <a class="bb-photo" href={storyUrl(lead)} tabindex="-1" aria-hidden="true">
@@ -43,7 +43,7 @@ const H = h1 ? 'h1' : 'h2';
         ))}
       </div>
     )}
-    <AdSlot size="infeed" class="bb-center-ad" />
+    <AdSlot size="infeed" class="bb-center-ad bb-fit-ad" />
   </div>
   {right.length > 0 && (
     <div class="bb-side">
@@ -58,3 +58,29 @@ const H = h1 ? 'h1' : 'h2';
     </div>
   )}
 </div>
+<script>
+  // The ads inside the top block only fill empty space: each one shows where its column already ends before the
+  // block's tallest column does, and only if it fits there, so it never makes the block taller (2026-10-30)
+  const fitTopAds = () => {
+    document.querySelectorAll<HTMLElement>('.bb-hero').forEach((hero) => {
+      const heroBottom = Math.max(...[...hero.children].map((col) => {
+        const kids = [...col.children].filter((e) => !e.classList.contains('bb-fit-ad') && e.tagName !== 'SCRIPT' && e.getBoundingClientRect().height > 0);
+        return kids.length ? kids[kids.length - 1].getBoundingClientRect().bottom : col.getBoundingClientRect().top;
+      }));
+      hero.querySelectorAll<HTMLElement>('.bb-fit-ad').forEach((ad) => {
+        const col = ad.parentElement!;
+        const kids = [...col.children].filter((e) => e !== ad && e.tagName !== 'SCRIPT' && e.getBoundingClientRect().height > 0);
+        const end = kids.length ? kids[kids.length - 1].getBoundingClientRect().bottom : col.getBoundingClientRect().top;
+        const wide = ad.classList.contains('bb-center-ad');
+        const need = (wide ? Math.min(col.clientWidth, 728) * 90 / 728 : 250) + 40; // the ad plus its label and a gap
+        const fits = !matchMedia('(max-width:760px)').matches && heroBottom - end >= need;
+        ad.classList.toggle('fits', fits);
+        if (fits) ad.style.top = `${end - col.getBoundingClientRect().top + 16}px`;
+      });
+    });
+  };
+  fitTopAds();
+  addEventListener('load', fitTopAds);
+  addEventListener('resize', fitTopAds);
+  document.fonts?.ready.then(fitTopAds);
+</script>

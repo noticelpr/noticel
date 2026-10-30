@@ -5001,3 +5001,8 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 }
 /* Section pages, "Más de NotiCel": rows the page hides (they don't fit beside the right column) really hide */
 [data-ncs-fill][hidden],[data-ncs-fill] [data-fill-row][hidden]{display:none !important}
+/* Ads inside the top block of section pages (TopStories.astro): placed in a column's leftover space only, never
+   adding height (they used to make the left column much taller and leave the right one with a big gap) */
+.bb-hero > *{position:relative}
+.bb-hero .bb-fit-ad{display:none !important;position:absolute;left:0;right:0;margin:0}
+.bb-hero .bb-fit-ad.fits{display:block !important}
