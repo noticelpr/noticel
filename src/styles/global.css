@@ -4990,3 +4990,12 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .jh-card-play{background:#000;color:var(--green);border:1px solid #000}
 .jh-card:hover .jh-card-play{background:var(--green);color:#000;border-color:var(--green)}
 [data-theme="dark"] .jh-card{border-bottom-color:var(--green)}
+/* Home page on tablets (iPad held upright, 761–1020px): the same flowing order as phones, but Tendencias and NotiCel
+   Fact Check sit side by side instead of stretching across the whole width */
+@media (min-width:761px) and (max-width:1020px){
+  .home-grid.nx-home{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:20px;row-gap:24px;align-items:start}
+  .nx-home > .home-main > *,.nx-home > .right > *{grid-column:1 / -1}
+  .nx-home .tr-box{grid-column:1}
+  .nx-home .fc-box{grid-column:2}
+  .nx-home .tr-box,.nx-home .fc-box{align-self:stretch}
+}
