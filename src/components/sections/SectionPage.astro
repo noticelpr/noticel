@@ -40,6 +40,11 @@ const opToday = byDate.length ? byDate.filter((s) => prDay(s.data.date) === prDa
 const rest = box === 'opiniones' ? byDate.filter((s) => !opToday.includes(s)) : page === 1 ? after.slice(6) : list;
 const rows = Array.from({ length: Math.ceil(rest.length / 3) }, (_, i) => rest.slice(i * 3, i * 3 + 3));
 // Section boxes (page 1 only)
+// "Más de NotiCel": the newest stories from other sections, to fill the space beside the long right column (the page
+// shows only the rows that fit beside it; see the script at the end). Not on Opiniones, which has its own layout.
+const shownIds = new Set(list.map((x) => x.id));
+const fill = slug === 'opiniones' ? [] : (await getStories()).filter((x) => !shownIds.has(x.id) && x.data.section !== 'opiniones').slice(0, 15);
+const fillRows = Array.from({ length: Math.floor(fill.length / 3) }, (_, i) => fill.slice(i * 3, i * 3 + 3));
 const games = box === 'deportes' ? scores(undefined, 8) : [];
 const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 ---
@@ -125,10 +130,36 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
         )}
         {rows.length < 2 && <AdSlot size="infeed" />}
         {slug !== 'opiniones' && <GamesTeaser />}
+        {fillRows.length > 0 && (
+          <section class="bb-sec ncs-fill" data-ncs-fill>
+            <div class="sec-h"><h2>Más de NotiCel</h2><a href={url()}>Portada</a></div>
+            {fillRows.map((r) => <div class="bb-row4 ncs-row" data-fill-row>{r.map((x) => <StoryCard story={x} />)}</div>)}
+          </section>
+        )}
       </div>
       <div class="ncs-right">
         {slug === 'opiniones' ? <OpinionSide /> : <Sidebar live={SECTION_LIVE[slug]} />}
       </div>
     </div>
   </main>
+  <script>
+    // "Más de NotiCel" fills the space beside the right column: keep only the rows that fit next to it, so the stories
+    // end about where the right column ends (no blank gap, and the page doesn't get longer). Phones and tablets
+    // stack the columns, so the block isn't needed there.
+    const fit = () => {
+      const block = document.querySelector<HTMLElement>('[data-ncs-fill]');
+      const side = document.querySelector<HTMLElement>('.ncs-right');
+      if (!block || !side) return;
+      const rows = [...block.querySelectorAll<HTMLElement>('[data-fill-row]')];
+      rows.forEach((r) => (r.hidden = false)); block.hidden = false;
+      if (matchMedia('(max-width:1020px)').matches) { block.hidden = true; return; }
+      const sideEnd = [...side.querySelectorAll<HTMLElement>('*')].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0);
+      for (let i = rows.length - 1; i >= 0 && rows[i].getBoundingClientRect().bottom > sideEnd + 60; i--) rows[i].hidden = true;
+      block.hidden = rows.every((r) => r.hidden);
+    };
+    fit();
+    addEventListener('load', fit);
+    addEventListener('resize', fit);
+    document.fonts?.ready.then(fit);
+  </script>
 </Base>

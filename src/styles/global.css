@@ -4999,3 +4999,5 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
   .nx-home .fc-box{grid-column:2}
   .nx-home .tr-box,.nx-home .fc-box{align-self:stretch}
 }
+/* Section pages, "Más de NotiCel": rows the page hides (they don't fit beside the right column) really hide */
+[data-ncs-fill][hidden],[data-ncs-fill] [data-fill-row][hidden]{display:none !important}
