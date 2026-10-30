@@ -4966,3 +4966,7 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 /* Deportes: the leagues and scores rows still slide sideways (mouse wheel, trackpad or finger), with no visible bar */
 .ncs-leagues,.ncs-scores{scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior-x:contain}
 .ncs-leagues::-webkit-scrollbar,.ncs-scores::-webkit-scrollbar{display:none}
+/* Story page main photo, smaller (the owner's request): still whole, centered, at most 440px tall (300px on phones) */
+.art > .ph:has(img){background:transparent;border-radius:0}
+.art > .ph:has(img) img{width:auto;max-width:100%;max-height:440px;border-radius:8px}
+@media (max-width:760px){.art > .ph:has(img) img{max-height:300px}}
