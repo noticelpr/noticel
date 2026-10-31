@@ -13,8 +13,9 @@ interface Props {
   league?: string; // sports: picks a photo for that sport when there is no image
   priority?: boolean; // the first big photo on a page: load it right away instead of lazily
   sizes?: string; // how wide the photo shows, so phones download the smallest copy that looks sharp
+  whole?: boolean; // show the whole photo inside the frame (never cropped), over a soft blurred copy of itself
 }
-const { sectionId, image, place, duration, alt = '', league, priority = false, sizes = '(max-width:760px) 100vw, 480px' } = Astro.props;
+const { sectionId, image, place, duration, alt = '', league, priority = false, sizes = '(max-width:760px) 100vw, 480px', whole = false } = Astro.props;
 const s = section(sectionId);
 // Stories without their own photo use their section's default photo (videos keep the placeholder)
 const pic = image ?? (duration ? undefined : defaultPhoto(sectionId, league).src);
@@ -25,7 +26,8 @@ const opt = (w: number) => `images/opt/${base}-${w}.webp`;
 const srcset = base && [480, 960].every((w) => fs.existsSync(path.join(process.cwd(), 'public', opt(w))))
   ? `${url(opt(480))} 480w, ${url(opt(960))} 960w` : undefined;
 ---
-<div class="ph" style={`--c:${s.color}`} aria-hidden={alt ? undefined : 'true'}>
+<div class:list={['ph', { 'ph-whole': whole && src }]} style={`--c:${s.color}`} aria-hidden={alt ? undefined : 'true'}>
+  {whole && src && <img class="ph-blur" src={src} alt="" aria-hidden="true" loading={priority ? 'eager' : 'lazy'} decoding="async" />}
   {!duration && !src && (
     <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><Fragment set:html={ICONS[sectionId]} /></svg>
   )}
