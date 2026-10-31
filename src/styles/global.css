@@ -5025,3 +5025,10 @@ body.staff .mh-staff{padding-left:14px;font-size:16px}
 .ph-whole > .place{z-index:2}
 /* Slideshow photos too: whole, with the dark backdrop */
 .art .gal-slide img{object-fit:contain !important}
+/* Story photos (2026-10-31, the owner: no gray area on the sides): the frame takes each photo's own shape, so there is
+   nothing beside the photo; wide photos fill the column, tall ones show whole up to 560px tall (420px on phones),
+   centered on the page background. Never cropped. */
+.art > .ph.ph-whole{aspect-ratio:auto !important;height:auto !important;background:transparent;display:flex;justify-content:center;overflow:visible}
+.ph-whole > .ph-blur{display:none}
+.art > .ph.ph-whole > img:not(.ph-blur){position:static;width:auto;max-width:100%;height:auto;max-height:560px;border-radius:10px}
+@media (max-width:760px){.art > .ph.ph-whole > img:not(.ph-blur){max-height:420px;border-radius:8px}}
