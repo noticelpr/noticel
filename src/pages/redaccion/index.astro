@@ -89,6 +89,7 @@ const TABS = [
         <option value="editor">Editor: noticias, comentarios y analítica</option>
         <option value="ads">Ventas: clientes, anuncios e ingresos</option>
         <option value="reporter">Periodista: escribir sus noticias</option>
+        <option value="photo">Fotoperiodista: subir y organizar fotos</option>
       </select>
       </div>
       <p class="cm-err" data-err hidden></p>
@@ -220,7 +221,7 @@ const TABS = [
           <form class="pnl-add" data-add novalidate>
             <input placeholder="Nombre" data-add-name maxlength="30" aria-label="Nombre" />
             <input placeholder="Correo o @usuario" data-add-mail maxlength="60" aria-label="Correo o nombre de usuario" autocapitalize="off" />
-            <select data-add-role aria-label="Rol"><option value="editor">Editor</option><option value="ads">Ventas</option><option value="reporter">Periodista</option><option value="admin">Administrador</option></select>
+            <select data-add-role aria-label="Rol"><option value="editor">Editor</option><option value="ads">Ventas</option><option value="reporter">Periodista</option><option value="photo">Fotoperiodista</option><option value="admin">Administrador</option></select>
             <button type="submit" class="adp-btn">Añadir</button>
           </form>
           <h2 class="pnl-h2">Qué puede hacer cada rol</h2>
@@ -237,7 +238,7 @@ const TABS = [
     import { listRequests, loadRequests } from '../../lib/adrequests';
     import { isDemo, demoAnalytics } from '../../lib/demo';
     import { REPO } from '../../lib/repo';
-    import { BACKEND, getAnalytics, hasBackend, staffApi, staffLogin, staffLogout, staffProfile, syncTeam, addToTeam, removeFromTeam } from '../../lib/backend';
+    import { BACKEND, getAnalytics, hasBackend, staffApi, staffLogin, staffLogout, staffProfile, syncTeam, addToTeam, removeFromTeam, setTeamPhotos } from '../../lib/backend';
     const root = document.querySelector<HTMLElement>('[data-pnl]')!;
     const RECENT: Array<{ id: string; title: string; section: string; url: string; date: string; author: string }> = JSON.parse(root.dataset.recent!);
     const SOURCES: Array<{ name: string; section: string; review: string }> = JSON.parse(root.dataset.sources!);
@@ -257,13 +258,14 @@ const TABS = [
     const toast = (m: string) => { const t = $('[data-ptoast]'); t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3800); };
 
     // ---------- login + roles ----------
-    type Staff = { name: string; role: 'admin' | 'editor' | 'ads' | 'reporter' };
-    const ROLE_NAME = { admin: 'Administrador', editor: 'Editor', ads: 'Ventas', reporter: 'Periodista' };
+    type Staff = { name: string; role: 'admin' | 'editor' | 'ads' | 'reporter' | 'photo'; canPhotos?: boolean };
+    const ROLE_NAME = { admin: 'Administrador', editor: 'Editor', ads: 'Ventas', reporter: 'Periodista', photo: 'Fotoperiodista' };
     const ROLE_TABS: Record<Staff['role'], string[]> = {
       admin: ['inicio', 'noticias', 'escribir', 'fotos', 'ventas', 'comentarios', 'anuncios', 'analitica', 'salud', 'columnistas', 'equipo'],
       editor: ['inicio', 'noticias', 'escribir', 'fotos', 'comentarios', 'analitica', 'salud', 'columnistas'],
       ads: ['inicio', 'ventas', 'anuncios', 'comentarios', 'analitica'],
       reporter: ['inicio', 'escribir', 'fotos'],
+      photo: ['inicio', 'fotos'], // Fotoperiodista: the photo library (upload, albums, editing)
     };
     const me = () => get<Staff | null>('nc-staff', null);
 
@@ -655,18 +657,21 @@ const TABS = [
 
       equipo() {
         const s = me()!;
-        const team = get<Array<{ id?: string; name: string; mail: string; role: Staff['role'] }>>('nc-staff-team', [
+        const team = get<Array<{ id?: string; name: string; mail: string; role: Staff['role']; canPhotos?: boolean }>>('nc-staff-team', [
           { name: s.name, mail: 'tú', role: 'admin' }, { name: 'Editora (ejemplo)', mail: 'editora@ejemplo.com', role: 'editor' },
           { name: 'Ventas (ejemplo)', mail: 'ventas@ejemplo.com', role: 'ads' }, { name: 'Periodista (ejemplo)', mail: 'periodista@ejemplo.com', role: 'reporter' },
         ]);
-        $('[data-team]').innerHTML = team.map((m, i) => `<li><span class="pnl-av sm">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span><b>${esc(m.name)}</b><small>${esc(m.mail)}</small></span><span class="pnl-tag">${ROLE_NAME[m.role]}</span>${i ? `<button type="button" class="pnl-link" data-rm="${i}">Quitar</button>` : ''}</li>`).join('');
-        const can: Array<[string, boolean[]]> = [
+        $('[data-team]').innerHTML = team.map((m, i) => `<li><span class="pnl-av sm">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span><b>${esc(m.name)}</b><small>${esc(m.mail)}</small></span><span class="pnl-tag">${ROLE_NAME[m.role] ?? m.role}</span>${m.role === 'reporter' && s.role === 'admin' ? `<label class="adb-check pnl-photos" title="Puede subir fotos a la biblioteca"><input type="checkbox" data-canphotos="${i}" ${m.canPhotos ? 'checked' : ''} /> Puede subir fotos</label>` : ''}${i ? `<button type="button" class="pnl-link" data-rm="${i}">Quitar</button>` : ''}</li>`).join('');
+        const can: Array<[string, Array<boolean | 'if-allowed'>]> = [
           ['Aprobar noticias', [true, true, false, false]], ['Escribir noticias', [true, true, false, true]], ['Publicar o programar', [true, true, false, false]],
           ['Clientes y propuestas', [true, false, true, false]], ['Moderar comentarios', [true, true, true, false]],
           ['Aprobar anuncios', [true, false, true, false]], ['Ver ingresos', [true, false, true, false]], ['Ver analítica', [true, true, false, false]],
-          ['Salud del sitio', [true, true, false, false]], ['Perfiles de columnistas', [true, true, false, false]], ['Manejar el equipo', [true, false, false, false]],
+          ['Salud del sitio', [true, true, false, false, false]], ['Perfiles de columnistas', [true, true, false, false, false]],
+          ['Subir y organizar fotos', [true, true, false, 'if-allowed', true]], ['Usar fotos de la biblioteca', [true, true, false, true, true]],
+          ['Manejar el equipo', [true, false, false, false, false]],
         ];
-        $('[data-perms]').innerHTML = `<table class="pnl-table perms"><thead><tr><th></th><th>Admin</th><th>Editor</th><th>Ventas</th><th>Periodista</th></tr></thead><tbody>${can.map(([k, v]) => `<tr><th scope="row">${k}</th>${v.map((x) => `<td>${x ? '✓' : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        can.forEach((row) => { if (row[1].length === 4) row[1].push(false); }); // the Fotoperiodista column
+        $('[data-perms]').innerHTML = `<table class="pnl-table perms"><thead><tr><th></th><th>Admin</th><th>Editor</th><th>Ventas</th><th>Periodista</th><th>Fotoperiodista</th></tr></thead><tbody>${can.map(([k, v]) => `<tr><th scope="row">${k}</th>${v.map((x) => `<td>${x === 'if-allowed' ? '<span title="Solo si el administrador lo permite en Equipo">Si se le permite</span>' : x ? '✓' : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
       },
     };
 
@@ -703,6 +708,17 @@ const TABS = [
       if (sub) { nf = sub.dataset.nf!; $$('[data-nf]').forEach((b) => b.setAttribute('aria-selected', String(b === sub))); paint.noticias(); return; }
       const rng = t.closest<HTMLElement>('[data-range]');
       if (rng) { $$('[data-range]').forEach((b) => b.setAttribute('aria-pressed', String(b === rng))); paint.analitica(); return; }
+      const cp = t.closest<HTMLInputElement>('[data-canphotos]');
+      if (cp) {
+        const team = get<Array<{ id?: string; name: string; canPhotos?: boolean }>>('nc-staff-team', []); const m = team[Number(cp.dataset.canphotos)];
+        if (!m) return;
+        if (hasBackend()) {
+          if (!m.id || (await setTeamPhotos(m.id, cp.checked)) !== 'ok') { cp.checked = !cp.checked; toast('No se pudo. Solo el administrador puede cambiar esto (y falta correr supabase/fotos-v2.sql).'); return; }
+          await syncTeam();
+        } else { m.canPhotos = cp.checked; set('nc-staff-team', team); }
+        toast(cp.checked ? `${m.name} ya puede subir fotos.` : `${m.name} ya no puede subir fotos.`);
+        return;
+      }
       const rm = t.closest<HTMLElement>('[data-rm]');
       if (rm) {
         if (hasBackend()) {

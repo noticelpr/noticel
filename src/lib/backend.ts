@@ -64,9 +64,12 @@ export async function staffLogin(email: string, password: string): Promise<boole
   return true;
 }
 /** Name and role of the logged-in staff member (from the `staff` table), or null if they're not on the team. */
-export async function staffProfile(): Promise<{ name: string; role: string } | null> {
+export async function staffProfile(): Promise<{ name: string; role: string; canPhotos?: boolean } | null> {
   const token = await freshToken(); if (!token) return null;
   try {
+    // my_staff (supabase/fotos-v2.sql) also says whether a reporter may upload photos; older setups: the staff row
+    const m = await fetch(rest('rpc/my_staff'), { method: 'POST', headers: head(token), body: '{}' });
+    if (m.ok) { const row = (await m.json())[0]; return row ? { name: row.name || 'Equipo', role: row.role, canPhotos: !!row.can_upload_photos } : null; }
     const r = await fetch(rest('staff?select=name,role'), { headers: head(token) });
     const row = (await r.json())[0];
     return row ? { name: row.name || 'Equipo', role: row.role } : null;
@@ -221,12 +224,12 @@ export async function staffApi(path: string, init: RequestInit = {}): Promise<Re
 }
 
 // ---- The staff team (panel → Equipo); supabase/connect-all.sql: staff_list, staff_add ----
-export type Member = { id: string; name: string; mail: string; role: string };
+export type Member = { id: string; name: string; mail: string; role: string; canPhotos?: boolean };
 /** The team from the database, also kept in 'nc-staff-team' so the tasks board can assign to them. null = couldn't load. */
 export async function syncTeam(): Promise<Member[] | null> {
   const r = await staffApi('rpc/staff_list', { method: 'POST', body: '{}' });
   if (!r?.ok) return null;
-  const team: Member[] = (await r.json()).map((m: any) => ({ id: m.user_id, name: m.name || m.username || 'Equipo', mail: m.email || (m.username ? `@${m.username}` : ''), role: m.role }));
+  const team: Member[] = (await r.json()).map((m: any) => ({ id: m.user_id, name: m.name || m.username || 'Equipo', mail: m.email || (m.username ? `@${m.username}` : ''), role: m.role, canPhotos: !!m.can_upload_photos }));
   try { localStorage.setItem('nc-staff-team', JSON.stringify(team)); } catch { /* storage blocked */ }
   return team;
 }
@@ -271,4 +274,10 @@ export async function uploadColumnistPhoto(name: string, file: Blob): Promise<st
   const base = BACKEND.url.replace(/\/$/, '');
   const r = await fetch(`${base}/storage/v1/object/columnistas/${name}`, { method: 'POST', headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${token}`, 'Content-Type': file.type || 'image/jpeg' }, body: file }).catch(() => null);
   return r?.ok ? `${base}/storage/v1/object/public/columnistas/${name}` : null;
+}
+
+/** Admin: lets a reporter upload photos to the library, or stops it (supabase/fotos-v2.sql). Returns 'ok' or a reason. */
+export async function setTeamPhotos(id: string, allow: boolean): Promise<string> {
+  const r = await staffApi('rpc/staff_set_photos', { method: 'POST', body: JSON.stringify({ member: id, allow }) });
+  return r?.ok ? await r.json() : 'No se pudo. Revisa tu conexión.';
 }
