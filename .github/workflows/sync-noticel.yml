@@ -1,0 +1,39 @@
+# Keeps the new NotiCel site up to date with noticel.com until switch day: every 15 minutes it copies the stories
+# published or edited on noticel.com (scripts/sync-wp.mjs) and saves them here; Cloudflare then rebuilds the site.
+# Uses only noticel.com's public story list (no passwords or keys). Turn it off on switch day (Actions → Disable).
+name: Sync from noticel.com
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {} # "Run workflow" button, to sync right now
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-noticel
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Copy new and edited stories from noticel.com
+        run: node scripts/sync-wp.mjs
+      - name: Save them (only when something changed)
+        run: |
+          git add src/content/noticias src/data/sync-state.json
+          if git diff --cached --quiet -- src/content/noticias; then
+            echo "No new or edited stories."
+          else
+            git config user.name "noticel-sync"
+            git config user.email "noticel-sync@users.noreply.github.com"
+            git commit -m "Sync from noticel.com: $(git diff --cached --name-only -- src/content/noticias | wc -l | tr -d ' ') new or edited stories"
+            git push
+          fi

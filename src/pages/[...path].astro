@@ -36,9 +36,17 @@ const cleanHtml = (bodyHtml ?? '').replace(DOC, '');
 // Ads inside the story (2026-10-30, ads review): spaced by amount of text, so a short story gets one or none, a long one
 // keeps getting them, and no ad ends up right before the end
 // Only paragraphs at the top level count (never one inside a quote, embed, list or table, which a cut would break)
-const BOXES = ['blockquote', 'div', 'figure', 'ul', 'ol', 'table', 'section', 'aside'];
-const topLevel = (end: number) => BOXES.every((t) => (cleanHtml.slice(0, end).match(new RegExp(`<${t}[\\s>]`, 'gi')) ?? []).length === (cleanHtml.slice(0, end).match(new RegExp(`</${t}>`, 'gi')) ?? []).length);
-const paraEnds: number[] = []; for (let i = cleanHtml.indexOf('</p>'); i >= 0; i = cleanHtml.indexOf('</p>', i + 1)) if (topLevel(i + 4)) paraEnds.push(i + 4);
+// One pass over the story: track how deep we are inside boxes, and note each paragraph end at the top level
+const BOXES = new Set(['blockquote', 'div', 'figure', 'ul', 'ol', 'table', 'section', 'aside']);
+const paraEnds: number[] = [];
+{
+  let depth = 0;
+  for (const m of cleanHtml.matchAll(/<(\/?)([a-z0-9]+)\b[^>]*>/gi)) {
+    const tag = m[2].toLowerCase(), closing = m[1] === '/';
+    if (BOXES.has(tag)) depth = Math.max(0, depth + (closing ? -1 : 1));
+    else if (tag === 'p' && closing && depth === 0) paraEnds.push(m.index! + m[0].length);
+  }
+}
 // First after paragraph 3, then about every 1,500 characters of text (at least 4 paragraphs apart), at most 10, each
 // with at least two paragraphs after it
 const textLen = (a: number, b: number) => cleanHtml.slice(a, b).replace(/<[^>]+>/g, '').length;

@@ -11,3 +11,7 @@ noticel-demo-real.html
 # Kept on this computer only (the repository is public): project notes, and the password page with the test address
 CLAUDE.md
 cloudflare/
+
+# The full archive copy (scripts/archive-copy.mjs): large, kept on this computer until it goes to Cloudflare R2
+archive/
+archive-run.out
