@@ -1,0 +1,93 @@
+---
+// Documentos y reglamentos (user, 2026-11-04): employee rules and other files. Everyone on the team downloads them
+// (shown on Inicio); the administrator and the Gerente upload and remove them (the same box, in Personal).
+// Table hr_docs + private storage folder "personal" (supabase/memos-documentos.sql). Demo: sample list, labeled EJEMPLO.
+interface Props { manage?: boolean }
+const { manage = false } = Astro.props;
+---
+<section class="pnl-card hr-docs" data-docs data-manage={manage ? '1' : undefined}>
+  <div class="hr-mine-h"><h2 class="pnl-h3">Documentos y reglamentos</h2>
+    {manage && <label class="adp-btn ghost-dark hr-up">Subir documento<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt" data-docs-file class="sr" /></label>}</div>
+  {manage && <div class="hr-up-f" data-docs-form hidden>
+    <input data-docs-title maxlength="120" placeholder="Nombre del documento (ej. Reglamento de empleados 2026)" aria-label="Nombre del documento" />
+    <select data-docs-cat aria-label="Tipo"><option>Reglamento</option><option>Política</option><option>Manual</option><option>Formulario</option><option>Otro</option></select>
+    <button type="button" class="adp-btn" data-docs-save>Subir</button><button type="button" class="pnl-link" data-docs-cancel>Cancelar</button>
+  </div>}
+  <ul class="hr-mine-list" data-docs-list></ul>
+</section>
+
+<script>
+  import { hasBackend, staffApi, uploadPrivate, downloadPrivate, removePrivate, logActivity } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  import { ask, askText } from '../../lib/dialogs';
+  type Doc = { id: string; title: string; category: string; path: string; file_name: string; size: number; uploaded_by?: string; created_at: string };
+  document.querySelectorAll<HTMLElement>('[data-docs]').forEach((root) => {
+    const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s);
+    const manage = root.dataset.manage === '1';
+    const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const kb = (n: number) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+    const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
+    const toast = (m: string) => dispatchEvent(new CustomEvent('nc-toast', { detail: m }));
+    let docs: Doc[] = [], file: File | null = null;
+    async function load() {
+      if (!me()) return;
+      if (isDemo()) docs = [{ id: 'd1', title: 'Reglamento de empleados 2026', category: 'Reglamento', path: '', file_name: 'reglamento.pdf', size: 240000, uploaded_by: 'Administración', created_at: new Date().toISOString() },
+        { id: 'd2', title: 'Manual de estilo de la redacción', category: 'Manual', path: '', file_name: 'manual.pdf', size: 610000, created_at: new Date(Date.now() - 864e6).toISOString() }];
+      else if (hasBackend()) { const r = await staffApi('hr_docs?select=*&order=created_at.desc'); docs = r?.ok ? await r.json() : []; }
+      paint();
+    }
+    function paint() {
+      $('[data-docs-list]')!.innerHTML = docs.map((d) => `<li data-doc="${d.id}"><span><b>${esc(d.title)}</b>${isDemo() ? ' <span class="sp-demo">EJEMPLO</span>' : ''}<br><small class="pnl-muted">${esc(d.category)} · ${kb(d.size)} · ${new Date(d.created_at).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}</small></span>
+        <button type="button" class="pnl-link" data-doc-get>Descargar</button>${manage ? '<button type="button" class="pnl-link" data-doc-ren>Cambiar nombre</button><button type="button" class="pnl-link danger" data-doc-del>Quitar</button>' : ''}</li>`).join('')
+        || `<li class="pnl-muted">${manage ? 'Todavía no hay documentos. Toca «Subir documento».' : 'Todavía no hay documentos.'}</li>`;
+    }
+    root.addEventListener('change', (e) => {
+      const inp = (e.target as HTMLElement).closest<HTMLInputElement>('[data-docs-file]'); if (!inp?.files?.[0]) return;
+      file = inp.files[0]; inp.value = '';
+      if (file.size > 20 * 1048576) { toast('El archivo pasa de 20 MB.'); file = null; return; }
+      $('[data-docs-form]')!.hidden = false; $<HTMLInputElement>('[data-docs-title]')!.value = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+      $<HTMLInputElement>('[data-docs-title]')!.focus();
+    });
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-docs-cancel]')) { file = null; $('[data-docs-form]')!.hidden = true; return; }
+      if (t.closest('[data-docs-save]') && file) {
+        const title = $<HTMLInputElement>('[data-docs-title]')!.value.trim() || file.name, category = $<HTMLSelectElement>('[data-docs-cat]')!.value;
+        if (isDemo() || !hasBackend()) { toast('Modo demo: no se sube nada.'); return; }
+        const b = t.closest<HTMLButtonElement>('[data-docs-save]')!; b.disabled = true; b.textContent = 'Subiendo…';
+        const path = `${Date.now().toString(36)}-${file.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9.]+/g, '-')}`;
+        const ok = await uploadPrivate('personal', path, file);
+        const r = ok ? await staffApi('hr_docs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ title, category, path, file_name: file.name, size: file.size, uploaded_by: me()?.name ?? '' }) }) : null;
+        b.disabled = false; b.textContent = 'Subir';
+        if (!r?.ok) { toast('No se pudo subir. ¿Ya se corrió supabase/memos-documentos.sql?'); return; }
+        logActivity('Subió un documento', title); file = null; $('[data-docs-form]')!.hidden = true; void load(); dispatchEvent(new Event('nc-docs'));
+        return;
+      }
+      const li = t.closest<HTMLElement>('[data-doc]'); const d = li ? docs.find((x) => x.id === li.dataset.doc) : undefined; if (!d) return;
+      if (t.closest('[data-doc-get]')) {
+        if (isDemo() || !d.path) { toast('Modo demo: es un documento de ejemplo.'); return; }
+        const blob = await downloadPrivate('personal', d.path); if (!blob) { toast('No se pudo descargar. Intenta otra vez.'); return; }
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = d.file_name || d.title; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      }
+      if (t.closest('[data-doc-ren]')) {
+        const title = (await askText('Nombre del documento', { value: d.title }))?.trim(); if (!title || title === d.title) return;
+        if (isDemo()) { toast('Modo demo: no se guarda nada.'); return; }
+        const r = await staffApi(`hr_docs?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+        if (!r?.ok) { toast('No se pudo cambiar. ¿Ya se corrió supabase/editar-memos-personal.sql?'); return; }
+        logActivity('Cambió el nombre de un documento', `${d.title} → ${title}`); void load(); dispatchEvent(new Event('nc-docs')); return;
+      }
+      if (t.closest('[data-doc-del]')) {
+        if (!(await ask(`¿Quitar «${d.title}»? El equipo ya no lo podrá descargar.`, { ok: 'Quitar', danger: true }))) return;
+        if (isDemo()) { toast('Modo demo: no se quita nada.'); return; }
+        await removePrivate('personal', d.path);
+        const r = await staffApi(`hr_docs?id=eq.${d.id}`, { method: 'DELETE' });
+        if (!r?.ok) { toast('No se pudo quitar.'); return; }
+        logActivity('Quitó un documento', d.title); void load(); dispatchEvent(new Event('nc-docs'));
+      }
+    });
+    addEventListener('nc-tab', (e) => { const t = (e as CustomEvent).detail; if (t === 'inicio' || t === 'personal') void load(); });
+    addEventListener('nc-docs', () => void load());
+    addEventListener('nc-staff-change', () => void load());
+    void load();
+  });
+</script>

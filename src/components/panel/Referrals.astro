@@ -1,0 +1,140 @@
+---
+// Panel → Mis referidos, for periodistas and editors (src/lib/sellers.ts REFERRERS): (user, 2026-11-02). Their own Anúnciate link (orders through it
+// are credited to them), a way to pass a business's contact to Ventas, the clients they referred, what they earned
+// (10% of a new client's order, 5% of a renewal: REFERRAL_PLAN in src/lib/sellers.ts; the owner can change it per
+// person) and their payments. Referral only: Ventas closes every deal. Demo mode: sample numbers labeled DEMO.
+---
+<section class="cm rf" data-rf hidden>
+  <header class="cm-head"><h1 class="pnl-h">Mis referidos <span class="sp-demo" data-rf-demo hidden>DEMO</span></h1></header>
+  <p class="pnl-muted pnl-small">Gana dinero cuando un negocio se anuncia gracias a ti: <b data-rf-rates>10% de un cliente nuevo y 5% de una renovación</b>, cuando el cliente paga.</p>
+  <div class="pnl-kpis" data-rf-kpis></div>
+  <div class="cm-grid">
+    <div class="pnl-card">
+      <h3 class="pnl-h4">Tu enlace</h3>
+      <p class="pnl-muted pnl-small">Compártelo con negocios que quieran anunciarse. Lo que pidan por este enlace en los próximos 30 días cuenta como tuyo.</p>
+      <div class="cm-link"><input readonly data-rf-link aria-label="Mi enlace" /><button type="button" class="adp-btn ghost-dark" data-rf-copy="es">Copiar</button></div>
+      <div class="cm-link"><input readonly data-rf-link-en aria-label="Mi enlace en inglés" /><button type="button" class="adp-btn ghost-dark" data-rf-copy="en">Copiar (inglés)</button></div>
+      <p class="rf-share"><a data-rf-wa target="_blank" rel="noopener">Enviar por WhatsApp</a></p>
+    </div>
+    <form class="pnl-card rf-pass" data-rf-pass novalidate>
+      <h3 class="pnl-h4">Pasar un cliente a Ventas</h3>
+      <p class="pnl-muted pnl-small">¿Un negocio quiere anunciarse pero prefiere hablar con alguien? Deja sus datos: Ventas lo llama y, si compra, la comisión es tuya.</p>
+      <label>Negocio<input name="business" maxlength="120" /></label>
+      <label>Persona de contacto<input name="name" maxlength="120" /></label>
+      <div class="cm-two"><label>Teléfono<input name="phone" type="tel" maxlength="40" /></label><label>Correo<input name="email" type="email" maxlength="160" /></label></div>
+      <label>Qué le interesa <small>(opcional)</small><input name="what" maxlength="300" placeholder="ej. anunciar su restaurante en Deportes" /></label>
+      <p class="cm-err" data-rf-err hidden></p>
+      <button type="submit" class="adp-btn">Pasar a Ventas</button>
+    </form>
+  </div>
+  <div class="pnl-card"><h3 class="pnl-h4">Mis clientes referidos</h3><ul class="earn-list" data-rf-list></ul></div>
+  <div class="pnl-card"><h3 class="pnl-h4">Mis pagos</h3><ul class="earn-list" data-rf-pay></ul></div>
+  <details class="pnl-card rf-rules"><summary class="pnl-h4">Reglas para periodistas y editores</summary>
+    <ul>
+      <li><b>Solo refieres.</b> Pásale tu enlace al negocio o sus datos a Ventas. No negocies precios ni descuentos, y nunca prometas cobertura: Ventas cierra la venta.</li>
+      <li><b>No refieras a quien cubres.</b> No refieras negocios ni personas sobre los que escribes o vas a escribir.</li>
+      <li><b>Las noticias no se venden.</b> Si escribes sobre un negocio que referiste, el editor verá un aviso antes de publicar.</li>
+      <li><b>Editores:</b> no apruebes ni publiques una noticia sobre un negocio que tú referiste. Pásasela a otro editor o al Editor en jefe.</li>
+      <li>La comisión se gana cuando el cliente paga. Si el pedido se rechaza o se devuelve el dinero, no cuenta.</li>
+    </ul>
+  </details>
+</section>
+
+<script>
+  import { listRequests, loadRequests, sendContact, type AdRequest } from '../../lib/adrequests';
+  import { hasBackend, staffApi, tokenInfo } from '../../lib/backend';
+  import { formatName } from '../../lib/ads';
+  import { isDemo } from '../../lib/demo';
+  import { commissionMonth, codeOf, referrerOf, staffMe, teamList, isReferrer, REFERRAL_PLAN, type SalesPlan, type TeamMember } from '../../lib/sellers';
+
+  const root = document.querySelector<HTMLElement>('[data-rf]')!;
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const money = (n: number) => { const c = Math.round(n * 100) / 100; return `$${c.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(c) ? 0 : 2, maximumFractionDigits: 2 })}`; };
+  const kpi = (l: string, v: string, sub = '', tone = '') => `<div class="pnl-kpi ${tone}"><span>${l}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const day = (iso: string) => new Date(iso).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  let me: TeamMember = { name: '', role: 'reporter' };
+  let team: TeamMember[] = [];
+  let requests: AdRequest[] = [];
+
+  /** Demo mode: a sample periodista with a few referred clients. */
+  function demo() {
+    me = { id: 'cccc3333-demo', name: staffMe()?.name || 'Periodista (ejemplo)', role: 'reporter' };
+    team = [...teamList(), me];
+    const biz = ['Restaurante El Fogón', 'Óptica Visión', 'Colmado La Placita', 'Taller El Rápido'];
+    requests = biz.map((b, i) => ({ id: `NX-EJR${i}`, created: new Date(Date.now() - (i * 9 + 2) * 864e5).toISOString(), status: i === 3 ? 'revisar' : 'aprobada', paid: i !== 1,
+      client: { name: '', business: `${b} (ejemplo)`, email: `r${i}@ejemplo.com`, phone: '', who: 'retail' }, formats: [['rectangle'], ['valla'], ['cuadrado'], ['infeed']][i], where: '', start: '', duration: '',
+      total: [149, 89, 210, 99][i], lines: [`Referido: ${codeOf(me.id!)}`], art: { mode: 'upload', files: [] }, link: '' } as AdRequest));
+  }
+
+  async function load() {
+    const s = staffMe();
+    if (!s || !isReferrer(s.role)) { root.hidden = true; return; } // periodistas and editors
+    root.hidden = false; $('[data-rf-demo]').hidden = !isDemo();
+    let plan: SalesPlan = REFERRAL_PLAN, payouts: Array<{ month: string; amount: number; paid_at: string }> = [];
+    if (isDemo()) demo();
+    else {
+      const id = hasBackend() ? tokenInfo().id : '';
+      team = teamList(); me = team.find((m) => m.id === id) ?? { id, name: s.name, role: s.role };
+      requests = hasBackend() ? await loadRequests() : listRequests();
+      if (hasBackend()) {
+        const [pl, po] = await Promise.all([staffApi(`sales_plans?user_id=eq.${id}&select=new_pct,renew_pct,bonus_pct,goal`), staffApi(`commission_payouts?user_id=eq.${id}&select=month,amount,paid_at`)]);
+        if (pl?.ok) plan = { ...REFERRAL_PLAN, ...((await pl.json())[0] ?? {}) };
+        if (po?.ok) payouts = await po.json();
+      }
+    }
+    // Only what they referred (their link, or a contact they passed to Ventas): never sales of their own
+    const mine = (r: AdRequest) => !!me.id && referrerOf(r, team)?.id === me.id;
+    const mo = commissionMonth(requests, mine, plan, monthKey(new Date()));
+    const all = requests.filter((r) => r.status !== 'rechazada' && mine(r)).sort((a, b) => Date.parse(b.created) - Date.parse(a.created));
+    const clients = new Set(all.map((r) => (r.client.email || r.client.business).toLowerCase())).size;
+    const ex = isDemo() ? 'DEMO · ' : '';
+    $('[data-rf-rates]').textContent = `${plan.new_pct}% de un cliente nuevo y ${plan.renew_pct}% de una renovación`;
+    $('[data-rf-kpis]').innerHTML = [
+      kpi('Ganado este mes', money(mo.earned), `${ex}de lo que ya pagaron`, mo.earned ? 'good' : ''),
+      kpi('Por ganar', money(mo.pending), `${ex}cuando paguen tus referidos`, mo.pending ? 'warn' : ''),
+      kpi('Clientes referidos', String(clients), `${ex}${all.length} ${all.length === 1 ? 'pedido' : 'pedidos'} en total`),
+    ].join('');
+    // The link, and a ready WhatsApp message
+    const base = `${location.origin}${(document.querySelector<HTMLElement>('[data-pnl]')?.dataset.base ?? '/').replace(/\/$/, '')}`, code = codeOf(me.id ?? '00000000');
+    const link = `${base}/publicidad/?v=${code}`;
+    $<HTMLInputElement>('[data-rf-link]').value = link; $<HTMLInputElement>('[data-rf-link-en]').value = `${base}/en/advertise/?v=${code}`;
+    $<HTMLAnchorElement>('[data-rf-wa]').href = `https://wa.me/?text=${encodeURIComponent(`¿Quieres anunciar tu negocio en NotiCel? Aquí ves los precios y creas tu anuncio en minutos: ${link}`)}`;
+    // Each referred order: status and what it earns (approved orders at the referral rate, as in commissionMonth)
+    const rateOf = (r: AdRequest) => { const row = commissionMonth(requests, (x) => x === r, plan, r.created.slice(0, 7)).rows[0]; return row ? row.commission : 0; };
+    const STATUS: Record<string, string> = { revisar: 'En revisión', disenar: 'Diseñándose', cambios: 'Necesita cambios', aprobada: '' };
+    $('[data-rf-list]').innerHTML = all.slice(0, 12).map((r) => {
+      const st = r.status === 'aprobada' ? (r.paid ? 'Pagado' : 'Por pagar') : STATUS[r.status] ?? r.status;
+      return `<li><span><b>${esc(r.client.business || r.client.name)}</b><small>${day(r.created)} · ${esc(r.formats.map((f) => formatName(f)).join(', '))} · pedido de ${money(Number(r.total || 0))}</small></span>`
+        + `<span class="pnl-chip ${st === 'Pagado' ? 'ok' : st === 'Por pagar' ? 'warn' : ''}">${st}</span><b>${r.status === 'aprobada' ? money(rateOf(r)) : '—'}</b></li>`;
+    }).join('') || '<li class="pnl-muted">Todavía no tienes referidos. Comparte tu enlace con un negocio que quiera anunciarse.</li>';
+    $('[data-rf-pay]').innerHTML = payouts.sort((a, b) => b.month.localeCompare(a.month)).slice(0, 6).map((p) => `<li><span><b>${new Date(`${p.month}-15T12:00:00`).toLocaleDateString('es-PR', { month: 'long', year: 'numeric' })}</b><small>pagado el ${day(p.paid_at)}</small></span><span></span><b>${money(Number(p.amount))}</b></li>`).join('')
+      || '<li class="pnl-muted">Todavía no hay pagos. Se pagan cada mes lo que tus referidos ya pagaron.</li>';
+  }
+
+  root.addEventListener('click', async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-rf-copy]'); if (!b) return;
+    await navigator.clipboard?.writeText($<HTMLInputElement>(b.dataset.rfCopy === 'en' ? '[data-rf-link-en]' : '[data-rf-link]').value).catch(() => {});
+    b.textContent = '¡Copiado!'; setTimeout(() => (b.textContent = b.dataset.rfCopy === 'en' ? 'Copiar (inglés)' : 'Copiar'), 1500);
+  });
+  // A contact for Ventas: it arrives like the site's contact form, marked with who referred it
+  $<HTMLFormElement>('[data-rf-pass]').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target as HTMLFormElement, v = (k: string) => String(new FormData(f).get(k) ?? '').trim();
+    const err = $('[data-rf-err]'); err.hidden = true;
+    if (v('business').length < 2) { err.textContent = 'Escribe el nombre del negocio.'; err.hidden = false; return; }
+    if (!v('phone') && !v('email')) { err.textContent = 'Añade un teléfono o un correo para que Ventas lo contacte.'; err.hidden = false; return; }
+    const r = await sendContact({ name: v('name'), business: v('business'), email: v('email'), phone: v('phone'),
+      message: `Referido por ${me.name} (${me.role === "reporter" ? "periodista" : "editor"}, código ${codeOf(me.id ?? '00000000')}). Al venderlo, escoge «Referido por: ${me.name}» en «+ Anuncio vendido».${v('what') ? ` Le interesa: ${v('what')}` : ''}` });
+    if (r === true) { f.reset(); err.textContent = '✓ Listo: Ventas lo va a contactar. Si compra, la comisión es tuya.'; err.classList.add('ok'); err.hidden = false; }
+    else { err.classList.remove('ok'); err.textContent = r === 'preview' ? 'En modo demostración no se envía.' : typeof r === 'string' ? r : 'No se pudo enviar. Intenta otra vez.'; err.hidden = false; }
+  });
+
+  // Periodistas: its own tab (Mis referidos); editors see each periodista's referrals in Mis periodistas
+  const watch = () => { if (location.hash === '#referidos') void load(); };
+  // Opening the tab from the menu changes the address without a hashchange: the panel tells us instead
+  addEventListener('nc-tab', (e) => { const t = (e as CustomEvent).detail; if (t === 'referidos') void load(); });
+  addEventListener('hashchange', watch); addEventListener('nc-staff-change', () => { if (!root.dataset.loaded && staffMe()?.role) { root.dataset.loaded = '1'; watch(); } }); addEventListener('nc-team', watch);
+  watch();
+</script>

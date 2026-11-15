@@ -5,7 +5,7 @@
 ---
 <section class="pnl-card lc" data-lc>
   <header class="lc-head">
-    <h2 class="pnl-h3">Campañas en el aire <span class="sp-demo" data-lc-demo hidden>DEMO</span></h2>
+    <h2 class="pnl-h3"><span data-lc-title>Campañas en el aire</span> <span class="sp-demo" data-lc-demo hidden>DEMO</span></h2>
     <div class="pnl-range" role="group" aria-label="Campañas">
       <button type="button" data-lf="live" aria-pressed="true">En el aire <b data-lfn="live"></b></button>
       <button type="button" data-lf="next" aria-pressed="false">Programadas <b data-lfn="next"></b></button>
@@ -14,13 +14,24 @@
   </header>
   <div class="pnl-kpis lc-kpis" data-lc-kpis></div>
   <div class="lc-list" data-lc-list><p class="pnl-muted">Cargando…</p></div>
+  {/* One ad's numbers (the 📊 button on each card): views, clicks and what they mean, and a summary to send the client */}
+  <dialog class="sd-dlg pnl-acct lc-stats" data-lc-stats aria-labelledby="lc-stats-h">
+    <form method="dialog" class="sd-form">
+      <header class="sd-dlg-h"><h2 id="lc-stats-h" data-lc-stats-h>Estadísticas</h2><button type="submit" class="sd-x" aria-label="Cerrar">✕</button></header>
+      <div data-lc-stats-body></div>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-lc-copy>Copiar resumen para el cliente</button><button type="submit" class="adp-btn">Cerrar</button></footer>
+    </form>
+  </dialog>
 </section>
 
 <script>
-  import { allCampaigns, setCampaignStatus, hasBackend, type CampaignRow } from '../../lib/backend';
-  import { DEMO_CAMPAIGNS } from '../../lib/ads';
+  import { allCampaigns, setCampaignStatus, startCampaignToday, deleteCampaigns, hasBackend, adInventory, type CampaignRow, type AdInventory } from '../../lib/backend';
+  let inv: AdInventory | null = null;
+  import { DEMO_CAMPAIGNS, estimateViews, adsOn, spaceOf } from '../../lib/ads';
   import { isDemo } from '../../lib/demo';
-  import { ask } from '../../lib/dialogs';
+  import { loadRequests } from '../../lib/adrequests';
+  import { isSeller, mineRequest } from '../../lib/sellers';
+  import { ask, tell } from '../../lib/dialogs';
   const root = document.querySelector<HTMLElement>('[data-lc]');
   if (root) {
     const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
@@ -34,7 +45,34 @@
     const demo = isDemo();
     let rows: CampaignRow[] = [], filter = 'live';
 
+    const isAdmin = () => { try { return ['admin', 'manager'].includes(JSON.parse(localStorage.getItem('nc-staff') || 'null')?.role); } catch { return false; } }; // the Gerente too (supabase/gerente-todo.sql)
+    // Direct sales entered with "+ Anuncio vendido": what was paid, from the team's client list (Ventas)
+    const paidOf = (id: string) => {
+      try {
+        const s = (JSON.parse(localStorage.getItem('nc-leads') || '[]') as any[]).find((l) => l.sale?.campaignId === id)?.sale;
+        return s ? `<p class="lc-meta lc-paid">${s.due ? 'Por cobrar' : 'Pagado'} $${Number(s.paid).toLocaleString('en-US')} · ${esc(s.due ? `pagará con ${s.method}` : s.method)}${s.invoice ? ` · factura ${esc(s.invoice)}` : ''}</p>` : '';
+      } catch { return ''; }
+    };
+    // The ad itself: the rectangle or square version when there is one (else the first size), tap to open it full size;
+    // the other sizes are counted next to it
+    const preview = (c: CampaignRow) => {
+      const list = (c.creatives ?? []).filter((x) => x.img);
+      if (!list.length) return '';
+      const ratio = (x: { w?: number; h?: number; img: string }) => { const [w, h] = x.w && x.h ? [x.w, x.h] : (x.img.match(/(\d+)x(\d+)\.\w+$/) ?? []).slice(1).map(Number); return w && h ? w / h : 0; };
+      const main = list.find((x) => { const r = ratio(x); return r >= 0.9 && r <= 1.4; }) ?? list[0];
+      const src = (u: string) => (/^(https?:|data:)/.test(u) ? u : `${location.origin}/${u.replace(/^\//, '')}`);
+      return `<div class="lc-ads"><a href="${esc(src(main.img))}" target="_blank" rel="noopener" title="Ver el anuncio"><img src="${esc(src(main.img))}" alt="Anuncio de ${esc(c.client)}" loading="lazy"></a>${list.length > 1 ? `<small>+${list.length - 1} ${list.length === 2 ? 'tamaño' : 'tamaños'}</small>` : ''}</div>`;
+    };
     const stage = (c: CampaignRow) => (c.status === 'ended' || c.end < today || (c.views != null && c.delivered >= c.views) ? 'done' : c.start > today ? 'next' : 'live');
+    // Safety net (user, 2026-11-06): after a week, an ad with less than half its estimated views is flagged, so the
+    // team can give it free days (src/lib/ads.ts, estimateViews)
+    function lowViews(c: CampaignRow, st: string, ran: number) {
+      const sp = spaceOf(c.sizes);
+      if (!inv || !sp || c.takeover || st !== 'live' || ran < 7 || (c.views != null && c.views > 0)) return '';
+      const est = estimateViews(inv.reads30, sp, Math.max(0, adsOn(inv.busy, sp, today) - 1));
+      if (!est || c.delivered / ran >= est[0] / 30 / 2) return '';
+      return `<p class="lc-low">⚠ Pocas vistas: ${num(Math.round(c.delivered / ran))} al día, menos de la mitad de lo estimado (unas ${num(Math.round(est[0] / 30))}). Considera regalarle días extra.</p>`;
+    }
     function card(c: CampaignRow) {
       const st = stage(c), byViews = c.views != null && c.views > 0;
       const total = byViews ? c.views! : Math.max(1, daysBetween(c.start, c.end) + 1);
@@ -46,11 +84,15 @@
       const ctr = c.delivered ? ((c.clicks / c.delivered) * 100).toFixed(1) : '0.0';
       const label = st === 'done' ? (byViews && c.delivered >= c.views! ? 'Vistas cumplidas' : 'Terminada') : st === 'next' ? `Empieza el ${day(c.start)}` : c.status === 'paused' ? 'En pausa' : 'En el aire';
       return `<article class="lc-card ${st}${c.status === 'paused' ? ' paused' : ''}" data-cid="${esc(c.id)}">
-        <header><b>${esc(c.client)}</b>${c.takeover ? '<span class="lc-tag tk">Toma de portada</span>' : ''}<span class="lc-st">${label}</span></header>
+        <header><b>${esc(c.client)}</b>${c.takeover ? '<span class="lc-tag tk">Toma de portada</span>' : ''}<span class="lc-st">${label}</span><button type="button" class="lc-stats-btn" data-lca-stats title="Ver estadísticas" aria-label="Estadísticas de ${esc(c.client)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button></header>
+        ${preview(c)}
         <p class="lc-meta">${c.takeover ? 'Todos los espacios del sitio' : esc(c.sizes.map((s) => SIZE[s] ?? s).join(', '))} · ${esc(WHERE[c.regions] ?? c.regions)} · ${byViews ? `desde el ${day(c.start)}` : `${day(c.start)} al ${day(c.end)}`}</p>
         <div class="lc-prog"><p><span>${byViews ? `${num(c.delivered)} de ${num(c.views!)} vistas` : `Día ${num(done)} de ${num(total)} · ${num(c.delivered)} vistas`}</span><b>${pct}%</b></p><i><em style="width:${pct}%"></em></i></div>
+        ${paidOf(c.id)}
+        ${lowViews(c, st, ran)}
         <p class="lc-meta">Clics: ${num(c.clicks)} (${ctr}%)${pace ? ` · al ritmo actual termina en unos ${pace} día${pace > 1 ? 's' : ''}` : ''}${!byViews && st === 'live' ? ` · termina el ${day(c.end)}` : ''}</p>
-        ${st !== 'done' && !demo ? `<div class="lc-acts">${c.status === 'paused' ? '<button type="button" class="pnl-link" data-lca="active">Reanudar</button>' : '<button type="button" class="pnl-link" data-lca="paused">Pausar</button>'}<button type="button" class="pnl-link danger" data-lca="ended">Terminar ya</button></div>` : ''}
+        ${st === 'done' && !demo && isAdmin() ? '<div class="lc-acts"><button type="button" class="pnl-link danger" data-lca-del>Borrar</button></div>' : ''}
+        ${st !== 'done' && !demo ? `<div class="lc-acts">${st === 'next' ? '<button type="button" class="pnl-link" data-lca-now>Empezar hoy</button>' : ''}${c.status === 'paused' ? '<button type="button" class="pnl-link" data-lca="active">Reanudar</button>' : '<button type="button" class="pnl-link" data-lca="paused">Pausar</button>'}<button type="button" class="pnl-link danger" data-lca="ended">Terminar ya</button></div>` : ''}
       </article>`;
     }
     function paint() {
@@ -67,12 +109,49 @@
       $('[data-lc-list]').innerHTML = list.map(card).join('')
         || `<p class="apr-empty">${filter === 'live' ? 'No hay campañas directas en el aire ahora. Los espacios libres muestran Google (cuando se conecte) o “Anúnciate”.' : filter === 'next' ? 'No hay campañas programadas.' : 'Todavía no hay campañas terminadas.'}</p>`;
     }
+    /** One ad's numbers. The site keeps each ad's total views and clicks; the rest is worked out from them. */
+    let summary = '';
+    async function showStats(c: CampaignRow) {
+      const st = stage(c), byViews = c.views != null && c.views > 0;
+      const days = Math.max(1, Math.min(daysBetween(c.start, today), daysBetween(c.start, c.end)) + 1);
+      const ran = st === 'next' ? 0 : days, perDay = ran ? c.delivered / ran : 0;
+      const ctr = c.delivered ? (c.clicks / c.delivered) * 100 : 0;
+      // The other ads that have run: how this one's click rate compares
+      const others = rows.filter((x) => x.id !== c.id && x.delivered > 200);
+      const avg = others.length ? (others.reduce((a, x) => a + x.clicks, 0) / Math.max(1, others.reduce((a, x) => a + x.delivered, 0))) * 100 : 0;
+      // What the client paid (their order), for the cost per 1,000 views and per click
+      const req = demo ? null : (await loadRequests().catch(() => [])).find((r) => r.id.toLowerCase() === c.id.toLowerCase());
+      const paid = req ? Number(req.total || 0) : 0;
+      const left = byViews ? Math.max(0, c.views! - c.delivered) : 0;
+      const eta = byViews && perDay && st === 'live' ? Math.ceil(left / perDay) : 0;
+      const n = (v: number) => Math.round(v).toLocaleString('es-PR');
+      const box = (l: string, v: string, sub = '') => `<div class="pnl-kpi"><span>${l}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+      $('[data-lc-stats-h]').textContent = `Estadísticas · ${c.client}`;
+      $('[data-lc-stats-body]').innerHTML = `${demo ? '<p class="pnl-note"><span class="sp-demo">DEMO</span> Números de ejemplo.</p>' : ''}
+        <div class="pnl-kpis lc-stats-kpis">
+          ${box('Vistas', n(c.delivered), byViews ? `de ${n(c.views!)} compradas` : `en ${ran} ${ran === 1 ? 'día' : 'días'}`)}
+          ${box('Clics', n(c.clicks), 'veces que lo tocaron')}
+          ${box('% de clics', `${ctr.toFixed(2)}%`, avg ? `${ctr >= avg ? '▲' : '▼'} promedio de los anuncios: ${avg.toFixed(2)}%` : 'de cada 100 vistas')}
+          ${box('Vistas por día', n(perDay), ran ? `promedio en ${ran} ${ran === 1 ? 'día' : 'días'}` : 'todavía no empieza')}
+        </div>
+        <ul class="lc-stats-list">
+          <li><span>Fechas</span><b>${day(c.start)} – ${byViews ? 'hasta cumplir las vistas' : day(c.end)}</b></li>
+          <li><span>Dónde sale</span><b>${c.takeover ? 'Todo el sitio (toma de portada)' : esc(c.sizes.map((x) => SIZE[x] ?? x).join(', '))} · ${esc(WHERE[c.regions] ?? c.regions)}</b></li>
+          ${byViews ? `<li><span>Faltan</span><b>${n(left)} vistas${eta ? ` · unos ${eta} ${eta === 1 ? 'día' : 'días'} al ritmo actual` : ''}</b></li>` : `<li><span>Quedan</span><b>${Math.max(0, daysBetween(today, c.end))} días</b></li>`}
+          ${paid ? `<li><span>Pagó</span><b>$${paid.toLocaleString('en-US')} · $${(c.delivered ? (paid / c.delivered) * 1000 : 0).toFixed(2)} por cada 1,000 vistas${c.clicks ? ` · $${(paid / c.clicks).toFixed(2)} por clic` : ''}</b></li>` : ''}
+        </ul>
+        <p class="pnl-muted pnl-small">Una vista cuenta cuando el anuncio aparece en la pantalla de un lector; un clic, cuando lo tocan. En sitios de noticias, más de 0.5% de clics es bueno.</p>`;
+      summary = `Resultados de tu anuncio en NotiCel (${c.client}), del ${day(c.start)} al ${st === 'done' ? day(c.end) : 'hoy'}:\n• ${n(c.delivered)} vistas${byViews ? ` de ${n(c.views!)}` : ''}\n• ${n(c.clicks)} clics (${ctr.toFixed(2)}% de las vistas)\n• ${n(perDay)} vistas por día en promedio\nGracias por anunciarte con nosotros.`;
+      $<HTMLDialogElement>('[data-lc-stats]').showModal();
+    }
+    $('[data-lc-copy]').addEventListener('click', async (e) => { await navigator.clipboard?.writeText(summary).catch(() => {}); (e.target as HTMLElement).textContent = '¡Copiado!'; setTimeout(() => ((e.target as HTMLElement).textContent = 'Copiar resumen para el cliente'), 1500); });
+
     async function load() {
       $('[data-lc-demo]').hidden = !demo;
       if (demo) {
         // Sample numbers so the guest sees how it works; labeled DEMO above
         const ago = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
-        rows = DEMO_CAMPAIGNS.map((c, i) => ({ id: c.id, client: c.client, sizes: c.sizes, start: ago([12, 5, 20, 2][i] ?? 3), end: ago(-[18, 25, 10, 28][i]), regions: 'all', takeover: false,
+        rows = DEMO_CAMPAIGNS.map((c, i) => ({ id: c.id, client: c.client, sizes: c.sizes, creatives: c.creatives, start: ago([12, 5, 20, 2][i] ?? 3), end: ago(-([18, 25, 10, 28][i] ?? 15)), regions: 'all', takeover: false,
           views: [25000, 10000, null, 50000][i] ?? null, status: 'active' as const, delivered: [18240, 3120, 9800, 2050][i] ?? 0, clicks: [212, 41, 96, 30][i] ?? 0, created: '' }));
         rows.push({ id: 'demo-toma', client: 'Mueblería Don Pepe (ejemplo)', sizes: [], start: ago(-12), end: ago(-13), regions: 'all', takeover: true, views: 50000, status: 'active', delivered: 0, clicks: 0, created: '' });
         rows.push({ id: 'demo-fin', client: 'Gimnasio Fuerza (ejemplo)', sizes: ['rectangle'], start: ago(40), end: ago(10), regions: 'island', takeover: false, views: 10000, status: 'ended', delivered: 10000, clicks: 184, created: '' });
@@ -80,19 +159,40 @@
         const r = await allCampaigns();
         if (!r) { $('[data-lc-list]').innerHTML = '<p class="pnl-muted">No se pudieron cargar las campañas. Revisa la conexión.</p>'; return; }
         rows = r;
+        inv = await adInventory();
+        // A salesperson: only their own clients' campaigns
+        if (isSeller()) { const mine = new Set((await loadRequests()).filter(mineRequest).map((q) => q.id.toLowerCase())); rows = rows.filter((c) => mine.has(c.id.toLowerCase())); }
       } else rows = [];
+      $('[data-lc-title]').textContent = isSeller() ? 'Mis anuncios en el aire' : 'Campañas en el aire';
       paint();
     }
     root.addEventListener('click', async (e) => {
       const t = e.target as HTMLElement;
       const f = t.closest<HTMLElement>('[data-lf]'); if (f) { filter = f.dataset.lf!; paint(); return; }
+      const sb = t.closest<HTMLElement>('[data-lca-stats]');
+      if (sb) { const c = rows.find((x) => x.id === sb.closest<HTMLElement>('[data-cid]')!.dataset.cid); if (c) void showStats(c); return; }
+      const del = t.closest<HTMLElement>('[data-lca-del]');
+      if (del) {
+        const id = del.closest<HTMLElement>('[data-cid]')!.dataset.cid!, c = rows.find((x) => x.id === id)!;
+        if (!(await ask(`¿Borrar para siempre la campaña terminada de ${c.client}? Se borran también sus vistas y toques. No se puede deshacer.`, { ok: 'Borrar', danger: true }))) return;
+        if (await deleteCampaigns([id])) { rows = rows.filter((x) => x.id !== id); paint(); } else void tell('No se pudo borrar. Solo el administrador o el Gerente pueden, y la campaña tiene que estar terminada.');
+        return;
+      }
+      const now = t.closest<HTMLElement>('[data-lca-now]');
+      if (now) {
+        const id = now.closest<HTMLElement>('[data-cid]')!.dataset.cid!, c = rows.find((x) => x.id === id)!;
+        if (!(await ask(`¿Empezar hoy la campaña de ${c.client}? Sale en el sitio en un minuto, en vez del ${c.start}.`, { ok: 'Empezar hoy' }))) return;
+        if (await startCampaignToday(id)) { c.start = today; c.status = 'active'; paint(); } else void tell('No se pudo cambiar. Solo el administrador y Ventas pueden hacerlo.');
+        return;
+      }
       const a = t.closest<HTMLElement>('[data-lca]'); if (!a) return;
       const id = t.closest<HTMLElement>('[data-cid]')!.dataset.cid!, c = rows.find((x) => x.id === id)!;
       const to = a.dataset.lca as 'active' | 'paused' | 'ended';
       const msg = to === 'ended' ? `¿Terminar ya la campaña de ${c.client}? Deja de salir en el sitio y no se puede reanudar.` : to === 'paused' ? `¿Pausar la campaña de ${c.client}? Deja de salir hasta que la reanudes.` : `¿Reanudar la campaña de ${c.client}?`;
       if (!(await ask(msg, { ok: to === 'ended' ? 'Terminar' : to === 'paused' ? 'Pausar' : 'Reanudar', danger: to === 'ended' }))) return;
-      if (await setCampaignStatus(id, to)) { c.status = to; paint(); } else alert('No se pudo cambiar. Solo el administrador y Ventas pueden hacerlo.');
+      if (await setCampaignStatus(id, to)) { c.status = to; paint(); } else void tell('No se pudo cambiar. Solo el administrador y Ventas pueden hacerlo.');
     });
+    addEventListener('nc-campaigns', () => void load()); // a sale just saved with "+ Anuncio vendido"
     void load();
   }
 </script>

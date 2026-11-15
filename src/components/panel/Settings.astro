@@ -1,0 +1,88 @@
+---
+// Panel → Ajustes (user, 2026-11-03), administrator only:
+//   · Datos del sitio: tagline, description, contact emails, phone, legal name, postal address and the days to pay an
+//     invoice, in one place instead of in the code (src/data/ajustes.json, saved through "publicar"; the site rebuilds).
+//   · Registro de actividad: who did what in the panel and when (activity_log, supabase/permisos-equipo.sql).
+import { SITE } from '../../lib/site';
+const cur = { tagline: SITE.tagline, description: SITE.description, email: SITE.email, salesEmail: SITE.salesEmail, phone: SITE.phone, legalName: SITE.legalName, address: SITE.address, invoiceDays: SITE.invoiceDays };
+---
+<section class="st" data-ajustes data-cur={JSON.stringify(cur)}>
+  <h1 class="pnl-h">Ajustes</h1>
+  <p class="pnl-muted">Los datos del sitio en un solo lugar. Al guardar, el sitio se actualiza solo en unos 2 minutos.</p>
+  <form class="pnl-card sd-form st-form" data-st-form novalidate>
+    <h2 class="pnl-h3">Datos del sitio</h2>
+    <label>Lema (debajo del nombre)<input name="tagline" maxlength="80" /></label>
+    <label>Descripción (Google y redes sociales)<textarea name="description" rows="2" maxlength="300"></textarea></label>
+    <div class="sd-2">
+      <label>Correo de la redacción (denuncias, correcciones)<input name="email" type="email" maxlength="120" /></label>
+      <label>Correo de ventas (facturas y anunciantes)<input name="salesEmail" type="email" maxlength="120" placeholder="Si lo dejas vacío, se usa el de la redacción" /></label>
+      <label>Teléfono<input name="phone" maxlength="30" inputmode="tel" /></label>
+      <label>Nombre legal de la compañía<input name="legalName" maxlength="120" /></label>
+      <label>Dirección postal<input name="address" maxlength="200" placeholder="ej. PO Box 1234, San Juan, PR 00936" /></label>
+      <label>Días para pagar una factura<input name="invoiceDays" type="number" min="0" max="90" /></label>
+    </div>
+    <p class="pnl-muted pnl-small">El nombre, el logo, los colores y los precios de los anuncios todavía se cambian en el código: pídemelos y los paso aquí si los necesitas cambiar seguido.</p>
+    <p class="cm-err" data-st-err hidden></p>
+    <div class="st-save"><button type="submit" class="adp-btn">Guardar ajustes</button><span class="pnl-muted pnl-small" data-st-ok></span></div>
+  </form>
+
+  <div class="pnl-card st-log">
+    <div class="st-log-h"><h2 class="pnl-h3">Registro de actividad</h2>
+      <select data-st-who aria-label="Persona"><option value="">Todo el equipo</option></select></div>
+    <p class="pnl-muted pnl-small">Quién publicó, borró, aprobó, invitó, cambió una comisión, hizo una factura… Nadie lo puede borrar.</p>
+    <ul class="st-log-list" data-st-log></ul>
+  </div>
+</section>
+
+<script>
+  import { hasBackend, staffApi, saveSettings, logActivity } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  const root = document.querySelector<HTMLElement>("[data-ajustes]")!;
+  const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const form = $<HTMLFormElement>('[data-st-form]');
+  const cur: Record<string, string | number> = JSON.parse(root.dataset.cur!);
+  type Row = { at: string; who: string; action: string; detail: string };
+  let log: Row[] = [];
+  function fill() { Object.entries(cur).forEach(([k, v]) => { const el = form.elements.namedItem(k) as HTMLInputElement | null; if (el) el.value = String(v ?? ''); }); }
+  async function load() {
+    fill();
+    if (isDemo()) {
+      const n = Date.now();
+      log = [{ at: new Date(n - 6e5).toISOString(), who: 'Editor (ejemplo)', action: 'Publicó una noticia', detail: 'Ejemplo: titular de la noticia' },
+        { at: new Date(n - 36e5).toISOString(), who: 'Gerente (ejemplo)', action: 'Creó una factura', detail: '#1004 · Gimnasio Fuerza (ejemplo) · $640.00' },
+        { at: new Date(n - 864e5).toISOString(), who: 'Administración (ejemplo)', action: 'Invitó al equipo', detail: 'Periodista (ejemplo) (Periodista)' }];
+    } else if (hasBackend()) {
+      const r = await staffApi('activity_log?select=at,who,action,detail&order=at.desc&limit=300');
+      log = r?.ok ? await r.json() : [];
+      if (r && r.status === 404) { $('[data-st-log]').innerHTML = '<li class="pnl-muted">Falta un paso en la base de datos: corre supabase/permisos-equipo.sql.</li>'; return; }
+    }
+    const who = $<HTMLSelectElement>('[data-st-who]'), keep = who.value;
+    who.innerHTML = '<option value="">Todo el equipo</option>' + [...new Set(log.map((x) => x.who))].sort().map((w) => `<option>${esc(w)}</option>`).join('');
+    who.value = keep; paintLog();
+  }
+  function paintLog() {
+    const w = $<HTMLSelectElement>('[data-st-who]').value;
+    const when = (s: string) => new Date(s).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    $('[data-st-log]').innerHTML = log.filter((x) => !w || x.who === w).map((x) => `<li><time>${when(x.at)}</time><span><b>${esc(x.who)}</b> ${esc(x.action.toLowerCase())}${x.detail ? `: ${esc(x.detail)}` : ''}${isDemo() ? ' <span class="sp-demo">EJEMPLO</span>' : ''}</span></li>`).join('')
+      || '<li class="pnl-muted">Todavía no hay actividad registrada.</li>';
+  }
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = (k: string) => String((form.elements.namedItem(k) as HTMLInputElement).value).trim(), er = $('[data-st-err]'), ok = $('[data-st-ok]');
+    er.hidden = true; ok.textContent = '';
+    const next = { tagline: v('tagline'), description: v('description'), email: v('email'), salesEmail: v('salesEmail'), phone: v('phone'), legalName: v('legalName'), address: v('address'), invoiceDays: Number(v('invoiceDays')) || 15 };
+    if ([next.email, next.salesEmail].some((m) => m && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m))) { er.textContent = 'Revisa los correos.'; er.hidden = false; return; }
+    if (isDemo() || !hasBackend()) { ok.textContent = 'Modo demo: no se guarda nada.'; return; }
+    const b = form.querySelector<HTMLButtonElement>('button[type=submit]')!; b.disabled = true; b.textContent = 'Guardando…';
+    const r = await saveSettings(next);
+    b.disabled = false; b.textContent = 'Guardar ajustes';
+    if (!r.ok) { er.textContent = `No se pudo guardar: ${r.error}`; er.hidden = false; return; }
+    const changed = Object.keys(next).filter((k) => String((next as Record<string, unknown>)[k]) !== String(cur[k] ?? ''));
+    Object.assign(cur, next);
+    logActivity('Cambió los ajustes del sitio', changed.join(', '));
+    ok.textContent = '✓ Guardado. El sitio se actualiza en unos 2 minutos.';
+  });
+  $('[data-st-who]').addEventListener('change', paintLog);
+  addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'ajustes') void load(); });
+</script>

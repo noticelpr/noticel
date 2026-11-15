@@ -1,0 +1,74 @@
+---
+// Inicio → «Mis días libres» (user, 2026-11-03): every team member asks for days off and sees whether they were approved.
+// The administrator and the Gerente decide in Personal (Personal.astro). Table hr_timeoff (supabase/permisos-equipo.sql).
+---
+<section class="pnl-card hr-mine" data-to>
+  <div class="hr-mine-h"><h2 class="pnl-h3">Mis días libres</h2><button type="button" class="adp-btn ghost-dark" data-to-new>Pedir días libres</button></div>
+  <ul class="hr-mine-list" data-to-list></ul>
+  <dialog class="sd-dlg pnl-acct" data-to-dlg aria-labelledby="to-h">
+    <form class="sd-form" data-to-form novalidate>
+      <header class="sd-dlg-h"><h2 id="to-h">Pedir días libres</h2><button type="button" class="sd-x" data-to-x aria-label="Cerrar">✕</button></header>
+      <div class="sd-2">
+        <label>Desde<input name="from" type="date" required /></label>
+        <label>Hasta<input name="to" type="date" required /></label>
+        <label>Tipo<select name="kind"><option value="vacaciones">Vacaciones</option><option value="personal">Personal</option><option value="enfermedad">Enfermedad</option><option value="otro">Otro</option></select></label>
+      </div>
+      <label>Nota (opcional)<input name="note" maxlength="300" placeholder="ej. Viaje familiar" /></label>
+      <p class="cm-err" data-to-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-to-x>Cancelar</button><button type="submit" class="adp-btn">Enviar</button></footer>
+    </form>
+  </dialog>
+</section>
+
+<script>
+  import { hasBackend, staffApi, tokenInfo } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  type Off = { id: string; day_from: string; day_to: string; kind: string; note: string; status: string; decided_by?: string };
+  const root = document.querySelector<HTMLElement>('[data-to]');
+  if (root) {
+    const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
+    const day = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' });
+    const ymd = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+    const ST: Record<string, [string, string]> = { pendiente: ['Pendiente', 'warn'], aprobado: ['Aprobado', 'ok'], negado: ['Negado', 'bad'], cancelado: ['Cancelado', ''] };
+    const KIND: Record<string, string> = { vacaciones: 'Vacaciones', enfermedad: 'Enfermedad', personal: 'Personal', otro: 'Otro' };
+    let mine: Off[] = [];
+    async function load() {
+      if (!me()) return;
+      if (isDemo()) mine = [{ id: 'd1', day_from: ymd(new Date(Date.now() + 9 * 864e5)), day_to: ymd(new Date(Date.now() + 11 * 864e5)), kind: 'vacaciones', note: 'Ejemplo', status: 'pendiente' }];
+      else if (hasBackend()) { const r = await staffApi(`hr_timeoff?user_id=eq.${tokenInfo().id}&select=*&order=day_from.desc&limit=6`); mine = r?.ok ? await r.json() : []; }
+      else { try { mine = JSON.parse(localStorage.getItem('nc-hr-timeoff') || '[]'); } catch { mine = []; } }
+      $('[data-to-list]').innerHTML = mine.map((o) => { const [l, t] = ST[o.status] ?? [o.status, ''];
+        return `<li><span><b>${KIND[o.kind] ?? o.kind}</b> · ${o.day_from === o.day_to ? day(o.day_from) : `${day(o.day_from)} a ${day(o.day_to)}`}${isDemo() ? ' <span class="sp-demo">EJEMPLO</span>' : ''}</span><span class="pnl-chip ${t}">${l}</span>${o.status === 'pendiente' && !isDemo() ? `<button type="button" class="pnl-link" data-to-cancel="${o.id}">Cancelar</button>` : ''}</li>`; }).join('')
+        || '<li class="pnl-muted">No has pedido días libres.</li>';
+    }
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-to-new]')) { const f = $<HTMLFormElement>('[data-to-form]'); f.reset(); $('[data-to-err]').hidden = true; $<HTMLDialogElement>('[data-to-dlg]').showModal(); return; }
+      if (t.closest('[data-to-x]')) { $<HTMLDialogElement>('[data-to-dlg]').close(); return; }
+      const c = t.closest<HTMLElement>('[data-to-cancel]');
+      if (c && hasBackend()) { await staffApi(`hr_timeoff?id=eq.${c.dataset.toCancel}`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelado' }) }); void load(); }
+    });
+    $<HTMLFormElement>('[data-to-form]').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target as HTMLFormElement, v = (k: string) => String((f.elements.namedItem(k) as HTMLInputElement).value).trim(), er = $('[data-to-err]');
+      if (!v('from') || !v('to') || v('to') < v('from')) { er.textContent = 'Escoge las fechas (la segunda no puede ser antes de la primera).'; er.hidden = false; return; }
+      if (isDemo()) { $<HTMLDialogElement>('[data-to-dlg]').close(); dispatchEvent(new CustomEvent('nc-toast', { detail: 'Modo demo: no se envía nada.' })); return; }
+      const row = { name: me()?.name ?? '', day_from: v('from'), day_to: v('to'), kind: v('kind'), note: v('note') };
+      if (hasBackend()) {
+        const r = await staffApi('hr_timeoff', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+        if (!r?.ok) { er.textContent = 'No se pudo enviar. Intenta otra vez.'; er.hidden = false; return; }
+      } else {
+        const all = (() => { try { return JSON.parse(localStorage.getItem('nc-hr-timeoff') || '[]'); } catch { return []; } })();
+        all.unshift({ ...row, id: `L-${Date.now()}`, user_id: me()?.name, status: 'pendiente' }); try { localStorage.setItem('nc-hr-timeoff', JSON.stringify(all)); } catch { /* storage blocked */ }
+      }
+      $<HTMLDialogElement>('[data-to-dlg]').close(); dispatchEvent(new CustomEvent('nc-toast', { detail: 'Enviado. El Gerente o el administrador lo aprueba en Personal.' }));
+      dispatchEvent(new Event('nc-timeoff')); void load();
+    });
+    $<HTMLDialogElement>('[data-to-dlg]').addEventListener('click', (e) => { const d = e.currentTarget as HTMLDialogElement; if (e.target === d) d.close(); });
+    addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'inicio') void load(); });
+    addEventListener('nc-staff-change', () => void load());
+    void load();
+  }
+</script>

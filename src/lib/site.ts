@@ -1,15 +1,17 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { league } from './leagues';
 import categoryData from '../data/categories.json';
+import AJUSTES from '../data/ajustes.json'; // panel → Ajustes saves here (the site rebuilds)
 
 /* =========================================================
    SITE SETTINGS: edit these to change the whole site
    ========================================================= */
 export const SITE = {
   name: 'NotiCel',
-  tagline: 'La verdad como es',
+  tagline: AJUSTES.tagline || 'La verdad como es',
   subtitle: 'Noticias de Puerto Rico',
-  description: 'NotiCel: noticias de Puerto Rico. La verdad como es.',
+  description: AJUSTES.description || 'NotiCel: noticias de Puerto Rico. La verdad como es.',
+  domain: 'noticel.com',
   timeZone: 'America/Puerto_Rico',
   // Test copy: every page asks search engines not to index it, so Google never sees a second copy
   // of NotiCel's stories. Set to false only on the day the new site replaces WordPress at noticel.com.
@@ -17,7 +19,13 @@ export const SITE = {
   // Shows the "sitio de demostración" bar at the top. Set to false when going live.
   demoMode: false,
   // Newsroom email: tips, corrections and privacy questions go here. Empty = pages say "muy pronto".
-  email: '',
+  email: AJUSTES.email || '',
+  // Panel → Ajustes: sales contact, phone and postal address (invoices, contact page), days to pay an invoice
+  salesEmail: AJUSTES.salesEmail || '',
+  phone: AJUSTES.phone || '',
+  address: AJUSTES.address || 'San Juan, Puerto Rico',
+  invoiceDays: Number(AJUSTES.invoiceDays) || 15,
+  legalName: AJUSTES.legalName || '', // the company's legal name, for invoices (set it in panel → Ajustes)
   // Breaking bar: chosen automatically (see src/lib/breaking.ts). Set this only to force a story by hand.
   breaking: null as
     | { text: string; id: string }
@@ -38,8 +46,6 @@ export const SITE = {
   gaId: '',
   // GIPHY key for GIF search in comments. Empty = only our own animated GIFs.
   giphyKey: '',
-  // Set to true once an Anthropic API key is added for the automatic news writer (the panel's Salud tab reads it)
-  aiKeyConnected: false,
   // Official National Weather Service forecast for Puerto Rico
   forecastUrl: 'https://www.weather.gov/sju/',
 };

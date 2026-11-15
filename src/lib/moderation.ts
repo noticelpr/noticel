@@ -6,22 +6,27 @@
 export type Verdict = 'ok' | 'review' | 'block';
 export type Assessment = { verdict: Verdict; score: number; reasons: string[] };
 
+// Comment rule (user, 2026-11-06): every comment stays, strong words and insults included, except ads, spam and scams.
+// Also removed, because they can be crimes: real threats of violence, someone's private data to harass them, and
+// anything sexual involving minors.
 export const REPORT_REASONS = [
-  { id: 'insulto', name: 'Insulto o acoso' },
-  { id: 'odio', name: 'Odio o discriminación' },
-  { id: 'amenaza', name: 'Amenaza o violencia' },
-  { id: 'spam', name: 'Spam o publicidad' },
-  { id: 'personal', name: 'Información personal de alguien' },
-  { id: 'falso', name: 'Información falsa' },
+  { id: 'spam', name: 'Anuncio, spam o estafa (cripto, premios, dinero fácil)' },
+  { id: 'amenaza', name: 'Amenaza de violencia contra alguien' },
+  { id: 'personal', name: 'Datos privados de alguien (dirección, teléfono)' },
+  { id: 'menores', name: 'Contenido sexual con menores' },
   { id: 'otro', name: 'Otra cosa' },
 ] as const;
+// Reasons readers could pick before 2026-11-06 (older reports still show their name)
+const OLD_REASONS: Record<string, string> = { insulto: 'Insulto o acoso', odio: 'Odio o discriminación', falso: 'Información falsa' };
 export const HIDE_AFTER_REPORTS = 3; // different readers reporting the same comment → hidden until reviewed
 
 // Word lists (lowercase, without accents). Kept short and clear on purpose: real moderation adds AI.
 const INSULTS = ['pendej', 'cabron', 'punet', 'mamao', 'charro', 'idiota', 'estupid', 'imbecil', 'bruto', 'animal', 'basura', 'cerdo', 'puerc', 'mierd', 'carajo', 'hdp', 'hijo de puta', 'puta', 'maric', 'loca de remate'];
 const HATE = ['negro de mierda', 'sudaca', 'maricon', 'pato', 'gringo asqueroso', 'dominicano de mierda', 'raza inferior'];
 const THREATS = ['te voy a matar', 'te mato', 'te voy a dar', 'ojala te mueras', 'ojala se muera', 'hay que matarl', 'te voy a buscar', 'se que donde vives', 'se donde vives', 'te voy a romper'];
-const SPAM = ['gana dinero', 'dinero facil', 'trabaja desde casa', 'haz clic', 'compra ahora', 'oferta exclusiva', 'whatsapp me', 'escribeme al', 'inversion segura', 'cripto gratis', 'bitcoin gratis'];
+// Scams: crypto, forex or "investments" with promised earnings or a contact request, fake prizes
+const SCAM = /(bitcoin|btc|usdt|cripto|forex|binance|inversion|invierte|trading)[^.!?]{0,80}(gana|ganancia|ganar|rendimiento|ingreso|escrib|contact|telegram|whatsapp|dm\b|inbox|privado)|(ganaste|has sido seleccionad|reclama tu premio|premio de \$)/;
+const SPAM = ['ganancias diarias', 'ingresos pasivos', 'gane desde casa', 'telegram', 'whatsapp', 'gana dinero', 'dinero facil', 'trabaja desde casa', 'haz clic', 'compra ahora', 'oferta exclusiva', 'whatsapp me', 'escribeme al', 'inversion segura', 'cripto gratis', 'bitcoin gratis'];
 
 const plain = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const has = (t: string, list: string[]) => list.filter((w) => new RegExp(`(^|[^a-z])${w.replace(/ /g, '\\s+')}`).test(t));
@@ -30,10 +35,9 @@ export function assess(text: string): Assessment {
   const t = plain(text);
   const reasons: string[] = [];
   let score = 0;
-  const ins = has(t, INSULTS); if (ins.length) { score += 45 + 10 * (ins.length - 1); reasons.push('Insulto o lenguaje ofensivo'); }
-  const hate = has(t, HATE); if (hate.length) { score += 70; reasons.push('Odio o discriminación'); }
+  // Insults and strong words don't count (user, 2026-11-06): only ads, spam, scams, threats and private data
   const thr = has(t, THREATS); if (thr.length) { score += 80; reasons.push('Amenaza'); }
-  const sp = has(t, SPAM); const links = (t.match(/https?:\/\/|www\./g) ?? []).length;
+  const sp = [...has(t, SPAM), ...(SCAM.test(t) ? ['estafa'] : [])]; const links = (t.match(/https?:\/\/|www\./g) ?? []).length;
   if (sp.length || links >= 2) { score += 40 + (links >= 2 ? 20 : 0); reasons.push('Spam o publicidad'); } else if (links === 1) { score += 15; reasons.push('Incluye un enlace'); }
   // Personal information: phone numbers, emails, social security, street addresses
   if (/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/.test(t)) { score += 45; reasons.push('Número de teléfono'); }
@@ -46,6 +50,17 @@ export function assess(text: string): Assessment {
   if (/(.)\1{7,}/.test(t)) { score += 10; reasons.push('Letras repetidas'); }
   const verdict: Verdict = score >= 60 ? 'block' : score >= 25 ? 'review' : 'ok';
   return { verdict, score: Math.min(100, score), reasons };
+}
+
+/** Comments and the Foro (user, 2026-11-03): no word filter before posting, only no ads. Returns what was found
+ *  ('' when the text is fine). Same rules as nx_has_ad() in the database (supabase/anti-spam.sql). */
+export function adIn(text: string): string {
+  const t = text || '';
+  if (/(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|pr|io|info|biz|shop|store|online|site|app|xyz)\b)/i.test(t)) return 'enlaces';
+  if (/(^|[^0-9])(\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}($|[^0-9])/.test(t) || /(^|[^0-9])\d{3}-\d{4}($|[^0-9])/.test(t)) return 'números de teléfono';
+  if (/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i.test(t)) return 'correos electrónicos';
+  if (SCAM.test(plain(t))) return 'ofertas de inversión, cripto o premios'; // scams (user, 2026-11-06)
+  return '';
 }
 
 /** Decision for a report. The reason picked by the reader adds doubt but never hides a comment alone.
@@ -61,7 +76,7 @@ export function judgeReport(text: string, reasonIds: string[], reportCount: numb
   if (a.verdict === 'block') return { action: 'hide', a };
   if (reportCount >= HIDE_AFTER_REPORTS) return { action: 'review', a }; // hidden until someone reviews it
   if (a.verdict === 'review') return { action: 'review', a };
-  const serious = reasonIds.some((r) => ['amenaza', 'odio', 'personal', 'falso'].includes(r));
+  const serious = reasonIds.some((r) => ['amenaza', 'personal', 'menores'].includes(r));
   if (serious && !weak) return { action: 'review', a };
   return { action: 'keep', a };
 }
@@ -83,7 +98,7 @@ export function saveReports(list: Report[]) { try { localStorage.setItem(KEY, JS
 export function upsertReport(r: Report) { saveReports([r, ...getReports().filter((x) => x.id !== r.id)]); }
 /** Is the comment hidden from readers right now? */
 export const isHidden = (r: Report) => r.status === 'auto' || r.status === 'removed' || (r.status === 'review' && r.count >= HIDE_AFTER_REPORTS);
-export const reasonName = (id: string) => REPORT_REASONS.find((x) => x.id === id)?.name ?? id;
+export const reasonName = (id: string) => REPORT_REASONS.find((x) => x.id === id)?.name ?? OLD_REASONS[id] ?? id;
 
 // Reports this reader made, and how many turned out wrong (comment kept). 3+ wrong out of 4+ = weak reporter.
 const MINE_KEY = 'nc-my-reports';

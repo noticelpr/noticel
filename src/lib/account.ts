@@ -2,7 +2,7 @@
 // the login is kept in this browser ('nc-session') and renewed by itself. The public profile (username, photo)
 // lives in the `profiles` table (supabase/comments.sql) and is mirrored in 'nc-profile' so the existing header,
 // comments and /perfil code keep working. Without Supabase (BACKEND empty) everything stays in preview mode.
-import { BACKEND, hasBackend } from './backend';
+import { BACKEND, hasBackend, deviceKey, saveDevice, dropDevice, deviceLabel, staffLogin, staffToken } from './backend';
 
 const SESSION = 'nc-session';
 const base = () => BACKEND.url.replace(/\/$/, '');
@@ -11,6 +11,26 @@ const read = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.
 const write = (k: string, v: unknown) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
 
 export type Me = { id: string; email: string; username: string; photo?: string };
+
+// ---- Signed in to the panel = signed in on the site (user, 2026-11-04) ----
+// When the panel is signed in (and past its emailed code) but the site isn't, the site uses the panel's sign-in.
+// Both then hold the same session: whichever renews it updates the other (sameSession), and signing out of the site
+// only forgets it here (no server logout, which would close the panel too). Signing out of the site on purpose is
+// respected for that sign-in ('nc-site-out').
+const STAFF_SESSION = 'nc-staff-session';
+const sidOf = (t?: string) => { try { return String(JSON.parse(atob(String(t).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).session_id ?? ''); } catch { return ''; } };
+const sameSession = () => { const a = sidOf(read<any>(SESSION, null)?.access_token); return !!a && a === sidOf(read<any>(STAFF_SESSION, null)?.access_token); };
+/** Uses the panel's sign-in on the site when the site has none. True when it did. */
+export function adoptPanel(): boolean {
+  if (typeof localStorage === 'undefined' || read<any>(SESSION, null)?.access_token) return false;
+  const st = read<any>(STAFF_SESSION, null), staff = read<any>('nc-staff', null);
+  if (!st?.access_token || !staff?.name) return false; // the panel isn't fully signed in (no code yet)
+  const sid = sidOf(st.access_token);
+  if (!sid || read<string>('nc-site-out', '') === sid) return false;
+  write(SESSION, st);
+  void syncProfile().then(() => changed());
+  return true;
+}
 export const accountsOn = hasBackend;
 export const loggedIn = () => !!read<any>(SESSION, null)?.access_token;
 const changed = () => dispatchEvent(new Event('nc-account'));
@@ -22,10 +42,13 @@ export async function token(): Promise<string | undefined> {
   if (!s.expires_at || s.expires_at * 1000 > Date.now() + 60_000 || !s.refresh_token) return s.access_token;
   const r = await fetch(`${base()}/auth/v1/token?grant_type=refresh_token`, { method: 'POST', headers: head(), body: JSON.stringify({ refresh_token: s.refresh_token }) }).catch(() => null);
   if (!r?.ok) { if (r && r.status >= 400 && r.status < 500) { write(SESSION, null); changed(); } return undefined; }
-  const next = await r.json(); write(SESSION, next); return next.access_token;
+  const shared = sameSession();
+  const next = await r.json(); write(SESSION, next); if (shared) write(STAFF_SESSION, next); return next.access_token;
 }
 const userId = () => read<any>(SESSION, null)?.user?.id as string | undefined;
 export const myId = userId;
+/** The signed-in reader's email (already confirmed when they made the account), or ''. */
+export const myEmail = () => String(read<any>(SESSION, null)?.user?.email ?? '').toLowerCase();
 
 const SPANISH: Record<string, string> = {
   invalid_credentials: 'Correo o contraseña incorrectos.',
@@ -64,11 +87,100 @@ export async function signUp(email: string, password: string, username: string):
   write(SESSION, s); await syncProfile(); changed();
   return { ok: true };
 }
-export async function signIn(email: string, password: string): Promise<{ ok?: boolean; error?: string }> {
+/** The other way around (user, 2026-11-04): signing in on the site with a team member's account also signs them into
+ *  the staff panel (its own session, so neither one's renewal logs out the other). Only for the team (soy_equipo);
+ *  the panel still asks for its emailed code, unless this sign-in or device was already verified. */
+async function alsoPanel(email: string, password: string, siteToken: string) {
+  if (staffToken()) return; // already signed in to the panel (maybe as someone else): leave it
+  const r = await fetch(`${base()}/rest/v1/rpc/soy_equipo`, { method: 'POST', headers: head(siteToken), body: '{}' }).catch(() => null);
+  if (!r?.ok || (await r.json().catch(() => false)) !== true) return;
+  await staffLogin(email, password).catch(() => false);
+}
+let pendingLogin: { email: string; password: string } | null = null; // kept in memory only, until the emailed code is typed
+
+export async function signIn(email: string, password: string): Promise<{ ok?: boolean; error?: string; code?: boolean; to?: string }> {
   const r = await fetch(`${base()}/auth/v1/token?grant_type=password`, { method: 'POST', headers: head(), body: JSON.stringify({ email, password }) });
   if (!r.ok) return { error: await why(r) };
-  write(SESSION, await r.json()); await syncProfile(); changed();
+  const s = await r.json();
+  // Two-step on (Mi perfil → Ajustes): the session waits here until the emailed code is typed
+  if (await twoStepOn(s.access_token)) {
+    // A device remembered for 30 days ("Recordar este dispositivo"): straight in, no code
+    const uid = s.user?.id ?? '', key = uid ? deviceKey(uid) : '';
+    if (key) {
+      const t = await codeFor(s.access_token, 'trust', { device: key });
+      if (t.ok) { write(SESSION, s); await syncProfile(); changed(); void alsoPanel(email, password, s.access_token); return { ok: true }; }
+      if (/recordado/.test(t.error ?? '')) dropDevice(uid);
+    }
+    pending = s; pendingLogin = { email, password };
+    const sent = await codeFor(s.access_token, 'send');
+    return sent.ok ? { code: true, to: sent.to } : { error: sent.error ?? 'No se pudo enviar el código.' };
+  }
+  write(SESSION, s); await syncProfile(); changed(); void alsoPanel(email, password, s.access_token);
   return { ok: true };
+}
+
+/** The staff panel's sign-in also signs the person in on the site (same account), so they can comment with their
+ *  team badge without signing in twice (user, 2026-11-03). Its own session, separate from the panel's. Skipped when
+ *  they're already signed in, or when their reader account asks for an emailed code (they sign in on the site then). */
+export async function signInQuiet(email: string, password: string): Promise<void> {
+  if (loggedIn()) return;
+  const r = await fetch(`${base()}/auth/v1/token?grant_type=password`, { method: 'POST', headers: head(), body: JSON.stringify({ email, password }) }).catch(() => null);
+  if (!r?.ok) return;
+  const s = await r.json();
+  if (await twoStepOn(s.access_token)) return;
+  write(SESSION, s); await syncProfile(); changed();
+}
+
+// ---- Account security (Mi perfil → Ajustes → Cuenta y seguridad; supabase/cuenta-segura.sql) ----
+let pending: any = null; // a sign-in waiting for its emailed code
+const codeFor = async (t: string, action: 'send' | 'verify' | 'trust' | 'forget', extra: Record<string, unknown> = {}): Promise<{ ok?: boolean; to?: string; error?: string; device?: string }> => {
+  const r = await fetch(`${base()}/functions/v1/codigo`, { method: 'POST', headers: head(t), body: JSON.stringify({ action, ...extra }) }).catch(() => null);
+  if (!r) return { error: 'No hay conexión.' };
+  return r.json().catch(() => ({ error: `Error ${r.status}` }));
+};
+async function twoStepOn(t: string): Promise<boolean> {
+  const r = await fetch(`${base()}/rest/v1/account_security?select=two_step`, { headers: head(t) }).catch(() => null);
+  return r?.ok ? !!(await r.json())[0]?.two_step : false;
+}
+/** Sign-in step two: the code from the email. */
+export async function finishCode(code: string, remember = false): Promise<{ ok?: boolean; error?: string }> {
+  if (!pending) return { error: 'Entra otra vez con tu correo y contraseña.' };
+  const v = await codeFor(pending.access_token, 'verify', { code, remember, label: deviceLabel() });
+  if (!v.ok) return { error: v.error ?? 'Ese código no es correcto.' };
+  if (v.device && pending.user?.id) saveDevice(pending.user.id, v.device);
+  const login = pendingLogin, t = pending.access_token; pendingLogin = null;
+  write(SESSION, pending); pending = null; await syncProfile(); changed();
+  if (login) void alsoPanel(login.email, login.password, t);
+  return { ok: true };
+}
+export const resendCode = async () => (pending ? codeFor(pending.access_token, 'send') : { error: 'Entra otra vez.' });
+/** The signed-in account: email, whether it signs in with Google, and whether two-step is on. */
+export async function accountInfo(): Promise<{ email: string; google: boolean; twoStep: boolean } | null> {
+  const t = await token(); if (!t) return null;
+  const u = await fetch(`${base()}/auth/v1/user`, { headers: head(t) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!u) return null;
+  const providers: string[] = u.app_metadata?.providers ?? [u.app_metadata?.provider];
+  return { email: u.email, google: providers.includes('google') && !providers.includes('email'), twoStep: await twoStepOn(t) };
+}
+/** Is this the account's current password? (checked without touching the session) */
+export async function passwordOk(email: string, password: string): Promise<boolean> {
+  const r = await fetch(`${base()}/auth/v1/token?grant_type=password`, { method: 'POST', headers: head(), body: JSON.stringify({ email, password }) }).catch(() => null);
+  return !!r?.ok;
+}
+/** Changes the email: Supabase sends a link to the new address to confirm it. */
+export async function changeEmail(email: string): Promise<{ ok?: boolean; error?: string }> {
+  const t = await token(); if (!t) return { error: 'Entra a tu cuenta otra vez.' };
+  const r = await fetch(`${base()}/auth/v1/user?redirect_to=${encodeURIComponent(`${location.origin}/perfil/`)}`, { method: 'PUT', headers: head(t), body: JSON.stringify({ email }) });
+  return r.ok ? { ok: true } : { error: await why(r) };
+}
+/** Two-step: sends a code now (to turn it on, the reader confirms the code first). */
+export async function twoStepSend() { const t = await token(); return t ? codeFor(t, 'send') : { error: 'Entra a tu cuenta otra vez.' }; }
+/** Turns two-step on (after checking the code) or off. */
+export async function twoStepSet(on: boolean, code = ''): Promise<{ ok?: boolean; error?: string }> {
+  const t = await token(); if (!t) return { error: 'Entra a tu cuenta otra vez.' };
+  if (on) { const v = await codeFor(t, 'verify', { code }); if (!v.ok) return { error: v.error ?? 'Ese código no es correcto.' }; }
+  const r = await fetch(`${base()}/rest/v1/account_security?on_conflict=user_id`, { method: 'POST', headers: { ...head(t), Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: userId(), two_step: on, updated_at: new Date().toISOString() }) });
+  return r.ok ? { ok: true } : { error: r.status === 404 ? 'Falta un paso en la base de datos (supabase/cuenta-segura.sql).' : 'No se pudo guardar.' };
 }
 /** "Continuar con Google": Supabase sends the reader to Google and back to this same page. */
 export function signInWithGoogle() {
@@ -94,11 +206,20 @@ export async function setPassword(password: string): Promise<{ ok?: boolean; err
   if (password.length < 8) return { error: 'La contraseña necesita al menos 8 caracteres.' };
   const t = await token(); if (!t) return { error: 'El enlace venció. Pide otro correo para cambiar tu contraseña.' };
   const r = await fetch(`${base()}/auth/v1/user`, { method: 'PUT', headers: head(t), body: JSON.stringify({ password }) });
+  if (r.ok) void forgetDevices(); // a new password: every remembered device asks for the code again
   return r.ok ? { ok: true } : { error: await why(r) };
+}
+/** Forgets every device remembered for 30 days (Mi perfil → Ajustes, and after a password change). */
+export async function forgetDevices(): Promise<boolean> {
+  const t = await token(); if (!t) return false;
+  const r = await codeFor(t, 'forget');
+  try { const uid = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; if (uid) dropDevice(uid); } catch { /* not a token */ }
+  return !!r.ok;
 }
 export async function signOut() {
   const t = await token();
-  if (t) fetch(`${base()}/auth/v1/logout`, { method: 'POST', headers: head(t) }).catch(() => {});
+  if (sameSession()) write('nc-site-out', sidOf(t)); // the panel keeps its sign-in; don't bring it back to the site
+  else if (t) fetch(`${base()}/auth/v1/logout`, { method: 'POST', headers: head(t) }).catch(() => {});
   write(SESSION, null);
   const prev = read<any>('nc-profile', {}); write('nc-profile', { color: prev.color }); // keep only the color choice
   dispatchEvent(new Event('nc-profile-change')); changed();
@@ -138,7 +259,7 @@ export async function api(path: string, init: RequestInit = {}, auth = true): Pr
   return fetch(`${base()}/rest/v1/${path}`, { ...init, headers: { ...head(t), ...(init.headers || {}) } }).catch(() => null);
 }
 /** Opens the "Entrar / Crear cuenta" box (src/components/AuthDialog.astro). */
-export const askLogin = (why?: string) => dispatchEvent(new CustomEvent('nc-auth-open', { detail: { why } }));
+export const askLogin = (why?: string, o: { mode?: 'in' | 'up'; email?: string } = {}) => dispatchEvent(new CustomEvent('nc-auth-open', { detail: { why, ...o } })); // mode 'up': opens on «Crear cuenta»
 
 /** A photo for a comment (data URL, already shrunk) → uploaded to the "comentarios" bucket; returns its address. */
 export async function uploadCommentPhoto(dataUrl: string): Promise<string | null> {
@@ -174,3 +295,6 @@ export async function deleteAccount(): Promise<{ ok?: boolean; error?: string }>
 let googleOn: Promise<boolean> | null = null;
 export const googleEnabled = () => (googleOn ??= fetch(`${base()}/auth/v1/settings`, { headers: { apikey: BACKEND.anonKey } })
   .then((r) => r.json()).then((d) => !!d?.external?.google).catch(() => false));
+
+// After everything above is defined: pick up the panel's sign-in on every page load
+adoptPanel();

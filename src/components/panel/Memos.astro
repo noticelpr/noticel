@@ -1,0 +1,147 @@
+---
+// Panel → Memos (user, 2026-11-04): the publisher (administrator), the Editor en jefe and the Gerente write, edit and
+// delete memos; they publish them to the
+// whole team, the newsroom or sales. Everyone sees the ones for them, newest first (pinned ones on top), closed to the
+// subject and sender; opening one marks it read. The administrator, the Editor en jefe and the Gerente see who opened each. Tables memos and memo_reads (supabase/memos-documentos.sql).
+---
+<section class="mm" data-memos>
+  <div class="sd-head"><div><h1 class="pnl-h">Memos <span class="sp-demo" data-mm-demo hidden>DEMO</span></h1><p class="pnl-muted">Avisos de la administración y la dirección para el equipo.</p></div>
+    <button type="button" class="adp-btn" data-mm-new hidden>+ Nuevo memo</button></div>
+  <div class="mm-list" data-mm-list></div>
+
+  <dialog class="sd-dlg mm-dlg" data-mm-dlg aria-labelledby="mm-h">
+    <form class="sd-form" data-mm-form novalidate>
+      <header class="sd-dlg-h"><h2 id="mm-h" data-mm-h>Nuevo memo</h2><button type="button" class="sd-x" data-mm-x aria-label="Cerrar">✕</button></header>
+      <label>Asunto<input name="title" maxlength="140" required placeholder="ej. Horario del Día de Acción de Gracias" /></label>
+      <label>Mensaje<textarea name="body" rows="9" maxlength="8000" required placeholder="Escribe el memo. Puedes usar líneas en blanco para separar párrafos."></textarea></label>
+      <div class="sd-2">
+        <label>Para<select name="audience"><option value="todos">Todo el equipo</option><option value="redaccion">La redacción (periodistas y editores)</option><option value="ventas">Ventas</option></select></label>
+        <label class="sd-chk mm-pin"><input type="checkbox" name="pinned" /><span>📌 Fijarlo arriba</span></label>
+      </div>
+      <p class="cm-err" data-mm-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-mm-x>Cancelar</button><button type="submit" class="adp-btn" data-mm-go>Publicar memo</button></footer>
+    </form>
+  </dialog>
+</section>
+
+<script>
+  import { hasBackend, staffApi, tokenInfo, logActivity } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  import { ask } from '../../lib/dialogs';
+  type Memo = { id: string; title: string; body: string; audience: string; pinned: boolean; author: string; author_id?: string; created_at: string; edited_at?: string | null; edited_by?: string | null };
+  type Read = { memo_id: string; user_id: string; name: string; read_at: string };
+  const root = document.querySelector<HTMLElement>('[data-memos]')!;
+  const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
+  const writer = () => ['admin', 'editor', 'manager'].includes(me()?.role ?? ''); // write, edit and delete any memo (user, 2026-11-04)
+  let editing: Memo | null = null;
+  const FOR: Record<string, string> = { todos: 'Todo el equipo', redaccion: 'La redacción', ventas: 'Ventas' };
+  const toast = (m: string) => dispatchEvent(new CustomEvent('nc-toast', { detail: m }));
+  let memos: Memo[] = [], reads: Read[] = [];
+  const expanded = new Set<string>(); // memos open on screen (closed: just the subject and who sent it)
+  const seesReaders = () => ['admin', 'editor', 'manager'].includes(me()?.role ?? ''); // who opened each memo (user, 2026-11-04)
+  const myId = () => (hasBackend() ? tokenInfo().id : 'yo');
+  const isRead = (m: Memo) => reads.some((r) => r.memo_id === m.id && r.user_id === myId()) || m.author_id === myId();
+  /** For the menu's count and Inicio: memos for me I haven't read. */
+  const unread = () => memos.filter((m) => !isRead(m));
+
+  async function load() {
+    if (!me()) return;
+    $('[data-mm-new]').hidden = !writer(); $('[data-mm-demo]').hidden = !isDemo();
+    if (isDemo()) {
+      if (memos.length) { paint(); return; } // the sample memos stay as they are (and what was marked read)
+      memos = [{ id: 'm1', title: 'Horario del Día de Acción de Gracias (ejemplo)', body: 'La redacción trabaja con turno reducido el jueves.\n\nVentas no tiene llamadas ese día.', audience: 'todos', pinned: true, author: 'Administración (ejemplo)', created_at: new Date().toISOString() },
+        { id: 'm2', title: 'Nuevo manual de estilo (ejemplo)', body: 'Lo encuentran en Inicio → Documentos y reglamentos.', audience: 'redaccion', pinned: false, author: 'Editor en jefe (ejemplo)', created_at: new Date(Date.now() - 2 * 864e5).toISOString() }];
+      reads = [];
+    } else if (hasBackend()) {
+      const [r1, r2] = await Promise.all([staffApi('memos?select=*&order=pinned.desc,created_at.desc&limit=100'), staffApi('memo_reads?select=*')]);
+      if (r1 && r1.status === 404) { $('[data-mm-list]').innerHTML = '<p class="pnl-muted">Falta un paso en la base de datos: corre supabase/memos-documentos.sql.</p>'; return; }
+      memos = r1?.ok ? await r1.json() : []; reads = r2?.ok ? await r2.json() : [];
+    }
+    paint();
+  }
+  function paint() {
+    const n = unread().length;
+    dispatchEvent(new CustomEvent('nc-memos-unread', { detail: n }));
+    const day = (iso: string) => new Date(iso).toLocaleDateString('es-PR', { weekday: 'short', day: 'numeric', month: 'short' });
+    const at = (iso: string) => new Date(iso).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    // Each memo closed: subject and sender; tapping it opens it, and opening it counts as read
+    $('[data-mm-list]').innerHTML = memos.map((m) => {
+      const mine = m.author_id === myId() || (isDemo() && writer()), who = reads.filter((r) => r.memo_id === m.id && r.user_id !== m.author_id), on = expanded.has(m.id);
+      const body = esc(m.body).split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+      return `<article class="pnl-card mm-item ${isRead(m) ? '' : 'new'} ${m.pinned ? 'pin' : ''} ${on ? 'on' : ''}" data-memo="${m.id}">
+        <button type="button" class="mm-head" data-mm-open aria-expanded="${on}">
+          <span class="mm-head-t">${m.pinned ? '📌 ' : ''}${!isRead(m) ? '<span class="mm-new">Nuevo</span>' : ''}<b>${esc(m.title)}</b></span>
+          <span class="mm-head-m">${esc(m.author)} · ${day(m.created_at)}</span><span class="mm-chev" aria-hidden="true">${on ? '▴' : '▾'}</span>
+        </button>
+        ${on ? `<div class="mm-open">
+          <p class="mm-meta">Para ${FOR[m.audience] ?? m.audience}</p>
+          <div class="mm-body">${body}</div>
+          ${seesReaders() ? `<p class="mm-who"><b>Lo abrieron (${who.length}):</b> ${who.map((r) => `${esc(r.name || 'Alguien')} <small>${at(r.read_at)}</small>`).join(', ') || 'nadie todavía.'}</p>` : ''}
+          ${m.edited_at ? `<p class="pnl-muted pnl-small">Editado por ${esc(m.edited_by || '')} el ${at(m.edited_at)}</p>` : ''}
+          ${writer() ? `<div class="mm-acts"><button type="button" class="pnl-link" data-mm-edit>Editar</button><button type="button" class="pnl-link" data-mm-pin>${m.pinned ? 'Quitar de arriba' : 'Fijar arriba'}</button><button type="button" class="pnl-link danger" data-mm-del>Borrar</button></div>` : ''}
+        </div>` : ''}
+      </article>`;
+    }).join('') || `<p class="apr-empty">No hay memos todavía.${writer() ? ' Toca «+ Nuevo memo» para escribir el primero.' : ''}</p>`;
+  }
+  /** Opening a memo marks it read (once). */
+  async function markRead(m: Memo) {
+    if (isRead(m)) return;
+    reads.push({ memo_id: m.id, user_id: myId(), name: me()?.name ?? '', read_at: new Date().toISOString() });
+    if (hasBackend() && !isDemo()) await staffApi('memo_reads', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify({ memo_id: m.id, name: me()?.name ?? '' }) });
+  }
+  root.addEventListener('click', async (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('[data-mm-new]')) { editing = null; $<HTMLFormElement>('[data-mm-form]').reset(); $('[data-mm-h]').textContent = 'Nuevo memo'; $('[data-mm-go]').textContent = 'Publicar memo'; $('[data-mm-err]').hidden = true; $<HTMLDialogElement>('[data-mm-dlg]').showModal(); return; }
+    if (t.closest('[data-mm-x]')) { $<HTMLDialogElement>('[data-mm-dlg]').close(); return; }
+    const card = t.closest<HTMLElement>('[data-memo]'); const m = card ? memos.find((x) => x.id === card.dataset.memo) : undefined; if (!m) return;
+    if (t.closest('[data-mm-edit]')) {
+      // The same window, filled with the memo: saving changes it for everyone (it says who edited it and when)
+      editing = m; const f = $<HTMLFormElement>('[data-mm-form]'); f.reset(); $('[data-mm-err]').hidden = true;
+      $('[data-mm-h]').textContent = 'Editar memo'; $('[data-mm-go]').textContent = 'Guardar cambios';
+      (f.elements.namedItem('title') as HTMLInputElement).value = m.title; (f.elements.namedItem('body') as HTMLTextAreaElement).value = m.body;
+      (f.elements.namedItem('audience') as HTMLSelectElement).value = m.audience; (f.elements.namedItem('pinned') as HTMLInputElement).checked = m.pinned;
+      $<HTMLDialogElement>('[data-mm-dlg]').showModal(); return;
+    }
+    if (t.closest('[data-mm-open]')) {
+      if (expanded.has(m.id)) expanded.delete(m.id); else { expanded.add(m.id); void markRead(m); }
+      paint(); return;
+    }
+    if (t.closest('[data-mm-pin]')) {
+      if (isDemo()) { toast('Modo demo: no se guarda nada.'); return; }
+      const r = await staffApi(`memos?id=eq.${m.id}`, { method: 'PATCH', body: JSON.stringify({ pinned: !m.pinned }) }); if (r?.ok) void load(); return;
+    }
+    if (t.closest('[data-mm-del]')) {
+      if (!(await ask(`¿Borrar el memo «${m.title}»?`, { ok: 'Borrar', danger: true }))) return;
+      if (isDemo()) { toast('Modo demo: no se borra nada.'); return; }
+      const r = await staffApi(`memos?id=eq.${m.id}`, { method: 'DELETE' }); if (r?.ok) { logActivity('Borró un memo', m.title); void load(); }
+    }
+  });
+  $<HTMLFormElement>('[data-mm-form]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement, v = (k: string) => String((f.elements.namedItem(k) as HTMLInputElement).value).trim(), er = $('[data-mm-err]');
+    if (v('title').length < 3 || v('body').length < 5) { er.textContent = 'Escribe el asunto y el mensaje.'; er.hidden = false; return; }
+    if (isDemo() || !hasBackend()) {
+      // Demo: the change shows on screen only (nothing is saved)
+      if (editing) Object.assign(editing, { title: v('title'), body: v('body'), audience: v('audience'), pinned: (f.elements.namedItem('pinned') as HTMLInputElement).checked, edited_at: new Date().toISOString(), edited_by: me()?.name ?? '' });
+      editing = null; $<HTMLDialogElement>('[data-mm-dlg]').close(); paint(); toast('Modo demo: no se guarda nada.'); return;
+    }
+    const row = { title: v('title'), body: v('body'), audience: v('audience'), pinned: (f.elements.namedItem('pinned') as HTMLInputElement).checked, author: me()?.name ?? '' };
+    if (editing) {
+      const { author: _a, ...changes } = row;
+      const r = await staffApi(`memos?id=eq.${editing.id}`, { method: 'PATCH', body: JSON.stringify({ ...changes, edited_at: new Date().toISOString(), edited_by: me()?.name ?? '' }) });
+      if (!r?.ok) { er.textContent = 'No se pudo guardar. ¿Ya se corrió supabase/editar-memos-personal.sql?'; er.hidden = false; return; }
+      logActivity('Editó un memo', row.title); editing = null;
+      $<HTMLDialogElement>('[data-mm-dlg]').close(); toast('Memo actualizado.'); void load(); return;
+    }
+    const r = await staffApi('memos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    if (!r?.ok) { er.textContent = 'No se pudo publicar. ¿Ya se corrió supabase/memos-documentos.sql?'; er.hidden = false; return; }
+    logActivity('Publicó un memo', `${row.title} (para ${FOR[row.audience]})`);
+    $<HTMLDialogElement>('[data-mm-dlg]').close(); toast('Memo publicado. El equipo lo ve en Memos.'); void load();
+  });
+  $<HTMLDialogElement>('[data-mm-dlg]').addEventListener('click', (e) => { const d = e.currentTarget as HTMLDialogElement; if (e.target === d) d.close(); });
+  addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'memos' || (e as CustomEvent).detail === 'inicio') void load(); });
+  addEventListener('nc-staff-change', () => void load());
+  void load();
+</script>

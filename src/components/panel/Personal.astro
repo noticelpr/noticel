@@ -1,0 +1,204 @@
+---
+// Panel → Personal (HR, user 2026-11-03), for the administrator and the Gerente: days off to approve, who's off soon,
+// and each team member's record (position, type, start date, phone, emergency contact, notes).
+// Tables hr_people and hr_timeoff (supabase/permisos-equipo.sql). Each person asks for days off from Inicio
+// (TimeOff.astro). Demo mode: sample people and requests labeled EJEMPLO, nothing is saved.
+---
+<section class="hr" data-hr>
+  <h1 class="pnl-h">Personal <span class="sp-demo" data-hr-demo hidden>DEMO</span></h1>
+  <p class="pnl-muted">Días libres, quién está fuera y el expediente de cada persona del equipo.</p>
+  <div class="pnl-kpis" data-hr-kpis></div>
+
+  <div class="hr-mine-h"><h2 class="pnl-h3">Días libres por aprobar</h2><button type="button" class="adp-btn ghost-dark" data-off-add>+ Añadir días libres</button></div>
+  <div class="hr-list" data-hr-pending></div>
+
+  <h2 class="pnl-h3">Quién está libre (próximos 30 días)</h2>
+  <div class="hr-list" data-hr-off></div>
+
+  <h2 class="pnl-h3">Personas</h2>
+  <p class="pnl-muted pnl-small">Toca «Expediente» para ver o cambiar los datos de cada persona. Solo el administrador y el Gerente los ven.</p>
+  <div class="hr-list" data-hr-people></div>
+
+  <dialog class="sd-dlg pnl-acct" data-off-dlg aria-labelledby="off-h">
+    <form class="sd-form" data-off-form novalidate>
+      <header class="sd-dlg-h"><h2 id="off-h" data-off-h>Días libres</h2><button type="button" class="sd-x" data-off-x aria-label="Cerrar">✕</button></header>
+      <label data-off-who-l>Persona<select name="who" data-off-who></select></label>
+      <div class="sd-2">
+        <label>Desde<input name="from" type="date" required /></label>
+        <label>Hasta<input name="to" type="date" required /></label>
+        <label>Tipo<select name="kind"><option value="vacaciones">Vacaciones</option><option value="personal">Personal</option><option value="enfermedad">Enfermedad</option><option value="otro">Otro</option></select></label>
+        <label>Estado<select name="status"><option value="aprobado">Aprobado</option><option value="pendiente">Pendiente</option><option value="negado">Negado</option></select></label>
+      </div>
+      <label>Nota<input name="note" maxlength="300" /></label>
+      <p class="cm-err" data-off-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="apr-reject" data-off-del hidden>Borrar</button><button type="button" class="adp-btn ghost-dark" data-off-x>Cancelar</button><button type="submit" class="adp-btn">Guardar</button></footer>
+    </form>
+  </dialog>
+
+  <dialog class="sd-dlg pnl-acct" data-hr-dlg aria-labelledby="hr-dlg-h">
+    <form class="sd-form" data-hr-form novalidate>
+      <header class="sd-dlg-h"><h2 id="hr-dlg-h" data-hr-name>Expediente</h2><button type="button" class="sd-x" data-hr-x aria-label="Cerrar">✕</button></header>
+      <div class="sd-2">
+        <label>Puesto<input name="title" maxlength="60" placeholder="ej. Periodista de deportes" /></label>
+        <label>Tipo<select name="kind"><option value="">—</option><option>Empleado a tiempo completo</option><option>Empleado a tiempo parcial</option><option>Contratista</option><option>Colaborador</option></select></label>
+        <label>Fecha de inicio<input name="start" type="date" /></label>
+        <label>Teléfono<input name="phone" maxlength="20" inputmode="tel" /></label>
+        <label>Contacto de emergencia<input name="ecName" maxlength="60" placeholder="Nombre y relación" /></label>
+        <label>Teléfono de emergencia<input name="ecPhone" maxlength="20" inputmode="tel" /></label>
+        <label>Días de vacaciones al año<input name="vacDays" type="number" min="0" max="60" /></label>
+      </div>
+      <label>Notas<textarea name="notes" rows="3" maxlength="800" placeholder="Lo que haga falta recordar (no pongas datos de salud ni números de seguro social)"></textarea></label>
+      <p class="cm-err" data-hr-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-hr-x>Cancelar</button><button type="submit" class="adp-btn">Guardar</button></footer>
+    </form>
+  </dialog>
+</section>
+
+<script>
+  import { hasBackend, staffApi, logActivity } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  import { ask } from '../../lib/dialogs';
+
+  type Person = { id?: string; name: string; role: string };
+  type Rec = { title?: string; kind?: string; start?: string; phone?: string; ecName?: string; ecPhone?: string; vacDays?: number; notes?: string };
+  type Off = { id: string; user_id: string; name: string; day_from: string; day_to: string; kind: string; note: string; status: string; decided_by?: string };
+  const root = document.querySelector<HTMLElement>('[data-hr]')!;
+  const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const $$ = <T extends Element = HTMLElement>(s: string) => [...root.querySelectorAll<T>(s)];
+  const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const get = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+  const me = () => get<{ name: string; role: string } | null>('nc-staff', null);
+  const ROLE: Record<string, string> = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente' };
+  const KIND: Record<string, string> = { vacaciones: 'Vacaciones', enfermedad: 'Enfermedad', personal: 'Personal', otro: 'Otro' };
+  const day = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'short', day: 'numeric', month: 'short' });
+  const ymd = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+  const span = (o: Off) => (o.day_from === o.day_to ? day(o.day_from) : `${day(o.day_from)} a ${day(o.day_to)}`);
+  const days = (o: Off) => Math.round((Date.parse(o.day_to) - Date.parse(o.day_from)) / 864e5) + 1;
+  const toast = (m: string) => dispatchEvent(new CustomEvent('nc-toast', { detail: m }));
+  let people: Person[] = [], recs: Record<string, Rec> = {}, offs: Off[] = [], editing: Person | null = null;
+
+  function sample() {
+    const t = new Date(), plus = (n: number) => ymd(new Date(t.valueOf() + n * 864e5));
+    people = [{ id: 'p1', name: 'Periodista (ejemplo)', role: 'reporter' }, { id: 'p2', name: 'Editor (ejemplo)', role: 'desk' }, { id: 'p3', name: 'Ventas (ejemplo)', role: 'ads' }];
+    recs = { p1: { title: 'Periodista de deportes', kind: 'Empleado a tiempo completo', start: '2025-03-01', phone: '787-555-0101', vacDays: 15 }, p3: { title: 'Ejecutiva de ventas', kind: 'Contratista', start: '2026-01-15' } };
+    offs = [{ id: 'o1', user_id: 'p1', name: 'Periodista (ejemplo)', day_from: plus(6), day_to: plus(8), kind: 'vacaciones', note: 'Viaje familiar', status: 'pendiente' },
+      { id: 'o2', user_id: 'p3', name: 'Ventas (ejemplo)', day_from: plus(2), day_to: plus(2), kind: 'personal', note: '', status: 'aprobado', decided_by: 'Administración' }];
+  }
+  async function load() {
+    const s = me(); if (!s || !['admin', 'manager'].includes(s.role)) return;
+    $('[data-hr-demo]').hidden = !isDemo();
+    if (isDemo()) sample();
+    else if (hasBackend()) {
+      people = get<Person[]>('nc-staff-team', []);
+      const [r1, r2] = await Promise.all([staffApi('hr_people?select=user_id,data'), staffApi(`hr_timeoff?select=*&day_to=gte.${ymd(new Date(Date.now() - 60 * 864e5))}&order=day_from.asc`)]);
+      if (r1 && r1.status === 404) { $('[data-hr-people]').innerHTML = '<p class="pnl-muted">Falta un paso en la base de datos: corre supabase/permisos-equipo.sql.</p>'; return; }
+      recs = Object.fromEntries(((r1?.ok ? await r1.json() : []) as Array<{ user_id: string; data: Rec }>).map((x) => [x.user_id, x.data]));
+      offs = r2?.ok ? await r2.json() : [];
+    } else { people = get<Person[]>('nc-staff-team', []); recs = get('nc-hr-people', {}); offs = get('nc-hr-timeoff', []); }
+    paint();
+  }
+  function paint() {
+    const today = ymd(new Date()), soon = ymd(new Date(Date.now() + 30 * 864e5));
+    const pending = offs.filter((o) => o.status === 'pendiente').sort((a, b) => a.day_from.localeCompare(b.day_from));
+    const off = offs.filter((o) => o.status === 'aprobado' && o.day_to >= today && o.day_from <= soon);
+    const outToday = off.filter((o) => o.day_from <= today && o.day_to >= today);
+    const demo = isDemo() ? 'DEMO · ' : '';
+    $('[data-hr-kpis]').innerHTML = [
+      ['Por aprobar', String(pending.length), `${demo}pedidos de días libres`, pending.length ? 'warn' : ''],
+      ['Fuera hoy', String(outToday.length), `${demo}${outToday.map((o) => o.name).join(', ') || 'todo el equipo trabaja'}`, ''],
+      ['En el equipo', String(people.length), `${demo}personas en el panel`, ''],
+    ].map(([l, v, s, t]) => `<div class="pnl-kpi ${t}"><span>${l}</span><b>${v}</b><small>${esc(s)}</small></div>`).join('');
+    $('[data-hr-pending]').innerHTML = pending.map((o) => `<div class="hr-row" data-off="${o.id}"><span><b>${esc(o.name)}</b><small>${KIND[o.kind] ?? o.kind} · ${span(o)} (${days(o)} ${days(o) === 1 ? 'día' : 'días'})${o.note ? ` · ${esc(o.note)}` : ''}</small></span>
+      <button type="button" class="adp-btn" data-off-ok>Aprobar</button><button type="button" class="apr-reject" data-off-no>Negar</button><button type="button" class="pnl-link" data-off-edit>Cambiar</button></div>`).join('') || '<p class="pnl-muted">No hay pedidos pendientes.</p>';
+    $('[data-hr-off]').innerHTML = off.map((o) => `<div class="hr-row" data-off="${o.id}"><span><b>${esc(o.name)}</b><small>${KIND[o.kind] ?? o.kind} · ${span(o)}${o.decided_by ? ` · aprobado por ${esc(o.decided_by)}` : ''}</small></span><button type="button" class="pnl-link" data-off-edit>Cambiar fechas</button></div>`).join('') || '<p class="pnl-muted">Nadie tiene días libres en los próximos 30 días.</p>';
+    const used = (id?: string) => offs.filter((o) => o.user_id === id && o.status === 'aprobado' && o.kind === 'vacaciones' && o.day_from.slice(0, 4) === today.slice(0, 4)).reduce((n, o) => n + days(o), 0);
+    $('[data-hr-people]').innerHTML = people.map((p, i) => { const r = (p.id && recs[p.id]) || {};
+      return `<div class="hr-row"><span><b>${esc(p.name)}</b><small>${esc(r.title || ROLE[p.role] || p.role)}${r.kind ? ` · ${esc(r.kind)}` : ''}${r.start ? ` · desde ${new Date(`${r.start}T12:00:00`).toLocaleDateString('es-PR', { month: 'short', year: 'numeric' })}` : ''}${r.vacDays ? ` · vacaciones: ${used(p.id)} de ${r.vacDays} días usados` : ''}</small></span>
+        <button type="button" class="adp-btn ghost-dark" data-hr-edit="${i}">Expediente</button></div>`; }).join('') || '<p class="pnl-muted">Abre Equipo para cargar la lista del equipo.</p>';
+  }
+  async function decide(o: Off, status: 'aprobado' | 'negado') {
+    if (status === 'negado' && !(await ask(`¿Negar los días libres de ${o.name} (${span(o)})?`, { ok: 'Negar', danger: true }))) return;
+    if (isDemo()) { toast('Modo demo: no se guarda nada.'); return; }
+    const by = me()?.name ?? '';
+    if (hasBackend()) {
+      const r = await staffApi(`hr_timeoff?id=eq.${o.id}`, { method: 'PATCH', body: JSON.stringify({ status, decided_by: by, decided_at: new Date().toISOString() }) });
+      if (!r?.ok) { toast('No se pudo guardar.'); return; }
+      logActivity(status === 'aprobado' ? 'Aprobó días libres' : 'Negó días libres', `${o.name} · ${span(o)}`);
+    }
+    o.status = status; o.decided_by = by;
+    if (!hasBackend()) { try { localStorage.setItem('nc-hr-timeoff', JSON.stringify(offs)); } catch { /* storage blocked */ } }
+    paint();
+  }
+  // ---- Change, delete or add days off (the administrator and the Gerente; user, 2026-11-04) ----
+  let offEditing: Off | null = null;
+  function offForm(o: Off | null) {
+    offEditing = o; const f = $<HTMLFormElement>('[data-off-form]'); f.reset(); $('[data-off-err]').hidden = true;
+    $('[data-off-h]').textContent = o ? `Días libres de ${o.name}` : 'Añadir días libres';
+    $('[data-off-who-l]').hidden = !!o; $('[data-off-del]').hidden = !o;
+    $('[data-off-who]').innerHTML = people.filter((p) => p.id).map((p) => `<option value="${esc(p.id!)}">${esc(p.name)}</option>`).join('');
+    const set = (k: string, v: string) => ((f.elements.namedItem(k) as HTMLInputElement).value = v);
+    if (o) { set('from', o.day_from); set('to', o.day_to); set('kind', o.kind); set('status', o.status === 'cancelado' ? 'negado' : o.status); set('note', o.note || ''); }
+    else { const t = ymd(new Date()); set('from', t); set('to', t); set('status', 'aprobado'); }
+    $<HTMLDialogElement>('[data-off-dlg]').showModal();
+  }
+  $<HTMLFormElement>('[data-off-form]').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target as HTMLFormElement, v = (k: string) => String((f.elements.namedItem(k) as HTMLInputElement).value).trim(), er = $('[data-off-err]');
+    if (!v('from') || !v('to') || v('to') < v('from')) { er.textContent = 'Revisa las fechas (la segunda no puede ser antes de la primera).'; er.hidden = false; return; }
+    if (isDemo() || !hasBackend()) { $<HTMLDialogElement>('[data-off-dlg]').close(); toast('Modo demo: no se guarda nada.'); return; }
+    const by = me()?.name ?? '', now = new Date().toISOString();
+    const base = { day_from: v('from'), day_to: v('to'), kind: v('kind'), status: v('status'), note: v('note'), decided_by: v('status') === 'pendiente' ? null : by, decided_at: v('status') === 'pendiente' ? null : now };
+    let r: Response | null;
+    if (offEditing) r = await staffApi(`hr_timeoff?id=eq.${offEditing.id}`, { method: 'PATCH', body: JSON.stringify(base) });
+    else { const p = people.find((x) => x.id === v('who')); r = await staffApi('hr_timeoff', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ...base, user_id: v('who'), name: p?.name ?? '' }) }); }
+    if (!r?.ok) { er.textContent = 'No se pudo guardar. ¿Ya se corrió supabase/editar-memos-personal.sql?'; er.hidden = false; return; }
+    const who = offEditing?.name ?? people.find((x) => x.id === v('who'))?.name ?? '';
+    logActivity(offEditing ? 'Cambió días libres' : 'Añadió días libres', `${who} · ${v('from')} a ${v('to')}`);
+    $<HTMLDialogElement>('[data-off-dlg]').close(); void load();
+  });
+  $('[data-off-del]').addEventListener('click', async () => {
+    const o = offEditing; if (!o) return;
+    if (!(await ask(`¿Borrar los días libres de ${o.name} (${span(o)})? Desaparecen de la lista.`, { ok: 'Borrar', danger: true }))) return;
+    if (isDemo() || !hasBackend()) { toast('Modo demo: no se borra nada.'); return; }
+    const r = await staffApi(`hr_timeoff?id=eq.${o.id}`, { method: 'DELETE' });
+    if (!r?.ok) { toast('No se pudo borrar. ¿Ya se corrió supabase/editar-memos-personal.sql?'); return; }
+    logActivity('Borró días libres', `${o.name} · ${span(o)}`);
+    $<HTMLDialogElement>('[data-off-dlg]').close(); void load();
+  });
+  root.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('[data-off-add]')) { offForm(null); return; }
+    if (t.closest('[data-off-x]')) { $<HTMLDialogElement>('[data-off-dlg]').close(); return; }
+    const row = t.closest<HTMLElement>('[data-off]'); const o = row ? offs.find((x) => x.id === row.dataset.off) : undefined;
+    if (o && t.closest('[data-off-edit]')) { offForm(o); return; }
+    if (o && t.closest('[data-off-ok]')) { void decide(o, 'aprobado'); return; }
+    if (o && t.closest('[data-off-no]')) { void decide(o, 'negado'); return; }
+    const ed = t.closest<HTMLElement>('[data-hr-edit]');
+    if (ed) {
+      editing = people[Number(ed.dataset.hrEdit)]; if (!editing) return;
+      const f = $<HTMLFormElement>('[data-hr-form]'); f.reset(); $('[data-hr-err]').hidden = true;
+      $('[data-hr-name]').textContent = `Expediente: ${editing.name}`;
+      const r = (editing.id && recs[editing.id]) || {};
+      (['title', 'kind', 'start', 'phone', 'ecName', 'ecPhone', 'vacDays', 'notes'] as const).forEach((k) => ((f.elements.namedItem(k) as HTMLInputElement).value = String(r[k] ?? '')));
+      $<HTMLDialogElement>('[data-hr-dlg]').showModal(); return;
+    }
+    if (t.closest('[data-hr-x]')) $<HTMLDialogElement>('[data-hr-dlg]').close();
+  });
+  $<HTMLFormElement>('[data-hr-form]').addEventListener('submit', async (e) => {
+    e.preventDefault(); if (!editing) return;
+    const f = e.target as HTMLFormElement, v = (k: string) => String((f.elements.namedItem(k) as HTMLInputElement).value).trim();
+    const data: Rec = { title: v('title'), kind: v('kind'), start: v('start'), phone: v('phone'), ecName: v('ecName'), ecPhone: v('ecPhone'), vacDays: Number(v('vacDays')) || 0, notes: v('notes') };
+    if (isDemo()) { toast('Modo demo: no se guarda nada.'); $<HTMLDialogElement>('[data-hr-dlg]').close(); return; }
+    if (hasBackend()) {
+      if (!editing.id) return;
+      const r = await staffApi('hr_people?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: editing.id, data, updated_at: new Date().toISOString(), updated_by: me()?.name ?? '' }) });
+      if (!r?.ok) { const er = $('[data-hr-err]'); er.textContent = 'No se pudo guardar. ¿Ya se corrió supabase/permisos-equipo.sql?'; er.hidden = false; return; }
+      logActivity('Cambió un expediente', editing.name);
+      recs[editing.id] = data;
+    } else { recs[editing.id ?? editing.name] = data; try { localStorage.setItem('nc-hr-people', JSON.stringify(recs)); } catch { /* storage blocked */ } }
+    $<HTMLDialogElement>('[data-hr-dlg]').close(); paint();
+  });
+  $$<HTMLDialogElement>('[data-hr-dlg],[data-off-dlg]').forEach((dl) => dl.addEventListener('click', (e) => { if (e.target === dl) dl.close(); }));
+  addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'personal') void load(); });
+  addEventListener('nc-timeoff', () => void load()); // someone asked for days off on this device
+</script>

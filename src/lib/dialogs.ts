@@ -3,7 +3,7 @@
 // askText('¿Qué debe corregir el periodista?', { value: '' }) → Promise<string | null> (null = canceled)
 // Styles: .nc-ask in src/styles/global.css.
 
-type Opts = { ok?: string; cancel?: string; danger?: boolean; value?: string; placeholder?: string; multiline?: boolean };
+type Opts = { ok?: string; cancel?: string; danger?: boolean; value?: string; placeholder?: string; multiline?: boolean; only?: boolean; html?: string }; // only: just the OK button; html: a block under the message, already escaped by the caller
 
 function open(message: string, o: Opts, withText: boolean): Promise<string | null> {
   return new Promise((resolve) => {
@@ -15,10 +15,11 @@ function open(message: string, o: Opts, withText: boolean): Promise<string | nul
         ? '<textarea class="nc-ask-in" rows="4"></textarea>'
         : '<input class="nc-ask-in" type="text" />'
       : '';
-    d.innerHTML = `<form method="dialog"><p class="nc-ask-msg"></p>${field}
+    d.innerHTML = `<form method="dialog"><p class="nc-ask-msg"></p>${o.html ? `<div class="nc-ask-html">${o.html}</div>` : ''}${field}
       <div class="nc-ask-btns"><button type="button" class="nc-ask-no"></button><button type="submit" class="nc-ask-ok${o.danger ? ' danger' : ''}"></button></div></form>`;
     d.querySelector('.nc-ask-msg')!.textContent = message;
     d.querySelector('.nc-ask-no')!.textContent = o.cancel ?? 'Cancelar';
+    if (o.only) d.querySelector<HTMLElement>('.nc-ask-no')!.hidden = true;
     d.querySelector('.nc-ask-ok')!.textContent = o.ok ?? (withText ? 'Guardar' : 'Sí, seguir');
     const input = d.querySelector<HTMLInputElement | HTMLTextAreaElement>('.nc-ask-in');
     if (input) { input.value = o.value ?? ''; input.placeholder = o.placeholder ?? ''; }
@@ -38,5 +39,7 @@ function open(message: string, o: Opts, withText: boolean): Promise<string | nul
 
 /** Yes/no question inside the page. Resolves true when the person confirms. */
 export const ask = (message: string, o: Opts = {}) => open(message, o, false).then((a) => a !== null);
+/** A message inside the page with one OK button (instead of the browser's own alert box). */
+export const tell = (message: string, ok = 'Entendido') => open(message, { ok, only: true }, false).then(() => undefined);
 /** Question with a text box inside the page. Resolves the text, or null when canceled. */
 export const askText = (message: string, o: Opts = {}) => open(message, o, true);

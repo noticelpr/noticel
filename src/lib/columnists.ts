@@ -27,7 +27,8 @@ async function fromDatabase(): Promise<Columnist[] | null> {
     if (!r.ok) return null; // table not created yet: use the file
     const rows: Array<Record<string, string | null>> = await r.json();
     const clean = (v: string | null | undefined) => (v && v.trim() ? v.trim() : undefined);
-    return rows.map((c) => ({
+    // Reporters' own profiles (panel → Mi perfil público, supabase/panel-equipo.sql) share this table: not columnists
+    return rows.filter((c) => c.kind !== 'periodista').map((c) => ({
       slug: c.slug!, name: c.name!, role: clean(c.role), bio: clean(c.bio), photo: clean(c.photo), email: clean(c.email),
       x: clean(c.x), instagram: clean(c.instagram), facebook: clean(c.facebook), website: clean(c.website),
     }));

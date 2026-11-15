@@ -29,6 +29,7 @@
         <label>Prioridad<select name="prio"><option value="normal">Normal</option><option value="alta">Alta</option><option value="urgente">Urgente</option></select></label>
         <label>Estado<select name="status"><option value="todo">Pendiente</option><option value="doing">En progreso</option><option value="done">Hecha</option></select></label>
       </div>
+      <label class="sd-chk" data-lead-only><input type="checkbox" name="story" /><span>📰 Es una noticia para escribir (la persona la empieza desde aquí y se marca hecha al publicarse)</span></label>
       <fieldset class="tk-mates"><legend>Compañeros que ayudan</legend><div data-tk-mates></div></fieldset>
       <p class="cm-err" data-tk-err hidden></p>
       <footer class="sd-dlg-f"><button type="button" class="apr-reject" data-tk-del hidden>Borrar tarea</button><button type="button" class="adp-btn ghost-dark" data-tk-close>Cancelar</button><button type="submit" class="adp-btn">Guardar</button></footer>
@@ -43,7 +44,8 @@
   if (root) {
     type Status = 'todo' | 'doing' | 'done';
     type Task = { id: string; title: string; notes: string; owner: string; mates: string[]; due: string; prio: 'normal' | 'alta' | 'urgente'; status: Status;
-      by: string; created: number; doneAt?: number; comments: Array<{ who: string; at: number; text: string }>; demo?: boolean };
+      by: string; created: number; doneAt?: number; comments: Array<{ who: string; at: number; text: string }>; demo?: boolean;
+      story?: boolean; articleId?: string }; // story: an assignment to write (Escribir); articleId: the draft started from it
     type Member = { name: string; mail: string; role: string };
     const $ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => el.querySelector<T>(s)!;
     const $$ = <T extends Element = HTMLElement>(s: string, el: ParentNode = root) => [...el.querySelectorAll<T>(s)];
@@ -51,7 +53,7 @@
     const get = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
     const set = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } dispatchEvent(new Event('nc-tasks')); };
     const me = () => get<{ name: string; role: string } | null>('nc-staff', null);
-    const isLead = () => ['admin', 'editor'].includes(me()?.role ?? '');
+    const isLead = () => ['admin', 'editor', 'desk'].includes(me()?.role ?? '');
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
     const addDays = (n: number) => { const d = new Date(`${today}T12:00:00`); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
     const fmtDate = (s: string) => (s ? new Date(`${s}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'short', day: 'numeric', month: 'short' }) : '');
@@ -95,7 +97,7 @@
         <button type="button" class="tk-check" data-tk-done aria-pressed="${t.status === 'done'}" aria-label="${t.status === 'done' ? 'Marcar como pendiente' : 'Marcar como hecha'}">✓</button>
         <div class="tk-main">
           <p class="tk-meta">${t.prio !== 'normal' ? `<span class="tk-prio ${t.prio}">${t.prio === 'urgente' ? 'Urgente' : 'Alta'}</span>` : ''}<span class="tk-st ${t.status}">${STATUS[t.status]}</span>${t.due ? `<span class="${late(t) ? 'tk-late' : ''}">${late(t) ? 'Atrasada · ' : ''}${t.due === today ? 'Hoy' : fmtDate(t.due)}</span>` : ''}${t.demo ? '<span class="sp-demo">EJEMPLO</span>' : ''}</p>
-          <h3>${esc(t.title)}</h3>
+          <h3>${t.story ? '<span class="tk-story">📰 Noticia</span> ' : ''}${esc(t.title)}</h3>
           ${t.notes ? `<p class="tk-notes">${esc(t.notes)}</p>` : ''}
           <div class="tk-people">${av(t.owner, 'owner')}<span class="tk-who"><b>${esc(t.owner)}</b>${t.mates.length ? ` con ${t.mates.map(esc).join(', ')}` : ''}</span><span class="tk-mav">${t.mates.map((m) => av(m)).join('')}</span></div>
           ${openId === t.id ? `<div class="tk-thread">${t.comments.map((c) => `<p>${av(c.who)}<span><b>${esc(c.who)}</b> <small>${ago(c.at)}</small><br>${esc(c.text)}</span></p>`).join('') || '<p class="pnl-muted pnl-small">Sin comentarios todavía.</p>'}
@@ -105,6 +107,7 @@
             <select data-tk-mate aria-label="Añadir compañero"><option value="">+ Compañero</option>${team().filter((m) => m.name !== t.owner && !t.mates.includes(m.name)).map((m) => `<option>${esc(m.name)}</option>`).join('')}</select>
             ${t.status !== 'done' && !mine ? '<button type="button" class="pnl-link" data-tk-join>Ayudar</button>' : ''}
             <button type="button" class="pnl-link" data-tk-thread>${openId === t.id ? 'Cerrar' : `Comentarios${t.comments.length ? ` (${t.comments.length})` : ''}`}</button>
+            ${t.story && t.status !== 'done' && t.owner === me()?.name ? `<button type="button" class="adp-btn" data-tk-write>${t.articleId ? 'Abrir mi noticia' : 'Escribir esta noticia'}</button>` : ''}
             <button type="button" class="pnl-link" data-tk-edit>Editar</button>
           </div>
         </div></article>`;
@@ -152,6 +155,7 @@
       $('[data-tk-people]').innerHTML = people.map((m) => `<option value="${esc(m.name)}">${esc(m.name)}${m.name === me()?.name ? ' (yo)' : ''}</option>`).join('');
       $('[data-tk-mates]').innerHTML = people.map((m) => `<label class="sd-chk sm"><input type="checkbox" name="mates" value="${esc(m.name)}" ${t?.mates.includes(m.name) ? 'checked' : ''} /><span>${esc(m.name)}</span></label>`).join('');
       const f = (k: string, v: string) => ((form.elements.namedItem(k) as HTMLInputElement).value = v);
+      (form.elements.namedItem('story') as HTMLInputElement).checked = !!t?.story;
       if (t) { f('title', t.title); f('notes', t.notes); f('owner', t.owner); f('due', t.due); f('prio', t.prio); f('status', t.status); }
       else { f('owner', me()?.name ?? ''); f('due', addDays(1)); }
       dlg.showModal();
@@ -160,7 +164,7 @@
       e.preventDefault();
       const d = new FormData(form); const s = (k: string) => String(d.get(k) ?? '').trim();
       if (s('title').length < 4) { const er = $('[data-tk-err]'); er.textContent = 'Escribe qué hay que hacer.'; er.hidden = false; return; }
-      const v = { title: s('title'), notes: s('notes'), owner: s('owner'), due: s('due'), prio: s('prio') as Task['prio'], status: s('status') as Status, mates: d.getAll('mates').map(String).filter((m) => m !== s('owner')) };
+      const v = { title: s('title'), notes: s('notes'), owner: s('owner'), due: s('due'), prio: s('prio') as Task['prio'], status: s('status') as Status, story: d.get('story') === 'on', mates: d.getAll('mates').map(String).filter((m) => m !== s('owner')) };
       const all = tasks();
       if (editing) { const i = all.findIndex((x) => x.id === editing!.id); all[i] = { ...all[i], ...v, doneAt: v.status === 'done' ? all[i].doneAt ?? Date.now() : undefined }; }
       else all.unshift({ ...v, id: `T-${Date.now().toString(36)}`, by: me()?.name ?? '', created: Date.now(), comments: [], doneAt: v.status === 'done' ? Date.now() : undefined });
@@ -183,6 +187,12 @@
       if (el.closest('[data-tk-join]')) update(id, (t) => { const n = me()?.name; if (n && !t.mates.includes(n)) t.mates.push(n); });
       if (el.closest('[data-tk-thread]')) { openId = openId === id ? '' : id; render(); }
       if (el.closest('[data-tk-edit]')) openForm(tasks().find((x) => x.id === id) ?? null);
+      // An assignment: start (or reopen) the story in Escribir with its title; Escribir links it back (nc-task-link)
+      if (el.closest('[data-tk-write]')) {
+        const t = tasks().find((x) => x.id === id); if (!t) return;
+        dispatchEvent(new CustomEvent('nc-write-assignment', { detail: { taskId: t.id, articleId: t.articleId, title: t.title, by: t.by, due: t.due, notes: t.notes } }));
+        location.hash = 'escribir';
+      }
     });
     root.addEventListener('change', (e) => {
       const el = e.target as HTMLSelectElement; const c = el.closest<HTMLElement>('[data-tid]'); if (!c) return;
@@ -194,6 +204,9 @@
       const text = String(new FormData(f).get('c') ?? '').trim(); const id = f.closest<HTMLElement>('[data-tid]')!.dataset.tid!;
       if (text) update(id, (t) => t.comments.push({ who: me()?.name ?? '', at: Date.now(), text }));
     });
+    // Escribir: the draft started from an assignment (in progress), and done once that story is published
+    addEventListener('nc-task-link', (e) => { const d = (e as CustomEvent).detail as { taskId: string; articleId: string }; update(d.taskId, (t) => { t.articleId = d.articleId; if (t.status === 'todo') t.status = 'doing'; }); });
+    addEventListener('nc-task-done', (e) => { const d = (e as CustomEvent).detail as { taskId: string }; update(d.taskId, (t) => { t.status = 'done'; t.doneAt = Date.now(); }); });
     addEventListener('nc-staff-change', render);
     addEventListener('nc-team', render);
     render();
