@@ -11,7 +11,10 @@ const FIRST_FROM = '2026-10-01T00:00:00'; // the export in this folder ends at t
 
 const state = existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : {};
 // Ask a little before the last seen time (5 minutes), in case two stories were saved in the same second
-const since = state.lastModifiedGmt ? new Date(Date.parse(`${state.lastModifiedGmt}Z`) - 5 * 60_000).toISOString().slice(0, 19) : null;
+// WordPress compares modified_after with its LOCAL time (Puerto Rico, UTC−4), not world time: ask in Puerto Rico time,
+// or every story changed in the last 4 hours is skipped (fixed 2026-11-15)
+const prTime = (ms) => new Date(ms).toLocaleString('sv-SE', { timeZone: 'America/Puerto_Rico' }).replace(' ', 'T');
+const since = state.lastModifiedGmt ? prTime(Date.parse(`${state.lastModifiedGmt}Z`) - 5 * 60_000) : null;
 const filter = since ? `modified_after=${since}&orderby=modified` : `after=${FIRST_FROM}&orderby=date`;
 
 let newest = state.lastModifiedGmt ?? '', changed = 0, seen = 0;
@@ -26,4 +29,4 @@ for (let page = 1, pages = 1; page <= pages; page++) {
 }
 
 writeFileSync(STATE, `${JSON.stringify({ lastModifiedGmt: newest, lastRun: new Date().toISOString(), lastSeen: seen, lastChanged: changed }, null, 2)}\n`);
-console.log(`Checked ${seen} stories published or edited on noticel.com ${since ? `since ${since} UTC` : `since ${FIRST_FROM}`}; ${changed} new or updated.`);
+console.log(`Checked ${seen} stories published or edited on noticel.com ${since ? `since ${since} (Puerto Rico time)` : `since ${FIRST_FROM}`}; ${changed} new or updated.`);
