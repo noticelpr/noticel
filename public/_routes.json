@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "description": "Cloudflare runs the site's functions (archive, test-site door) only for pages, not for photos, fonts or code files.",
+  "include": ["/*"],
+  "exclude": ["/_astro/*", "/images/*", "/logos/*", "/stickers/*", "/demo-anuncios/*", "/favicon.png", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"]
+}

@@ -211,6 +211,7 @@ export const SECTION_LIVE: Record<string, string> = { gobierno: 'gobierno', legi
 
 /** Builds a link that works with the GitHub Pages base path, e.g. url('noticia/abc') */
 export function url(path = ''): string {
+  if (/^https?:\/\//.test(path)) return path; // already a full address (e.g. photos on cdn.noticel.com)
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const clean = path.replace(/^\//, '');
   return clean ? `${base}/${clean}${clean.includes('.') || clean.endsWith('/') ? '' : '/'}` : `${base}/`;

@@ -1,7 +1,7 @@
 ---
 // Story page (same as Noticias Xtra's), at the story's exact old WordPress address: /noticias/20260930/mi-noticia/,
 // /noticias/la-calle/policiacas/20260808/mi-noticia/, ... (any depth).
-import { render } from 'astro:content';
+import { render, getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import Ph from '../components/Ph.astro';
 import Gallery from '../components/Gallery.astro';
@@ -19,13 +19,18 @@ import { columnistOf, photoSrc } from '../lib/columnists';
 
 export async function getStaticPaths() {
   const stories = await getStories();
-  return stories.map((story) => ({ params: { path: story.data.path.replace(/^\/|\/$/g, '') }, props: { story, stories } }));
+  // The archive template (src/content/noticias/zz-archivo-plantilla.md, a hidden draft): its page is filled in by
+  // functions/[[path]].js with any old noticel.com story kept in NotiCel's R2 archive. It's never listed anywhere.
+  const tpl = (await getCollection('noticias', (e) => e.id === 'zz-archivo-plantilla')).map((e) => ({ ...e, data: { ...e.data, section: 'noticias' as const, featured: false } })) as Story[];
+  return [...stories, ...tpl].map((story) => ({ params: { path: story.data.path.replace(/^\/|\/$/g, '') }, props: { story, stories } }));
 }
+const ARCHIVE_TEMPLATE = 'zz-archivo-plantilla';
 
 interface Props { story: Story; stories: Story[] }
 const { story, stories } = Astro.props;
 const d = story.data;
-const s = section(d.section);
+const isTpl = story.id === ARCHIVE_TEMPLATE; // the archive template: section and reading time are filled in later
+const s = isTpl ? { ...section(d.section), name: 'ARCHSECNAME0' } : section(d.section);
 const { Content } = await render(story);
 // Documents (PDF cards) are attached at the end of the story, in their own area, wherever the editor put them
 const DOC = /<figure class="doc-card">[\s\S]*?<\/figure>/g;
@@ -63,7 +68,7 @@ const credit = d.image ? d.imageCredit : fallback.credit;
 const creditUrl = d.image ? d.imageCreditUrl : fallback.creditUrl;
 // Reading time: about 200 words a minute
 const words = (story.body ?? '').split(/\s+/).filter(Boolean).length;
-const minutes = Math.max(1, Math.round(words / 200));
+const minutes = isTpl ? 'ARCHMIN0' : Math.max(1, Math.round(words / 200));
 // Related stories the editor picked (Escribir → Noticias relacionadas), shown at the end of the story
 const related = d.related.map((id) => stories.find((x) => x.id === id)).filter((x): x is Story => !!x && x.id !== story.id).slice(0, 6);
 const more = stories
@@ -82,8 +87,8 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
       <div class="read-progress" aria-hidden="true"><span data-progress></span></div>
       <article class="art" data-read-section={s.name} data-read-url={storyUrl(story)}
         data-title={d.title} data-date={d.date.toISOString()} data-image={url(d.image ?? fallback.src)}>
-        <div class="crumbs"><a href={url()}>Portada</a> / <a href={sectionUrl(s.id)}>{s.name}</a></div>
-        <Label story={story} />
+        <div class="crumbs"><a href={url()}>Portada</a> / <a href={isTpl ? 'ARCHSECURL0' : sectionUrl(s.id)}>{s.name}</a></div>
+        {isTpl ? <span class="badge">ARCHSECNAME0</span> : <Label story={story} />}
         <h1>{d.title}</h1>
         <p class="dek">{d.description}</p>
         {/* One line: who and when on the left; reading tools and sharing on the right */}

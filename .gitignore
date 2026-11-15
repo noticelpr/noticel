@@ -15,3 +15,6 @@ cloudflare/
 # The full archive copy (scripts/archive-copy.mjs): large, kept on this computer until it goes to Cloudflare R2
 archive/
 archive-run.out
+
+# Wrangler local test data
+.wrangler/
