@@ -1,0 +1,953 @@
+---
+// Anúnciate (/publicidad/) and its English version (/en/advertise/), for advertisers who don't speak Spanish: a short page built around one step-by-step guide (one question at a time):
+//   1 format → 2 where and when → 3 the ad (upload it, or write what it should say and we create it) → 4 details and pay.
+// Requests go to the approval page (src/pages/publicidad/aprobar.astro) for the one employee who reviews and designs ads.
+// Prices, discounts, payments and where requests are saved: src/lib/ads.ts. Everything else is folded into "Preguntas".
+import Base from '../../layouts/Base.astro';
+import { SITE, url, SECTIONS } from '../../lib/site';
+import { FORMATS, REGIONS, AUDIENCE, LAUNCH_DISCOUNT, DURATION_DISCOUNTS, OTHER_DISCOUNTS, MAX_DISCOUNT, REWARDS, VOLUME_TIERS, AGENCY_COMMISSION, WEEK_SHARE, periodCost, VIEW_PACKS, VIEW_DISCOUNTS, LAUNCH_VIEWS,
+  DESIGN_FEE, DESIGN_FREE_FROM_MONTHS, UPLOAD, PAYMENTS, APPROVAL_HOURS, ROTATE_SECONDS, TAKEOVER_CPM, TAKEOVER_VIEW_PACKS, SELL_BY_VIEWS,
+  FORMATS_EN, REGIONS_EN, REWARDS_EN, OTHER_DISCOUNTS_EN, COMUNICADO_PRICES, SELF_SERVE, SUBSCRIPTION_DISCOUNT, type Lang } from '../../lib/ads';
+import { THEMES } from '../../lib/adcreative';
+
+const { lang = 'es' } = Astro.props as { lang?: Lang };
+const en = lang === 'en';
+const t = (es: string, eng: string) => (en ? eng : es);
+// Formats, regions and rewards in the page's language (English texts: src/lib/ads.ts)
+// The ads a client buys here by themselves (SELF_SERVE); the rest are sold through Ventas
+const SELF = FORMATS.filter((f) => SELF_SERVE.includes(f.id));
+const fmt = (f: (typeof FORMATS)[number]) => (en ? { ...f, ...FORMATS_EN[f.id] } : f);
+const regName = (id: string) => (en ? REGIONS_EN[id]?.name : undefined) ?? REGIONS.find((r) => r.id === id)!.name;
+const regTowns = (r: (typeof REGIONS)[number]) => (en ? REGIONS_EN[r.id]?.towns : undefined) ?? r.towns;
+const gift = (r: (typeof REWARDS)[number]) => (en ? REWARDS_EN[r.at] : undefined) ?? r.gift;
+const per = (p: string) => (en ? (p === 'día' ? 'day' : 'month') : p);
+
+const money = (n: number) => `$${n.toLocaleString('en-US')}`;
+// Cheapest way in: the smallest views package of the cheapest display ad
+const cheapest = SELL_BY_VIEWS ? Math.min(...FORMATS.filter((f) => 'cpm' in f).map((f) => ('cpm' in f ? f.cpm : 99) * (VIEW_PACKS[0] / 1000)))
+  : Math.min(...SELF.filter((f) => f.per === 'mes').map((f) => f.price)); // by time (launch): the cheapest month on sale here
+const fromText = SELL_BY_VIEWS ? `${t('por', 'per')} ${VIEW_PACKS[0].toLocaleString('en-US')} ${t('vistas', 'views')}` : t('al mes', 'a month');
+// Simplified map of Puerto Rico (viewBox 0 0 690 215): the island outline, cut into regions
+const ISLAND = 'M46 13L132 20L231 20L330 23L396 26L462 36L554 56L554 99L512 142L485 175L413 191L330 201L231 191L149 198L99 191L33 198L36 149L26 116L10 59Z';
+const CUTS: Record<string, string> = {
+  oeste: 'M0 0H120V215H0Z', norte: 'M120 0H370V88L120 92Z', metro: 'M370 0H470V100L370 88Z',
+  centro: 'M120 92L370 88L470 100V140L120 145Z', sur: 'M120 145L470 140V215H120Z', este: 'M470 0H562V215H470Z',
+};
+const LABELS: Record<string, [number, number]> = { oeste: [64, 108], norte: [245, 58], metro: [420, 62], centro: [292, 120], sur: [292, 176], este: [514, 112], islas: [622, 172] };
+// Campaign length in days (prices: src/lib/ads.ts quote; a week costs WEEK_SHARE of the month)
+const DURATIONS = [
+  // Monthly subscription first and chosen by default (user, 2026-11-06): the simplest for a small business; charged every month by card, cancel anytime (src/lib/ads.ts)
+  { v: 'sub', label: t('Cada mes, se renueva solo', 'Monthly, renews automatically'), off: SUBSCRIPTION_DISCOUNT },
+  { v: '7', label: t('1 semana', '1 week'), off: 0 }, { v: '14', label: t('2 semanas', '2 weeks'), off: 0 }, { v: '30', label: t('1 mes', '1 month'), off: 0 },
+  ...DURATION_DISCOUNTS.map((d) => ({ v: String(d.months * 30), label: `${d.months} ${t('meses', 'months')}`, off: d.pct })),
+];
+// Rate card for the price table: week, month and 3 months (with the length discount) for each format
+const rate = (f: (typeof FORMATS)[number]) => f.per === 'día' ? null : { week: Math.round(periodCost(f.price, 7)), month: f.price, three: Math.round(f.price * 3 * (1 - (DURATION_DISCOUNTS[0]?.pct ?? 0) / 100)) };
+const rewards = REWARDS.map((r) => ({ ...r, gift: gift(r) }));
+const cfg = { comunicado: COMUNICADO_PRICES, lang, formats: FORMATS.map((f) => ({ id: f.id, name: fmt(f).name, price: f.price, per: f.per, art: f.art, slots: f.slots, cpm: SELL_BY_VIEWS && 'cpm' in f ? f.cpm : 0 })), audience: AUDIENCE, launch: LAUNCH_DISCOUNT, duration: DURATION_DISCOUNTS,
+  other: OTHER_DISCOUNTS, max: MAX_DISCOUNT, rewards, volume: VOLUME_TIERS, design: DESIGN_FEE, designFree: DESIGN_FREE_FROM_MONTHS, upload: UPLOAD,
+  pay: PAYMENTS, regions: REGIONS.map(({ id }) => ({ id, name: regName(id) })), tkCpm: TAKEOVER_CPM };
+const CTAS = en ? ['Call today', 'Visit us', 'Order now', 'Message us on WhatsApp', 'See deals'] : ['Llama hoy', 'Visítanos', 'Ordena ya', 'Escríbenos por WhatsApp', 'Ver ofertas'];
+const DISC_EN: Record<string, string> = OTHER_DISCOUNTS_EN;
+---
+<Base lang={lang} title={t('Anúnciate', 'Advertise')} description={en ? `Advertise on NotiCel, Puerto Rico's news site, from ${money(cheapest)} ${fromText}: create your ad in 4 steps, pay online, and it runs within ${APPROVAL_HOURS} hours.` : `Anúnciate en NotiCel desde ${money(cheapest)} ${fromText}: crea tu anuncio en 4 pasos, paga en línea y sale en ${APPROVAL_HOURS} horas.`}>
+  <main class="wrap ad-page" id="main">
+    <section class="adp-hero adp-hero-s">
+      <p class="adp-kicker">{t('Publicidad en NotiCel', 'Advertising on NotiCel')}<a class="adp-lang" href={url(en ? 'publicidad' : 'en/advertise')} hreflang={en ? 'es' : 'en'} lang={en ? 'es' : 'en'}>{en ? 'Español' : 'English'}</a></p>
+      <h1>{t('Anúnciate desde', 'Advertise from')} {money(cheapest)} {fromText}</h1>
+      <p class="adp-lead">{en ? `Create your ad in 4 steps, pay online, and it runs within ${APPROVAL_HOURS} hours. Reach Puerto Rico and Puerto Ricans in the U.S.` : `Crea tu anuncio en 4 pasos, paga en línea y sale en ${APPROVAL_HOURS} horas.`}</p>
+      {/* First, what to publish (user, 2026-11-06): an ad, or a press release; each opens its own form */}
+      <div class="adp-pick" role="group" aria-label={t('¿Qué quieres publicar?', 'What do you want to publish?')}>
+        <a class="adp-pick-c" href="#campana" data-pick="ad" data-start>
+          <span class="adp-pick-i" aria-hidden="true">📣</span>
+          <b>{t('Anuncio', 'Ad')}</b>
+          <small>{t(`Tu marca en la portada, las noticias y el celular. Desde ${money(cheapest)} ${fromText}.`, `Your brand on the home page, the stories and phones. From ${money(cheapest)} ${fromText}.`)}</small>
+        </a>
+        <a class="adp-pick-c" href="#comunicado" data-pick="com" hidden>
+          <span class="adp-pick-i" aria-hidden="true">📰</span>
+          <b>{t('Comunicado de prensa', 'Press release')}</b>
+          <small>{t(`Publicado en su sección con la etiqueta «Comunicado pagado». Desde ${money(COMUNICADO_PRICES.ready)}.`, `Published in its section, labeled "Paid release". From ${money(COMUNICADO_PRICES.ready)}.`)}</small>
+        </a>
+      </div>
+      <div class="adp-ctas"><a class="adp-btn ghost" href="#contacto">{t("Prefiero hablar con alguien", "I'd rather talk to someone")}</a></div>
+      <script is:inline>
+        // Which form shows: the one picked, or the one a link asks for (#campana, #comunicado, a salesperson's ?v=,
+        // coming back from paying). With none, just the choice.
+        (function () {
+          var show = function (which, scroll) {
+            document.querySelectorAll('[data-flow]').forEach(function (el) { el.hidden = el.getAttribute('data-flow') !== which; });
+            // The big banner only on the first screen (user, 2026-11-06: repeated on every screen it got annoying)
+            document.querySelector('.adp-hero').classList.toggle('adp-hero-off', !!which);
+            // In a form: questions and contact hidden behind the small "¿Dudas?" line
+            document.querySelectorAll('[data-extra]').forEach(function (el) { el.hidden = !!which; });
+            document.querySelector('[data-help]').hidden = !which;
+            var el = which && document.querySelector('[data-flow="' + which + '"]');
+            if (el && scroll) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          };
+          var fromUrl = function () {
+            var q = new URLSearchParams(location.search);
+            if (location.hash === '#comunicado') return 'ad'; // NotiCel: paid press releases are off for now
+            if (location.hash === '#campana' || q.has('v') || q.has('r') || q.has('pagado') || q.has('cancelado')) return 'ad';
+            return '';
+          };
+          // Read now, while the page is loading: the payment script clears ?pagado / ?cancelado from the address before
+          // DOMContentLoaded, and then the confirmation would be hidden (user, 2026-11-07)
+          var initial = fromUrl();
+          document.addEventListener('DOMContentLoaded', function () { show(initial, false); });
+          addEventListener('hashchange', function () { var w = fromUrl(); if (w) show(w, true); });
+          document.addEventListener('click', function (e) {
+            var p = e.target.closest && e.target.closest('[data-pick]');
+            // A link to the questions or to contact opens that part, then the page goes to it
+            var x = e.target.closest && e.target.closest('a[href="#preguntas"], a[href="#contacto"]');
+            if (x) { var sec = document.querySelector(x.getAttribute('href')); if (sec) sec.hidden = false; }
+            if (p) { e.preventDefault(); history.replaceState(null, '', p.getAttribute('href')); show(p.getAttribute('data-pick'), true); return; }
+            if (e.target.closest && e.target.closest('[data-pick-back]')) { history.replaceState(null, '', location.pathname + location.search.replace(/([?&])(pagado|cancelado|r)=[^&]*/g, '$1')); show('', false); scrollTo({ top: 0, behavior: 'smooth' }); }
+          });
+        })();
+      </script>
+    </section>
+
+    <section class="wiz" id="campana" aria-labelledby="wiz-h" data-flow="ad" hidden>
+      <button type="button" class="wiz-backlink" data-pick-back>{t('‹ Volver', '‹ Back')}</button>
+      <h2 id="wiz-h" class="sr">{t("Crea tu anuncio", "Create your ad")}</h2>
+      <ol class="wiz-prog" aria-label={t('Pasos', 'Steps')}>
+        <li><button type="button" data-goto="1" aria-current="step">{t("Anuncio", "Ad")}</button></li>
+        <li><button type="button" data-goto="2">{t("Cuándo", "When")}</button></li>
+        <li><button type="button" data-goto="3">{t("Tu arte", "Your artwork")}</button></li>
+        <li><button type="button" data-goto="4">{t("Pago", "Payment")}</button></li>
+      </ol>
+
+      <form class="wiz-form" data-wiz data-cfg={JSON.stringify(cfg)} data-email={SITE.email} novalidate>
+        <!-- 1 · Format -->
+        <fieldset class="wiz-step" data-step="1">
+          <legend>{t("¿Qué anuncio quieres?", "Which ad do you want?")}</legend>
+          <p class="wiz-help">{t("Se ve grande en celular, donde lee la mayoría, y al lado de las noticias en computadora.", "It shows big on phones, where most people read, and beside the news on computers.")}</p>
+          <div class="wiz-fmts wiz-fmts-one">
+            {SELF.map((f) => (
+              <label class="wiz-fmt">
+                <input type="checkbox" name="fmt" value={f.id} checked data-keep />
+                <b>{fmt(f).name}</b>
+                <span class="wiz-price">{SELL_BY_VIEWS && 'cpm' in f ? <>{money(f.cpm)}<small>/1,000 {t('vistas', 'views')}</small></> : <>{money(f.price)}<small>/{per(f.per)}</small></>}</span>
+                <span class="wiz-about">{fmt(f).about}</span>
+              </label>
+            ))}
+            {/* Takeover until the views are met: the same "Toma de portada" bought by views (step 2 shows the packs) */}
+            {SELL_BY_VIEWS && <label class="wiz-fmt wiz-fmt-tk">
+              <input type="checkbox" data-tk-alias />
+              <span class="wiz-pop">{t("Todo el sitio", "Whole site")}</span>
+              <b>{t("Toma total por vistas", "Full takeover by views")}</b>
+              <span class="wiz-price">{money(TAKEOVER_CPM)}<small>/1,000 {t("vistas", "views")}</small></span>
+              <span class="wiz-about">{t("Tu marca en todos los espacios del sitio, sin otras marcas, hasta cumplir las vistas que compres. Luego termina sola.", "Your brand in every ad space on the site, no other brands, until the views you buy are delivered. Then it ends by itself.")}</span>
+            </label>}
+          </div>
+        </fieldset>
+
+        <!-- 2 · Where and when -->
+        <fieldset class="wiz-step" data-step="2" hidden>
+          <legend>{t("¿Cuándo?", "When?")}</legend>
+          {/* "¿Quién lo ve?" removed (user, 2026-11-06): every ad is seen by everyone (Puerto Rico and the diaspora).
+              The sales desk can still sell audience options; regions are planned for NotiCel first. */}
+          <input type="hidden" name="aud" value="all" />
+          <div class="wiz-map" data-map-wrap hidden>
+            <svg class="adb-map" viewBox="0 0 690 215" role="group" aria-label={t("Mapa de regiones de Puerto Rico", "Map of Puerto Rico regions")}>
+              <defs><clipPath id="adb-isla"><path d={ISLAND} /></clipPath></defs>
+              <g clip-path="url(#adb-isla)">
+                {Object.entries(CUTS).map(([id, d]) => <path class="adb-reg" data-reg={id} d={d}><title>{regName(id)}</title></path>)}
+              </g>
+              <g class="adb-reg" data-reg="islas"><title>{regName("islas")}</title><ellipse cx="618" cy="143" rx="50" ry="9" /><ellipse cx="660" cy="80" rx="13" ry="6" /></g>
+              <path class="adb-outline" d={ISLAND} />
+              {Object.entries(LABELS).map(([id, [x, y]]) => <text x={x} y={y} class="adb-lbl" data-lbl={id}>{id === 'islas' ? t('Islas', 'Islands') : regName(id)}</text>)}
+            </svg>
+            <div class="adb-regs">{REGIONS.map((r) => <button type="button" data-reg-btn={r.id} aria-pressed="false" title={regTowns(r)}>{regName(r.id)}</button>)}</div>
+            <p class="wiz-help" data-aud-hint></p>
+          </div>
+          <div data-views-wrap>
+            <p class="wiz-q">{t("¿Cuántas vistas quieres?", "How many views do you want?")}</p>
+            <div class="wiz-chips">
+              {VIEW_PACKS.map((v) => { const d = [...VIEW_DISCOUNTS].reverse().find((x) => v >= x.from); return <label><input type="radio" name="views" value={v} checked={v === 10000} /><span>{v.toLocaleString('en-US')}{d && <small> −{d.pct}%</small>}</span></label>; })}
+            </div>
+            <p class="wiz-help">{t("Pagas por vistas reales: cuenta cuando tu anuncio aparece en la pantalla de un lector. Cuando se cumplen, tu anuncio termina solo y te avisamos.", "You pay for real views: one counts when your ad appears on a reader's screen. When they're delivered, your ad ends by itself and we let you know.")}</p>
+          </div>
+          <div data-time-wrap>
+          <p class="wiz-q" data-time-q>{t("¿Por cuánto tiempo?", "For how long?")}</p>
+          {/* Monthly first, as a card of its own; then the fixed lengths (user, 2026-11-06: clearer for a small business) */}
+          <div class="wiz-chips wiz-time-sub">
+            <label><input type="radio" name="months" value="sub" checked /><span><b>{t('Cada mes', 'Monthly')} <small>−{SUBSCRIPTION_DISCOUNT}%</small></b><em>{t('Recomendado · se renueva solo y cancelas cuando quieras', 'Recommended · renews by itself, cancel anytime')}</em></span></label>
+          </div>
+          <p class="wiz-help" data-sub-note hidden>{t('Se cobra a tu tarjeta cada mes y tu anuncio sigue saliendo. Cancelas cuando quieras (escríbenos y lo cancelamos): sale hasta el final del mes pagado. Solo con tarjeta.', 'Your card is charged every month and your ad keeps running. Cancel anytime (write to us and we cancel it): it runs until the end of the paid month. Card only.')}</p>
+          <p class="wiz-time-or">{t('O escoge un tiempo fijo (se paga una sola vez):', 'Or pick a fixed time (paid once):')}</p>
+          <div class="wiz-chips">
+            {DURATIONS.filter((d) => !['sub', '14', '360'].includes(d.v)) /* fewer buttons (user, 2026-11-06): 1 week, 1, 3 and 6 months */.map((d) => <label><input type="radio" name="months" value={d.v} /><span>{d.label}{d.off > 0 && <small> −{d.off}%</small>}</span></label>)}
+          </div>
+          </div>
+          <div data-days-wrap hidden>
+            <p class="wiz-q">{SELL_BY_VIEWS ? t('Toma de portada: ¿por días o por vistas?', 'Home page takeover: by days or by views?') : t('Toma de portada: ¿cuántos días?', 'Home page takeover: how many days?')}</p>
+            <div class="wiz-chips">
+              <label><input type="radio" name="tkmode" value="dias" checked /><span>{t("Por días", "By days")}</span></label>
+              {SELL_BY_VIEWS && <label><input type="radio" name="tkmode" value="vistas" /><span>{t("Por vistas", "By views")}</span></label>}
+            </div>
+            <div class="wiz-chips" data-tk-views hidden>
+              {TAKEOVER_VIEW_PACKS.map((v) => <label><input type="radio" name="tkviews" value={v} checked={v === 50000} /><span>{v.toLocaleString('en-US')}</span></label>)}
+            </div>
+            <p class="wiz-help" data-tk-help></p>
+          </div>
+          <div class="wiz-row">
+            <label>{t("Empieza el", "Starts on")}<input type="date" name="start" data-start /></label>
+          {/* Fair share (src/lib/ads.ts): an estimate of views, and the next free date when the space is full */}
+          <p class="wiz-help wiz-fair" data-fair hidden></p>
+            <label data-tk-days>{t("Días de toma de portada", "Takeover days")}<input type="number" name="days" min="1" max="14" value="1" /></label>
+          </div>
+        </fieldset>
+
+        <!-- 3 · The ad -->
+        <fieldset class="wiz-step" data-step="3" hidden>
+          <legend>{t("Tu anuncio", "Your ad")}</legend>
+          <div class="wiz-two">
+            <label class="wiz-mode"><input type="radio" name="mode" value="upload" checked /><b>{t("Ya tengo mi anuncio", "I already have my ad")}</b><span>{t("Súbelo y lo revisamos.", "Upload it and we'll review it.")}</span></label>
+            <label class="wiz-mode"><input type="radio" name="mode" value="design" /><b>{t("Créenlo por mí", "Create it for me")}</b><span data-design-price>{money(DESIGN_FEE)} · {t('lo diseñamos en todos los tamaños', 'we design it in every size')}</span></label>
+          </div>
+
+          <div class="wiz-pane" data-pane="upload">
+            <p class="wiz-help" data-sizes></p>
+            <label class="wiz-drop">
+              <input type="file" accept={UPLOAD.types.join(',')} multiple data-files />
+              <b>{t("Toca para subir tu anuncio", "Tap to upload your ad")}</b>
+              <span>{en ? `JPG, PNG, GIF or WEBP · up to ${UPLOAD.maxMB} MB each` : `JPG, PNG, GIF o WEBP · hasta ${UPLOAD.maxMB} MB cada uno`}</span>
+            </label>
+            <ul class="wiz-thumbs" data-thumbs></ul>
+          </div>
+
+          <div class="wiz-pane" data-pane="design" hidden>
+            <div class="wiz-design">
+              <div class="wiz-fields">
+                <label class="wiz-drop sm">
+                  <input type="file" accept={UPLOAD.types.join(',')} data-logo />
+                  <b data-logo-label>{t("Sube tu logo (opcional)", "Upload your logo (optional)")}</b>
+                </label>
+                <label>{t("¿Qué dice el título?", "Headline")} <small data-count="title">0/30</small><input name="title" maxlength="30" placeholder={t("Ej. Pan sobao calientito", "E.g. Fresh bread every morning")} /></label>
+                <label>{t("Mensaje corto", "Short message")} <small data-count="msg">0/80</small><textarea name="msg" rows="2" maxlength="80" placeholder={t("Ej. Todos los días desde las 6 a.m. en Bayamón", "E.g. Every day from 6 a.m. in Bayamón")}></textarea></label>
+                <label>{t("Botón", "Button")} <small data-count="cta">0/24</small><input name="cta" maxlength="24" placeholder={t("Ej. Llama hoy", "E.g. Call today")} /></label>
+                <div class="wiz-sugg">{CTAS.map((c) => <button type="button" data-cta={c}>{c}</button>)}</div>
+                <p class="wiz-q">{t("Colores", "Colors")}</p>
+                <div class="wiz-themes">
+                  {THEMES.map((t, i) => <label title={t.name}><input type="radio" name="theme" value={t.id} checked={i === 0} /><span style={`background:linear-gradient(135deg,${t.a},${t.b})`}></span><b class="sr">{t.name}</b></label>)}
+                </div>
+                <label>{t("Algo más para quien lo diseña (opcional)", "Anything else for the designer (optional)")}<textarea name="notes" rows="2" placeholder={t("Ej. Incluye el teléfono 787-555-0100", "E.g. Include the phone number 787-555-0100")}></textarea></label>
+              </div>
+              <div class="wiz-previews">
+                <p class="wiz-q">{t("Así se verá", "How it will look")}</p>
+                <div data-previews></div>
+                <p class="wiz-help">{t("Nuestro equipo lo revisa y lo mejora antes de publicarlo.", "Our team reviews and polishes it before it runs.")}</p>
+              </div>
+            </div>
+          </div>
+
+          <label class="wiz-link">{t("¿A dónde lleva tu anuncio cuando lo tocan?", "Where should your ad go when tapped?")} <small>{t("Tu página, Facebook, Instagram o WhatsApp", "Your website, Facebook, Instagram or WhatsApp")}</small>
+            <input name="link" type="text" inputmode="url" placeholder={t("https://tu-negocio.com o https://wa.me/1787…", "https://your-business.com or https://wa.me/1787…")} />
+          </label>
+        </fieldset>
+
+        <!-- 4 · Details and payment -->
+        <fieldset class="wiz-step" data-step="4" hidden>
+          <legend>{t("Tus datos y pago", "Your details and payment")}</legend>
+          <div class="wiz-pay">
+            <div class="wiz-fields">
+              <div class="wiz-row">
+                <label>{t("Tu nombre", "Your name")}<input name="nombre" autocomplete="name" /></label>
+                <label>{t("Negocio", "Business")}<input name="negocio" autocomplete="organization" /></label>
+                <label>{t("Correo", "Email")}<input name="correo" type="email" autocomplete="email" /></label>
+                <label>{t("Teléfono", "Phone")}<input name="telefono" type="tel" autocomplete="tel" /></label>
+              </div>
+              <label>{t("Soy", "I am")}
+                <select name="who"><option value="retail">{t("Negocio local", "A local business")}</option><option value="agency">{t("Agencia o marca grande", "An agency or large brand")}</option><option value="nonprofit">{t("Sin fines de lucro (−50%)", "A nonprofit (−50%)")}</option></select>
+              </label>
+              {/* First-time discount: only for a signed-in client whose account never ordered (checked again by the database) */}
+              <label class="adb-check" data-founder-wrap><input type="checkbox" name="founder" data-founder disabled /> {t("Es mi primera vez anunciándome aquí", "It's my first time advertising here")} (−{LAUNCH_DISCOUNT.pct}%)</label>
+              <p class="wiz-help founder-note" data-founder-note></p>
+            </div>
+            <div class="wiz-sum">
+              <h3>{t("Resumen", "Summary")}</h3>
+              <ul class="adb-lines" data-lines></ul>
+              <p class="adb-total"><span>Total</span><b data-total>$0</b></p>
+              <p class="adb-month" data-month></p>
+              <p class="adb-gift" data-gift hidden></p>
+              <p class="wiz-safe">{t("🔒 Pagas en el próximo paso con tarjeta o ATH Móvil. Si no aprobamos tu anuncio, te devolvemos todo tu dinero.", "🔒 You pay in the next step by card or ATH Móvil. If we don't approve your ad, you get all your money back.")}</p>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Pay (shown after step 4 when Stripe or ATH Móvil is set up in src/lib/ads.ts) -->
+        <div class="wiz-paybox" data-paybox hidden>
+          <h3>{t("Paga tu anuncio", "Pay for your ad")}</h3>
+          <p class="wiz-paytotal">{t("Total a pagar", "Total due")} <b data-pay-total></b></p>
+          <div class="wiz-paymethods">
+            {PAYMENTS.athMovilToken && (
+              <div class="wiz-method">
+                <p class="wiz-q">ATH Móvil</p>
+                <div id="ATHMovil_Checkout_Button_payment"></div>
+                <small data-ath-note>{t("Se abre ATH Móvil para confirmar el pago.", "ATH Móvil opens to confirm the payment.")}</small>
+              </div>
+            )}
+            {PAYMENTS.stripe && (
+              <div class="wiz-method">
+                <p class="wiz-q">{t("Tarjeta, Apple Pay o Google Pay", "Card, Apple Pay or Google Pay")}</p>
+                <button type="button" class="adp-btn" data-stripe>{t("Pagar con tarjeta", "Pay by card")}</button>
+                <small>{t("Se abre la página segura de Stripe con la cantidad exacta.", "Stripe's secure page opens with the exact amount.")}</small>
+                {PAYMENTS.stripeTest && <small class="wiz-test"><b>{t("MODO DE PRUEBA", "TEST MODE")}</b> · {t("no se cobra dinero de verdad. Usa la tarjeta 4242 4242 4242 4242, cualquier fecha futura y cualquier código.", "no real money is charged. Use card 4242 4242 4242 4242, any future date and any code.")}</small>}
+              </div>
+            )}
+          </div>
+          <p class="cm-err" data-pay-err hidden></p>
+          <p class="wiz-safe">{t("🔒 Pago seguro. Si no aprobamos tu anuncio, te devolvemos todo tu dinero.", "🔒 Secure payment. If we don't approve your ad, you get all your money back.")}</p>
+          <button type="button" class="wiz-backlink" data-pay-back>{t("‹ Volver a editar", "‹ Back to editing")}</button>
+        </div>
+
+        <!-- Done -->
+        <div class="wiz-done" data-done hidden>
+          <span class="wiz-check" aria-hidden="true">✓</span>
+          <h3 data-done-h>{t("¡Pago recibido! Gracias", "Payment received! Thank you")}</h3>
+          <p class="wiz-help" data-done-ref></p>
+          <div class="wiz-send" data-send hidden>
+            <p><b data-send-label>{t("Último paso:", "Last step:")}</b> <span data-send-text></span></p>
+            <a class="adp-btn red" href="#" data-send-link>{t("Enviar mi anuncio por correo", "Email my ad")}</a>
+          </div>
+          <ol>
+            <li>{en ? `We review it within ${APPROVAL_HOURS} hours` : `Lo revisamos en menos de ${APPROVAL_HOURS} horas`}<span data-done-design hidden>{t(' y lo diseñamos con lo que escribiste', ' and design it with what you wrote')}</span>.</li>
+            <li>{t('Te escribimos a', 'We email you at')} <b data-done-email></b> {t('cuando esté aprobado.', 'when it\'s approved.')}</li>
+            <li>{t("Sale en la fecha que escogiste y lo sigues en tu panel.", "It runs on the date you chose, and you follow it in your panel.")}</li>
+          </ol>
+          <p class="adp-note wiz-preview-note" data-done-note hidden></p>
+          <div class="adp-ctas"><button type="button" class="adp-btn ghost-dark" data-again>{t("Crear otro anuncio", "Create another ad")}</button></div>
+        </div>
+
+        <p class="cm-err" data-err hidden></p>
+        <p class="adp-terms" data-pay-terms hidden>{en ? <>By sending your request you accept the <a href={url('terminos-anunciantes')} target="_blank" rel="noopener">advertiser terms</a> and the <a href={url('privacidad')} target="_blank" rel="noopener">privacy policy</a> (in Spanish).</> : <>Al enviar tu solicitud aceptas los <a href={url('terminos-anunciantes')} target="_blank" rel="noopener">términos para anunciantes</a> y la <a href={url('privacidad')} target="_blank" rel="noopener">política de privacidad</a>.</>}</p>
+        <div class="wiz-bar" data-bar>
+          <div class="wiz-bar-total"><span>Total</span><b data-bar-total>$0</b></div>
+          <button type="button" class="adp-btn ghost-dark" data-back hidden>{t("Atrás", "Back")}</button>
+          <button type="button" class="adp-btn" data-next>{t("Siguiente", "Next")}</button>
+          <button type="submit" class="adp-btn red" data-pay hidden>{t("Pagar", "Pay")}</button>
+        </div>
+      </form>
+    </section>
+
+    {/* Press release: its own screen, opened from the choice at the top (user, 2026-11-06) */}
+    <section class="adp-sec adp-com" id="comunicado" aria-labelledby="adp-com-h" data-flow="com" hidden>
+      <button type="button" class="wiz-backlink" data-pick-back>{t('‹ Volver', '‹ Back')}</button>
+      <h2 id="adp-com-h">{t('Comunicado de prensa', 'Press release')}</h2>
+      <p class="adp-lead-sm">{en ? `Publish it on NotiCel from ${money(COMUNICADO_PRICES.ready)}. It runs in the section you choose, with a "Paid release" label, after an editor reviews it.` : `Publícalo en NotiCel desde ${money(COMUNICADO_PRICES.ready)}. Sale en la sección que escojas, con la etiqueta «Comunicado pagado», después de que un editor lo revise.`}</p>
+      <form class="adp-form com-form" data-com-form novalidate>
+        <div class="com-kind adp-wide" role="radiogroup">
+          <label class="wiz-mode"><input type="radio" name="kind" value="ready" checked /><b>{t('Ya lo tengo escrito', 'I already have it written')}</b><span>{money(COMUNICADO_PRICES.ready)} · {t('lo revisamos y le damos formato', 'we review and format it')}</span></label>
+          <label class="wiz-mode"><input type="radio" name="kind" value="written" /><b>{t('Escríbanlo por mí', 'Write it for me')}</b><span>{money(COMUNICADO_PRICES.written)} · {t('nos das los datos y lo redactamos', 'you give us the facts and we write it')}</span></label>
+        </div>
+        <label>{t('Sección', 'Section')}<select name="section">{SECTIONS.filter((x) => x.id !== 'opinion').map((x) => <option value={x.id}>{x.name}</option>)}</select></label>
+        <label>{t('Título', 'Headline')}<input name="title" maxlength="140" /></label>
+        <label class="adp-wide">{t('Resumen en una oración', 'One-sentence summary')}<input name="summary" maxlength="220" /></label>
+        <label class="adp-wide"><span data-com-text-l>{t('El comunicado', 'The press release')}</span><textarea name="text" rows="8" maxlength="8000" data-com-text></textarea></label>
+        <label class="adp-wide">{t('Foto (opcional, tuya o con permiso)', 'Photo (optional, yours or with permission)')}<input type="file" accept="image/jpeg,image/png,image/webp" data-com-photo /></label>
+        <label>{t('Tu nombre', 'Your name')}<input name="nombre" autocomplete="name" /></label>
+        <label>{t('Negocio u organización', 'Business or organization')}<input name="negocio" autocomplete="organization" /></label>
+        <label>{t('Correo', 'Email')}<input name="correo" type="email" autocomplete="email" /></label>
+        <label>{t('Teléfono', 'Phone')}<input name="telefono" type="tel" autocomplete="tel" /></label>
+        <p class="adp-note adp-wide">{en ? 'It is published as a paid release, signed by your business and labeled "Comunicado pagado". Our editors may adjust style and format, and won’t publish misleading claims; if we don’t approve it, you get all your money back.' : 'Se publica como comunicado pagado, firmado por tu negocio y con la etiqueta «Comunicado pagado». Los editores pueden ajustar el estilo y el formato, y no publican afirmaciones engañosas; si no lo aprobamos, te devolvemos todo tu dinero.'}</p>
+        <p class="cm-err adp-wide" data-com-err hidden></p>
+        <button type="submit" class="adp-btn red adp-wide" data-com-pay>{t('Pagar', 'Pay')} {money(COMUNICADO_PRICES.ready)}</button>
+        <p class="adp-terms adp-wide">{en ? <>By sending it you accept the <a href={url('terminos-anunciantes')} target="_blank" rel="noopener">advertiser terms</a>.</> : <>Al enviarlo aceptas los <a href={url('terminos-anunciantes')} target="_blank" rel="noopener">términos para anunciantes</a>.</>}</p>
+        <p class="adp-note adp-wide" data-com-done hidden></p>
+      </form>
+    </section>
+
+
+    {/* Inside a form, the questions and "talk to someone" fold into one small line (user, 2026-11-06) */}
+    <p class="adp-help" data-help hidden>{t('¿Dudas?', 'Questions?')} <a href="#preguntas">{t('Ver preguntas frecuentes', 'See common questions')}</a> · <a href="#contacto">{t('Hablar con una persona', 'Talk to a person')}</a></p>
+
+    <section class="adp-sec adp-faq" id="preguntas" aria-labelledby="adp-faq-h" data-extra>
+      <h2 id="adp-faq-h">{t("Preguntas", "Questions")}</h2>
+      <details id="precios">
+        <summary>{t("Precios, descuentos y premios", "Prices, discounts and rewards")}</summary>
+        <div class="adp-prices">
+          <table class="adp-table">
+            <thead><tr><th scope="col">{t("Anuncio", "Ad")}</th><th scope="col">{t("Por 1,000 vistas", "Per 1,000 views")}</th><th scope="col">10,000 {t("vistas", "views")}</th><th scope="col">50,000 {t("vistas", "views")}</th></tr></thead>
+            {/* Every spot, for the salespeople's «…#precios» link; the ones not sold here say so */}
+            <tbody>{FORMATS.map((f) => SELL_BY_VIEWS && 'cpm' in f
+              ? <tr><td>{fmt(f).name}<small>{fmt(f).size}</small></td><td>{money(f.cpm)}</td><td><b>{money(f.cpm * 10)}</b></td><td>{money(Math.round(f.cpm * 50 * (1 - (VIEW_DISCOUNTS.find((d) => d.from === 50000)?.pct ?? 0) / 100)))}</td></tr>
+              : <tr><td>{fmt(f).name}<small>{fmt(f).size}{!SELF_SERVE.includes(f.id) && <> · {t('con Ventas', 'through sales')}</>}</small></td><td colspan="3"><b>{money(f.price)}</b> {t('por', 'per')} {per(f.per)}{f.per === 'mes' && ` · ${money(rate(f)!.week)} ${t('por semana', 'per week')}`}</td></tr>)}</tbody>
+          </table>
+          <div>
+            <ul class="adp-disc">
+              <li><b>{LAUNCH_DISCOUNT.pct}%</b><span>{SELL_BY_VIEWS ? (en ? `Your first time: your first ${LAUNCH_VIEWS.toLocaleString('en-US')} views (or the first ${LAUNCH_DISCOUNT.months} months of a sponsorship)` : `Tu primera vez: tus primeras ${LAUNCH_VIEWS.toLocaleString('en-US')} vistas (o los primeros ${LAUNCH_DISCOUNT.months} meses de un patrocinio)`) : en ? `Founding advertiser: your first ${LAUNCH_DISCOUNT.months} months` : `Anunciante fundador: tus primeros ${LAUNCH_DISCOUNT.months} meses`}</span></li>
+              {SELL_BY_VIEWS && VIEW_DISCOUNTS.map((d) => <li><b>{d.pct}%</b><span>{t('Desde', 'From')} {d.from.toLocaleString('en-US')} {t('vistas', 'views')}</span></li>)}
+              {DURATION_DISCOUNTS.filter((d) => d.months <= 6).map((d) => <li><b>{d.pct}%</b><span>{en ? `${d.months}-month ${SELL_BY_VIEWS ? 'sponsorships' : 'campaigns'}` : `${SELL_BY_VIEWS ? 'Patrocinios' : 'Campañas'} de ${d.months} meses`}</span></li>)}
+              {/* Paying everything up front is a discount for agency proposals only (panel → Ventas), not on this page */}
+              {OTHER_DISCOUNTS.filter((d) => d.id !== 'prepago').map((d) => <li><b>{d.pct}%</b><span>{en ? DISC_EN[d.id] ?? d.text : d.text}</span></li>)}
+            </ul>
+            <p class="adb-fine">{en ? `${SELL_BY_VIEWS ? 'Ads are paid by views: a view counts when your ad appears on a reader\'s screen, and your campaign ends by itself when they\'re delivered. Sponsorships and the takeover are paid by time.' : 'Ads are paid by time (weeks or months). In your advertiser panel you see live how many times your ad was seen and how many people tapped it.'} Discounts add up to ${MAX_DISCOUNT}%.` : <>{SELL_BY_VIEWS ? 'Los anuncios se pagan por vistas: una vista cuenta cuando tu anuncio aparece en la pantalla de un lector, y tu campaña termina sola al cumplirlas. Los patrocinios y la toma de portada se pagan por tiempo.' : 'Los anuncios se pagan por tiempo (semanas o meses). En tu panel de anunciante ves en vivo cuántas veces se vio tu anuncio y cuántas personas lo tocaron.'} Los descuentos se suman hasta {MAX_DISCOUNT}%.</>}</p>
+            <p class="wiz-q">{t("Premios: anuncios gratis según lo que inviertas", "Rewards: free ads based on what you spend")}</p>
+            <ol class="adp-rewards">{rewards.map((r) => <li><b>{money(r.at)}</b><span>{r.gift}</span></li>)}</ol>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>{t("Soy una agencia o una marca grande", "I'm an agency or a large brand")}</summary>
+        <ul class="adp-list">
+          {en ? <>
+          <li><b>Home page takeover:</b> the whole site with your brand for {money(FORMATS.find((f) => f.id === 'takeover')!.price)} a day, or by views at {money(TAKEOVER_CPM)} per 1,000 (it ends by itself when they're delivered).</li>
+          <li><b>{AGENCY_COMMISSION}% agency commission</b> on every order, monthly invoice and a panel for each client.</li>
+          <li><b>Volume discount</b> by order size: {VOLUME_TIERS.map((v) => `${v.pct}% from ${money(v.from)}`).join(' · ')}.</li>
+          <li><b>Custom orders:</b> sponsored articles, newsletter mentions, social media, video, events and exact dates. We'll prepare a proposal for you.</li>
+          </> : <>
+          <li><b>Toma de portada:</b> todo el sitio con tu marca por {money(FORMATS.find((f) => f.id === 'takeover')!.price)} al día, o por vistas a {money(TAKEOVER_CPM)} cada 1,000 (termina sola al cumplirlas).</li>
+          <li><b>{AGENCY_COMMISSION}% de comisión de agencia</b> en cada orden, factura mensual y un panel para cada cliente.</li>
+          <li><b>Descuento por volumen</b> según el tamaño de la orden: {VOLUME_TIERS.map((v) => `${v.pct}% desde ${money(v.from)}`).join(' · ')}.</li>
+          <li><b>Pedidos a la medida:</b> artículos patrocinados, menciones en el boletín, redes sociales, video, eventos y fechas exactas. Te preparamos una propuesta.</li>
+          </>}
+        </ul>
+        <a class="adp-btn" href="#contacto">{t("Hablemos", "Let's talk")}</a>
+      </details>
+      <details>
+        <summary>{t("¿Cómo funciona la valla digital?", "How does the digital billboard work?")}</summary>
+        <p>{en ? `Your ad shares the space with up to 3 brands and changes every ${ROTATE_SECONDS} seconds, like a billboard on the highway. It only rotates while the reader is looking at it. You can upload 2 or 3 versions and they rotate by themselves.` : `Tu anuncio comparte el espacio con hasta 3 marcas y cambia cada ${ROTATE_SECONDS} segundos, como una valla en la carretera. Solo rota cuando el lector lo está mirando. Puedes subir 2 o 3 versiones y rotan solas.`}</p>
+      </details>
+      <details>
+        <summary>{t("¿Mi anuncio sale antes que los de Google?", "Does my ad show before Google's ads?")}</summary>
+        <p>{t("Sí. Los anuncios de nuestros clientes siempre salen primero. Google solo llena los espacios que nadie compró.", "Yes. Our clients' ads always show first. Google only fills the spaces nobody bought.")}</p>
+      </details>
+      <details>
+        <summary>{t("¿Cómo sé si mi anuncio funciona?", "How do I know my ad is working?")}</summary>
+        <p>{t("Tienes un panel con cuántas personas lo vieron, cuántas lo tocaron y en qué regiones, y te enviamos un informe por correo cada semana.", "You get a panel showing how many people saw it, how many tapped it and in which regions, and we email you a report every week.")}</p>
+      </details>
+      <details>
+        <summary>{t("¿Qué anuncios no aceptamos?", "Which ads don't we accept?")}</summary>
+        <p>{t("Contenido engañoso, para adultos, armas, apuestas sin licencia, tabaco o vapeo, ni anuncios que parezcan noticias. Si no lo aprobamos, te devolvemos el dinero.", "Misleading or adult content, weapons, unlicensed gambling, tobacco or vaping, or ads that look like news. If we don't approve it, we refund your money.")}</p>
+      </details>
+      {en && <details>
+        <summary>Can my ad be in English?</summary>
+        <p>Yes. Your ad can be in English or Spanish; most of our readers read Spanish, and many Puerto Ricans in the U.S. read both. If we design it for you, tell us which language you want in the notes. Our team answers in English, and your emails and advertiser panel are in English.</p>
+      </details>}
+    </section>
+
+    <section class="adp-sec adp-contact" id="contacto" aria-labelledby="adp-c" data-extra>
+      <div>
+        <h2 id="adp-c">{t("Prefiero hablar con alguien", "I'd rather talk to someone")}</h2>
+        <p>{t("Déjanos tus datos y te llamamos o escribimos.", "Leave your details and we'll call or write to you.")}</p>
+        {/* Spots for bigger clients are sold by Ventas (moved here from the ad form's first step, user 2026-11-06) */}
+        <p class="adp-big">{t("También aquí: el banner de arriba, media página, patrocinar una sección o la toma de portada.", "Also here: the top banner, half page, a section sponsorship or the home page takeover.")}</p>
+        {SITE.email && <p>{t('O escríbenos a', 'Or email us at')} <a href={`mailto:${SITE.email}?subject=${encodeURIComponent(t('Publicidad en NotiCel', 'Advertising on NotiCel'))}`}>{SITE.email}</a>.</p>}
+      </div>
+      <form class="adp-form" data-ad-form data-email={SITE.email} novalidate>
+        <label>{t("Nombre", "Name")}<input name="nombre" autocomplete="name" required /></label>
+        <label>{t("Negocio", "Business")}<input name="negocio" autocomplete="organization" required /></label>
+        <label>{t("Correo electrónico", "Email")}<input name="correo" type="email" autocomplete="email" required /></label>
+        <label>{t("Teléfono", "Phone")}<input name="telefono" type="tel" autocomplete="tel" /></label>
+        <label class="adp-wide">{t("¿En qué te ayudamos?", "How can we help?")}<textarea name="mensaje" rows="3" placeholder={t("¿Qué quieres anunciar, dónde y cuándo?", "What do you want to advertise, where and when?")}></textarea></label>
+        <p class="cm-err adp-wide" data-err hidden></p>
+        <button type="submit" class="adp-btn red adp-wide">{t("Enviar", "Send")}</button>
+        <p class="adp-note adp-wide" data-note hidden></p>
+      </form>
+    </section>
+
+    {/* Comunicado de prensa pagado (src/lib/comunicados.ts): published in its section with a "Comunicado pagado" label */}
+  </main>
+  <script>
+    import { drawAd, loadImage, THEMES } from '../../lib/adcreative';
+    import { saveRequest, markPaid, sharedRequests, shrink, sendContact, cardPayment, type ArtFile } from '../../lib/adrequests';
+    import { quote, RENEWS, nextOpen, adsOn, estimateViews, spaceOf, type QuoteInput, type AdSize } from '../../lib/ads';
+    import { loggedIn, token as accountToken, accountInfo, askLogin, api } from '../../lib/account';
+    import { hasBackend, adInventory, type AdInventory } from '../../lib/backend';
+
+    // English page (/en/advertise/): <html lang="en">
+    const EN = document.documentElement.lang === 'en';
+    const t = (es: string, en: string) => (EN ? en : es);
+
+    const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+    // A salesperson's own link (?v=<code>, panel → Ventas → Mis comisiones): orders in the next 30 days are credited to them
+    const refCode = (() => {
+      const v = new URLSearchParams(location.search).get('v');
+      try {
+        if (v && /^[a-f0-9]{8}$/.test(v)) localStorage.setItem('nc-ref', JSON.stringify({ code: v, at: Date.now() }));
+        const r = JSON.parse(localStorage.getItem('nc-ref') || 'null');
+        return r && Date.now() - r.at < 30 * 864e5 ? String(r.code) : '';
+      } catch { return v && /^[a-f0-9]{8}$/.test(v) ? v : ''; }
+    })();
+    // A salesperson's "send the prices" link (…#precios): the price table opens by itself
+    if (location.hash === '#precios') { const d = document.getElementById('precios') as HTMLDetailsElement | null; if (d) { d.open = true; setTimeout(() => d.scrollIntoView({ block: 'start' }), 300); } }
+    const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+    // ---- Contact form: goes straight to the panel's Ventas (sendContact); without the database, the email app as before ----
+    const cf = document.querySelector<HTMLFormElement>('[data-ad-form]')!;
+    cf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = new FormData(cf); const v = (k: string) => String(d.get(k) || '').trim();
+      const er = cf.querySelector<HTMLElement>('[data-err]')!, note = cf.querySelector<HTMLElement>('[data-note]')!;
+      const msg = !v('nombre') || !v('negocio') ? t('Escribe tu nombre y el de tu negocio.', 'Enter your name and your business name.') : !emailOk(v('correo')) ? t('Escribe un correo válido, por ejemplo nombre@negocio.com.', 'Enter a valid email, for example name@business.com.') : '';
+      er.textContent = msg; er.hidden = !msg; if (msg) return;
+      const btn = cf.querySelector<HTMLButtonElement>('button[type="submit"]')!; btn.disabled = true;
+      const sent = await sendContact({ name: v('nombre'), business: v('negocio'), email: v('correo'), phone: v('telefono'), message: EN ? `[English] ${v('mensaje')}` : v('mensaje') });
+      btn.disabled = false;
+      if (sent === true) { cf.reset(); note.textContent = t('¡Recibimos tu mensaje! Nuestro equipo de ventas te contactará en 1 día laborable.', 'We got your message! Our sales team will contact you within 1 business day, in English.'); note.hidden = false; return; }
+      if (sent !== 'preview') { er.textContent = t('No pudimos enviar tu mensaje. Revisa tu conexión e intenta otra vez.', "We couldn't send your message. Check your connection and try again."); er.hidden = false; return; }
+      if (!cf.dataset.email) { note.textContent = t('Gracias. El envío se activará muy pronto, cuando publiquemos el correo de ventas.', 'Thank you. Sending will be turned on very soon, when we publish the sales email.'); note.hidden = false; return; }
+      location.href = `mailto:${cf.dataset.email}?subject=${encodeURIComponent(`Publicidad: ${v('negocio')}`)}&body=${encodeURIComponent([`Nombre: ${v('nombre')}`, `Negocio: ${v('negocio')}`, `Correo: ${v('correo')}`, `Teléfono: ${v('telefono')}`, '', v('mensaje')].join('\n'))}`;
+      note.textContent = t('Se abrió tu correo con el mensaje listo. Solo tienes que enviarlo.', 'Your email app opened with the message ready. Just send it.'); note.hidden = false;
+    });
+
+    // ---- Step-by-step guide ----
+    type Fmt = { id: string; name: string; price: number; per: string; art: number[][]; slots: string[]; cpm: number };
+    type Cfg = { lang: 'es' | 'en'; formats: Fmt[]; audience: { all: number; island: number; diaspora: number; perRegion: number }; launch: { pct: number; months: number };
+      duration: Array<{ months: number; pct: number }>; other: Array<{ id: string; pct: number }>; max: number; rewards: Array<{ at: number; gift: string }>;
+      volume: Array<{ from: number; pct: number }>; design: number; designFree: number; upload: { maxMB: number; types: string[] };
+      pay: { stripe: boolean; stripeTest: boolean; athMovilToken: string }; comunicado: { ready: number; written: number }; regions: Array<{ id: string; name: string }>; tkCpm: number };
+    const wf = document.querySelector<HTMLFormElement>('[data-wiz]')!;
+    const cfg: Cfg = JSON.parse(wf.dataset.cfg!);
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => wf.querySelector<T>(s)!;
+    const val = (k: string) => String(new FormData(wf).get(k) ?? '').trim();
+    const picked = () => { const ids = new FormData(wf).getAll('fmt'); if (wf.querySelector<HTMLInputElement>('[data-tk-alias]')?.checked) ids.push('takeover'); return cfg.formats.filter((f) => ids.includes(f.id)); };
+    const subOn = () => new FormData(wf).get('months') === 'sub' && !picked().some((f) => f.per === 'día'); // the takeover is by days: never a subscription
+    const timeLabel = () => (subOn() ? (EN ? RENEWS.en : RENEWS.es) : (wf.querySelector<HTMLInputElement>('[name="months"]:checked')!.nextElementSibling as HTMLElement).textContent!.replace(/\s*−\d+%/, ''));
+    const viewsPicked = () => (picked().some((f) => f.cpm > 0) ? Number(new FormData(wf).get('views')) || 10000 : 0);
+    // What the client bought: views for display ads, time for sponsorship, days for the takeover
+    // Takeover: by days, or by views (it owns every ad space until they're delivered)
+    const tkViews = () => (picked().some((f) => f.id === 'takeover') && new FormData(wf).get('tkmode') === 'vistas' ? Number(new FormData(wf).get('tkviews')) || 50000 : 0);
+    const tkLabel = () => { if (!picked().some((f) => f.id === 'takeover')) return ''; const v = tkViews(), n = Number(new FormData(wf).get('days')) || 1; return v ? t(`toma de portada hasta ${v.toLocaleString('en-US')} vistas`, `home page takeover until ${v.toLocaleString('en-US')} views`) : t(`${n} día${n > 1 ? 's' : ''} de toma de portada`, `${n} day${n > 1 ? 's' : ''} of home page takeover`); };
+    const durLabel = () => [viewsPicked() ? `${viewsPicked().toLocaleString('en-US')} ${t('vistas', 'views')}` : '', picked().some((f) => f.id === 'patrocinio') ? timeLabel() : '', tkLabel()].filter(Boolean).join(' + ') || timeLabel();
+    const regs = new Set<string>();
+    let step = 1;
+    let files: ArtFile[] = [];
+    let logo: HTMLImageElement | null = null; let logoData = '';
+
+    const start = $<HTMLInputElement>('[data-start]');
+    start.valueAsDate = new Date(Date.now() + 2 * 864e5);
+    start.min = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+
+    // Regions
+    const setRegion = (id: string) => { regs.has(id) ? regs.delete(id) : regs.add(id); calc(); };
+    wf.querySelectorAll<SVGElement>('.adb-reg').forEach((el) => el.addEventListener('click', () => setRegion(el.dataset.reg!)));
+    wf.querySelectorAll<HTMLButtonElement>('[data-reg-btn]').forEach((b) => b.addEventListener('click', () => setRegion(b.dataset.regBtn!)));
+
+    // ---- Fair share: estimated views, and full spaces (user, 2026-11-06; src/lib/ads.ts) ----
+    let inv: AdInventory | null = null;
+    void adInventory().then((x) => { inv = x; calc(); });
+    function fairNote(fmts: ReturnType<typeof picked>) {
+      const el = $('[data-fair]');
+      const spaces = [...new Set(fmts.map((f) => spaceOf(f.slots)).filter(Boolean))] as AdSize[];
+      if (!inv || !spaces.length) { el.hidden = true; return; }
+      const from = val('start') || start.min;
+      // A full space: the ad starts on the first day a place opens
+      const open = spaces.map((sp) => nextOpen(inv!.busy, sp, from)).sort().pop()!;
+      const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(EN ? 'en-US' : 'es-PR', { day: 'numeric', month: 'long' });
+      let full = '';
+      if (open > from) { start.value = open; full = t(`Ese espacio está lleno hasta entonces: tu anuncio empieza el ${day(open)}. `, `That space is full until then: your ad starts on ${day(open)}. `); }
+      const est = spaces.map((sp) => estimateViews(inv!.reads30, sp, adsOn(inv!.busy, sp, open))).filter(Boolean) as Array<[number, number]>;
+      const lo = est.reduce((a, e) => a + e[0], 0), hi = est.reduce((a, e) => a + e[1], 0);
+      const n = (x: number) => x.toLocaleString('en-US');
+      el.textContent = full + (lo ? t(`Vistas estimadas: unas ${n(lo)} a ${n(hi)} al mes (según nuestras lecturas de los últimos 30 días; es un estimado, no una garantía).`, `Estimated views: about ${n(lo)} to ${n(hi)} a month (from our reads in the last 30 days; an estimate, not a guarantee).`) : '');
+      el.hidden = !el.textContent;
+    }
+
+    // ---- Price ----
+    let total = 0, where = '', summary: string[] = [];
+    let lastAud = 'all';
+    function calc() {
+      const d = new FormData(wf);
+      const fmts = picked();
+      const len = Number(d.get('months')) || 30; /* 'sub' (monthly subscription) counts as one month */ const months = len / 30; const days = Math.max(1, Math.min(14, Number(d.get('days')) || 1)); // 'months' holds the length in days
+      const aud = String(d.get('aud'));
+      if (aud === 'regions' && lastAud !== 'regions' && !regs.size) regs.add('metro');
+      if (aud !== 'regions') regs.clear();
+      lastAud = aud;
+      $('[data-map-wrap]').hidden = aud !== 'regions';
+      const hasTk = fmts.some((f) => f.per === 'día'), tkByViews = hasTk && d.get('tkmode') === 'vistas';
+      $('[data-days-wrap]').hidden = !hasTk;
+      $('[data-tk-days]').hidden = !hasTk || tkByViews; $('[data-tk-views]').hidden = !tkByViews;
+      $('[data-tk-help]').textContent = tkByViews ? t(`Tu marca en todos los espacios del sitio desde el día que escojas hasta cumplir las vistas; luego termina sola. $${cfg.tkCpm} por cada 1,000 vistas.`, `Your brand in every ad space on the site from the day you choose until the views are delivered; then it ends by itself. $${cfg.tkCpm} per 1,000 views.`) : t('Tu marca en todos los espacios del sitio durante los días que escojas.', 'Your brand in every ad space on the site for the days you choose.');
+      // Display ads are bought by views; section sponsorship by time; the takeover by days
+      // By views only while SELL_BY_VIEWS is on (src/lib/ads.ts); otherwise every monthly format is bought by time
+      const byViews = fmts.some((f) => f.cpm > 0), byTime = fmts.some((f) => f.id === 'patrocinio' || (f.per === 'mes' && !f.cpm));
+      $('[data-views-wrap]').hidden = !byViews && fmts.length > 0;
+      $('[data-time-wrap]').hidden = !byTime;
+      const views = byViews ? Number(d.get('views')) || 10000 : 0;
+      wf.querySelectorAll<SVGElement>('.adb-reg').forEach((el) => el.classList.toggle('on', regs.has(el.dataset.reg!)));
+      wf.querySelectorAll<SVGElement>('[data-lbl]').forEach((el) => el.classList.toggle('on', regs.has(el.dataset.lbl!)));
+      wf.querySelectorAll<HTMLButtonElement>('[data-reg-btn]').forEach((b) => b.setAttribute('aria-pressed', String(regs.has(b.dataset.regBtn!))));
+      const factor = aud === 'all' ? cfg.audience.all : aud === 'island' ? cfg.audience.island : aud === 'diaspora' ? cfg.audience.diaspora : Math.min(cfg.audience.island, regs.size * cfg.audience.perRegion);
+      where = aud === 'all' ? t('Puerto Rico y la diáspora', 'Puerto Rico and the U.S.') : aud === 'island' ? t('Solo Puerto Rico', 'Puerto Rico only') : aud === 'diaspora' ? t('Solo la diáspora', 'Puerto Ricans in the U.S. only') : cfg.regions.filter((r) => regs.has(r.id)).map((r) => r.name).join(', ');
+      $('[data-aud-hint]').textContent = t(`Toca las regiones donde quieres salir. Pagas ${Math.round(factor * 100)}% del precio.`, `Tap the regions where you want to show. You pay ${Math.round(factor * 100)}% of the price.`);
+
+      // Price math lives in src/lib/ads.ts (quote), shared with the sales desk
+      const q = quote({ formats: fmts.map((f) => f.id), days: len, takeoverDays: days, takeoverViews: tkByViews ? Number(d.get('tkviews')) || 50000 : 0, views, aud: aud as QuoteInput['aud'], regions: regs.size,
+        who: String(d.get('who') || 'retail') as QuoteInput['who'], prepay: !!d.get('prepay'), founder: !!d.get('founder'), design: d.get('mode') === 'design', lang: cfg.lang, recurring: subOn() });
+      $('[data-sub-note]').hidden = !subOn();
+      try { fairNote(fmts); } catch { /* the estimate never blocks the price */ }
+      const { lines, off, design } = q;
+      total = q.total;
+      $('[data-design-price]').textContent = `${money(cfg.design)} · ${t('lo diseñamos en todos los tamaños', 'we design it in every size')}`;
+
+      const rows = lines.map(([n, c]) => `<li><span>${n}</span><b>${money(c)}</b></li>`);
+      if (!fmts.length) rows.push(`<li class="adb-empty">${t('Escoge al menos un anuncio.', 'Choose at least one ad.')}</li>`);
+      q.discounts.forEach(([n, a]) => rows.push(`<li class="adb-off"><span>${n}</span><b>−${money(a)}</b></li>`));
+      if (q.capped > 0.5) rows.push(`<li class="adb-off"><span>${t('Tope de descuento', 'Discount cap')} (${cfg.max}%)</span><b>+${money(q.capped)}</b></li>`);
+      if (design !== null) rows.push(`<li><span>${t('Diseño del anuncio', 'Ad design')}</span><b>${design ? money(design) : t('Gratis', 'Free')}</b></li>`);
+      rows.push(`<li class="adb-where"><span>${where || '—'} · ${durLabel()} ${t('desde el', 'from')} ${val('start') ? new Date(`${val('start')}T12:00:00`).toLocaleDateString(EN ? 'en-US' : 'es-PR', { day: 'numeric', month: 'long' }) : '—'}</span></li>`);
+      $('[data-lines]').innerHTML = rows.join('');
+      const perMonth = subOn() ? t(' al mes', '/month') : '';
+      $('[data-total]').textContent = money(total) + perMonth; $('[data-bar-total]').textContent = money(total) + perMonth;
+      $('[data-month]').textContent = off ? `${t('Ahorras', 'You save')} ${money(off)}${views ? ` · ${money(total / (views / 1000))} ${t('por cada 1,000 vistas', 'per 1,000 views')}` : months > 1 ? ` · ${t('unos', 'about')} ${money(total / months)} ${t('al mes', 'a month')}` : ''}` : '';
+      const gift = [...cfg.rewards].reverse().find((r) => total >= r.at), next = cfg.rewards.find((r) => total < r.at);
+      const g = $('[data-gift]'); g.hidden = !fmts.length;
+      g.innerHTML = gift ? `🎁 ${t('Te ganas', 'You earn')}: <b>${gift.gift}</b>` : next ? t(`🎁 Te faltan ${money(next.at - total)} para ganarte ${next.gift.toLowerCase()}.`, `🎁 Spend ${money(next.at - total)} more to earn ${next.gift.replace(/^1 free/, 'a free')}.`) : '';
+      $<HTMLButtonElement>('[data-pay]').textContent = `${t('Pagar', 'Pay')} ${money(total)}`;
+      summary = [...lines.map(([n, c]) => `${n}: ${money(c)}`), ...q.discounts.map(([n, a]) => `${t('Descuento', 'Discount')}: ${n} −${money(a)}`), `${t('Descuentos', 'Discounts')}: −${money(off)}`, design !== null ? `${t('Diseño', 'Design')}: ${design ? money(design) : t('gratis', 'free')}` : ''].filter(Boolean);
+      // Sizes the client must upload
+      const sizes = [...new Set(fmts.flatMap((f) => f.art.map(([w, h]) => `${w} × ${h}`)))];
+      $('[data-sizes]').innerHTML = sizes.length ? t(`Tamaños que necesitamos: <b>${sizes.join(', ')}</b> píxeles. Si te falta alguno, lo adaptamos nosotros.`, `Sizes we need: <b>${sizes.join(', ')}</b> pixels. If you're missing one, we'll adapt it.`) : '';
+      paintThumbs(); drawPreviews();
+    }
+
+    // ---- Upload ----
+    const fitsSize = (w: number, h: number) => picked().flatMap((f) => f.art).some(([aw, ah]) => Math.abs(w / h - aw / ah) / (aw / ah) < 0.08);
+    function paintThumbs() {
+      $('[data-thumbs]').innerHTML = files.map((f, i) => {
+        const ok = fitsSize(f.w, f.h);
+        return `<li><img src="${f.data}" alt="" /><span><b>${f.name.replace(/</g, '&lt;')}</b><small class="${ok ? 'ok' : 'warn'}">${f.w} × ${f.h} ${ok ? t('✓ Buen tamaño', '✓ Good size') : t('⚠ Otro tamaño: lo adaptamos', "⚠ Different size: we'll adapt it")}</small></span><button type="button" data-rm="${i}" aria-label="${t('Quitar', 'Remove')}">✕</button></li>`;
+      }).join('');
+    }
+    $<HTMLInputElement>('[data-files]').addEventListener('change', async (e) => {
+      const input = e.target as HTMLInputElement; const er = $('[data-err]'); er.hidden = true;
+      for (const file of [...(input.files || [])].slice(0, 6)) {
+        if (!cfg.upload.types.includes(file.type)) { er.textContent = `${file.name}: ${t('usa JPG, PNG, GIF o WEBP.', 'use JPG, PNG, GIF or WEBP.')}`; er.hidden = false; continue; }
+        if (file.size > cfg.upload.maxMB * 1048576) { er.textContent = t(`${file.name} pesa más de ${cfg.upload.maxMB} MB.`, `${file.name} is larger than ${cfg.upload.maxMB} MB.`); er.hidden = false; continue; }
+        const img = await loadImage(file);
+        files.push({ name: file.name, w: img.naturalWidth, h: img.naturalHeight, data: shrink(img, 800, file.type === 'image/png' ? 'image/png' : 'image/jpeg') });
+      }
+      input.value = ''; paintThumbs();
+    });
+    $('[data-thumbs]').addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-rm]'); if (b) { files.splice(Number(b.dataset.rm), 1); paintThumbs(); } });
+
+    // ---- We create it: logo + text → live preview ----
+    $<HTMLInputElement>('[data-logo]').addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
+      if (!cfg.upload.types.includes(file.type) || file.size > cfg.upload.maxMB * 1048576) { $('[data-logo-label]').textContent = t(`Usa una imagen de hasta ${cfg.upload.maxMB} MB`, `Use an image up to ${cfg.upload.maxMB} MB`); return; }
+      logo = await loadImage(file); logoData = shrink(logo, 500);
+      $('[data-logo-label]').textContent = `Logo: ${file.name} ✓ (${t('toca para cambiarlo', 'tap to change it')})`; drawPreviews();
+    });
+    wf.querySelectorAll<HTMLButtonElement>('[data-cta]').forEach((b) => b.addEventListener('click', () => { $<HTMLInputElement>('[name="cta"]').value = b.dataset.cta!; drawPreviews(); }));
+    function drawPreviews() {
+      if (val('mode') !== 'design') return;
+      ['title', 'msg', 'cta'].forEach((k) => { const el = $<HTMLInputElement>(`[name="${k}"]`); $(`[data-count="${k}"]`).textContent = `${el.value.length}/${el.maxLength}`; });
+      const sizes = [...new Map(picked().flatMap((f) => f.art).map((s) => [s.join('x'), s])).values()].slice(0, 3);
+      const theme = THEMES.find((t) => t.id === val('theme')) ?? THEMES[0];
+      const box = $('[data-previews]');
+      box.innerHTML = sizes.map(([w, h]) => `<figure><canvas data-w="${w}" data-h="${h}" style="aspect-ratio:${w}/${h};max-width:${w}px"></canvas><figcaption>${w} × ${h}</figcaption></figure>`).join('') || `<p class="wiz-help">${t('Escoge un anuncio en el paso 1.', 'Choose an ad in step 1.')}</p>`;
+      box.querySelectorAll<HTMLCanvasElement>('canvas').forEach((c) => drawAd(c, Number(c.dataset.w), Number(c.dataset.h), { title: val('title'), msg: val('msg'), cta: val('cta'), business: val('negocio') }, theme, logo));
+    }
+
+    // ---- Steps ----
+    // Nothing moves on without what the team needs (user, 2026-11-06): the missing field is marked and focused
+    let bad = '';
+    const need = (name: string, msg: string) => { bad = name; return msg; };
+    // A link typed without https:// (tunegocio.com, facebook.com/…) gets it added; a phone number becomes a WhatsApp link
+    function fixLink() {
+      const el = wf.querySelector<HTMLInputElement>('[name="link"]')!;
+      let v = el.value.trim();
+      if (/^\+?1?[\s-]*\(?[2-9]\d{2}\)?[\s.-]*\d{3}[\s.-]*\d{4}$/.test(v)) v = `https://wa.me/1${v.replace(/\D/g, '').slice(-10)}`;
+      else if (v && !/^https?:\/\//i.test(v)) v = `https://${v.replace(/^\/+/, '')}`;
+      el.value = v;
+    }
+    function check(n: number): string {
+      bad = '';
+      if (n === 1 && !picked().length) return t('Escoge al menos un anuncio.', 'Choose at least one ad.');
+      if (n === 2 && val('aud') === 'regions' && !regs.size) return t('Toca al menos una región en el mapa.', 'Tap at least one region on the map.');
+      if (n === 2 && !val('start')) return need('start', t('Escoge la fecha en que empieza.', 'Choose the start date.'));
+      if (n === 3 && val('mode') === 'upload' && !files.length) return t('Sube tu anuncio, o escoge “Créenlo por mí”.', 'Upload your ad, or choose “Create it for me”.');
+      if (n === 3 && val('mode') === 'design' && !val('title')) return need('title', t('Escribe el título de tu anuncio.', "Write your ad's headline."));
+      if (n === 3 && val('mode') === 'design' && !val('msg')) return need('msg', t('Escribe un mensaje corto para tu anuncio (qué ofreces, dónde, horario).', 'Write a short message for your ad (what you offer, where, hours).'));
+      if (n === 3) fixLink();
+      if (n === 3 && !val('link')) return need('link', t('Escribe a dónde lleva tu anuncio: tu página, Facebook, Instagram o WhatsApp.', 'Enter where your ad goes: your website, Facebook, Instagram or WhatsApp.'));
+      if (n === 3 && !/^https?:\/\/[^\s/]+\.[^\s]+$/.test(val('link'))) return need('link', t('Revisa el enlace, por ejemplo tunegocio.com o facebook.com/tunegocio.', 'Check the link, for example yourbusiness.com or facebook.com/yourbusiness.'));
+      if (n === 4 && !val('nombre')) return need('nombre', t('Escribe tu nombre.', 'Enter your name.'));
+      if (n === 4 && !val('negocio')) return need('negocio', t('Escribe el nombre de tu negocio.', 'Enter your business name.'));
+      if (n === 4 && !emailOk(val('correo'))) return need('correo', t('Escribe un correo válido, por ejemplo nombre@negocio.com.', 'Enter a valid email, for example name@business.com.'));
+      if (n === 4 && val('telefono').replace(/\D/g, '').length < 10) return need('telefono', t('Escribe tu teléfono con el código de área (10 dígitos), para llamarte si hace falta.', 'Enter your phone with area code (10 digits), so we can call you if needed.'));
+      return '';
+    }
+    const err = (m: string) => {
+      const e = $('[data-err]'); e.textContent = m; e.hidden = !m;
+      wf.querySelectorAll('.wiz-bad').forEach((x) => x.classList.remove('wiz-bad'));
+      const f = m && bad ? wf.querySelector<HTMLInputElement>(`[name="${bad}"]`) : null;
+      if (f) { f.classList.add('wiz-bad'); setTimeout(() => f.focus(), 50); f.addEventListener('input', () => f.classList.remove('wiz-bad'), { once: true }); }
+      return !!m;
+    };
+    function go(n: number) {
+      step = n;
+      wf.querySelectorAll<HTMLElement>('[data-step]').forEach((s) => (s.hidden = Number(s.dataset.step) !== n));
+      document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((b) => { const k = Number(b.dataset.goto); if (k === n) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); b.classList.toggle('done', k < n); });
+      $('[data-back]').hidden = n === 1; $('[data-next]').hidden = n === 4; $('[data-pay]').hidden = n !== 4; $('[data-pay-terms]').hidden = n !== 4;
+      err('');
+      calc();
+    }
+    const top = () => document.getElementById('campana')!.scrollIntoView({ behavior: 'smooth' });
+    $('[data-next]').addEventListener('click', () => { if (!err(check(step))) { go(step + 1); top(); } });
+    $('[data-back]').addEventListener('click', () => { go(step - 1); top(); });
+    document.querySelectorAll<HTMLButtonElement>('[data-goto]').forEach((b) => b.addEventListener('click', () => {
+      const k = Number(b.dataset.goto);
+      for (let i = 1; i < k; i++) if (err(check(i))) { go(i); err(check(i)); return; } // finish earlier steps first
+      go(k);
+    }));
+    // "Toma total por vistas" is the takeover bought by views: it checks Toma de portada and picks "Por vistas"
+    const tkAlias = wf.querySelector<HTMLInputElement>('[data-tk-alias]')!;
+    const tkBox = wf.querySelector<HTMLInputElement>('input[name="fmt"][value="takeover"]')!;
+    const tkMode = (v: string) => wf.querySelector<HTMLInputElement>(`input[name="tkmode"][value="${v}"]`)!;
+    wf.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.matches('[data-keep]') && !t.checked) { t.checked = true; return; } // the only ad sold here: always picked
+      // Only one of the two takeover cards at a time; the alias counts as Toma de portada bought by views
+      // The full takeover already owns every space: picking it clears the other cards, and picking another card clears it
+      // (Both only exist while selling by views; by time there is just "Toma de portada" by days)
+      if (tkAlias && tkMode('vistas')) {
+        if (t === tkAlias && t.checked) { wf.querySelectorAll<HTMLInputElement>('input[name="fmt"]').forEach((b) => (b.checked = false)); tkMode('vistas').checked = true; }
+        else if (t.name === 'fmt' && t.checked && tkAlias.checked) tkAlias.checked = false;
+        if (t === tkBox && t.checked) tkMode('dias').checked = true;
+        else if (t.name === 'tkmode') { const v = tkMode('vistas').checked; if (tkAlias.checked || tkBox.checked) { tkAlias.checked = v; tkBox.checked = !v; } }
+      }
+      if (t.name === 'mode') wf.querySelectorAll<HTMLElement>('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== t.value));
+      calc();
+    });
+    wf.addEventListener('input', (e) => { if ((e.target as HTMLElement).closest('.wiz-design')) drawPreviews(); else calc(); });
+
+    // ---- Pay ----
+    // Stripe: the "pagos" Edge Function opens Stripe's page for the saved request's exact amount, and Stripe confirms
+    // the payment to the database itself (coming back here doesn't mark it paid). ATH Móvil: the official web button.
+    // Until the request database is connected, the client emails us the artwork as a last step.
+    const canPay = !!(cfg.pay.stripe || cfg.pay.athMovilToken);
+    const salesEmail = wf.dataset.email || '';
+    type Pending = { id: string; email: string; business: string; mode: string; amount: number; body: string; logo?: boolean };
+    let pending: Pending | null = null;
+    const amountOf = (n: number) => Math.round(n * 100) / 100;
+    const show = (part: 'steps' | 'pay' | 'done') => {
+      wf.querySelectorAll<HTMLElement>('[data-step]').forEach((s) => (s.hidden = part !== 'steps' || Number(s.dataset.step) !== step));
+      $('[data-bar]').hidden = part !== 'steps'; document.querySelector<HTMLElement>('.wiz-prog')!.hidden = part !== 'steps';
+      $('[data-paybox]').hidden = part !== 'pay'; $('[data-done]').hidden = part !== 'done';
+      // Order finished: the purple welcome area at the top goes away, so the confirmation is the first thing they see
+      const hero = document.querySelector<HTMLElement>('.adp-hero'); if (hero) hero.style.display = part === 'done' ? 'none' : '';
+      top();
+    };
+    function done(p: Pending, how: string, confirmedByStripe = false) {
+      if (!confirmedByStripe) void markPaid(p.id); // a card payment is marked paid by Stripe itself
+      try { localStorage.removeItem('nc-ad-pending'); } catch { /* storage blocked */ }
+      $('[data-done-ref]').textContent = `${how} · ${t('Solicitud', 'Request')} ${p.id}`;
+      $('[data-done-email]').textContent = p.email || t('tu correo', 'your email');
+      $('[data-done-design]').hidden = p.mode !== 'design';
+      if (sharedRequests()) {
+        // The order (with its images, or the logo and text to design it) is already saved: nothing to email.
+        // Only a "Créenlo por mí" order without a logo gets a tip to send one by replying to the confirmation.
+        const noLogo = p.mode === 'design' && !p.logo;
+        $('[data-send]').hidden = !noLogo; $<HTMLAnchorElement>('[data-send-link]').hidden = true;
+        if (noLogo) { $('[data-send-label]').textContent = t('¿Tienes logo?', 'Have a logo?'); $('[data-send-text]').textContent = t('Contesta el correo de confirmación que te enviamos y adjúntalo. Si no tienes, lo diseñamos con el nombre de tu negocio.', "Reply to the confirmation email we sent you and attach it. If you don't have one, we'll design it with your business name."); }
+      } else if (salesEmail) {
+        $('[data-send]').hidden = false;
+        $('[data-send-text]').textContent = p.mode === 'design' ? t('envíanos tu logo por correo (si tienes uno). Ya incluimos lo que escribiste.', 'email us your logo (if you have one). What you wrote is already included.') : t('envíanos por correo las imágenes de tu anuncio.', 'email us the images of your ad.');
+        $<HTMLAnchorElement>('[data-send-link]').href = `mailto:${salesEmail}?subject=${encodeURIComponent(`${t('Mi anuncio', 'My ad')} ${p.id}: ${p.business}`)}&body=${encodeURIComponent(p.body)}`;
+      } else {
+        $('[data-send]').hidden = false;
+        $('[data-send-text]').textContent = t('te escribiremos a tu correo para recibir tu anuncio.', "we'll email you to receive your ad.");
+        $('[data-send-link]').hidden = true;
+      }
+      show('done');
+    }
+    function payErr(m: string) { const e = $('[data-pay-err]'); e.textContent = m; e.hidden = !m; }
+
+    // ATH Móvil web button (loaded once, only when set up)
+    let athLoaded = false;
+    function setupATH(p: Pending) {
+      if (!cfg.pay.athMovilToken) return;
+      const w = window as any;
+      const ok = p.amount >= 1 && p.amount <= 1500;
+      wf.querySelector<HTMLElement>('#ATHMovil_Checkout_Button_payment')!.hidden = !ok;
+      $('[data-ath-note]').textContent = ok ? t('Se abre ATH Móvil para confirmar el pago.', 'ATH Móvil opens to confirm the payment.') : t('ATH Móvil acepta pagos de $1 a $1,500. Usa tarjeta para esta cantidad.', 'ATH Móvil accepts payments from $1 to $1,500. Use a card for this amount.');
+      w.ATHM_Checkout = { env: 'production', publicToken: cfg.pay.athMovilToken, timeout: 600, theme: 'btn', lang: EN ? 'en' : 'es',
+        total: p.amount, subtotal: p.amount, tax: 0, metadata1: p.id.slice(0, 40), metadata2: p.business.slice(0, 40),
+        items: [{ name: t('Anuncio en NotiCel', 'Ad on NotiCel'), description: p.id, quantity: '1', price: String(p.amount), tax: '0', metadata: p.business.slice(0, 40) }], phoneNumber: '' };
+      w.authorizationATHM = async () => {
+        try {
+          const r = await w.authorization(); const d = r?.data ?? r;
+          if (d?.ecommerceStatus === 'COMPLETED') done(p, `${t('Pagado con ATH Móvil', 'Paid with ATH Móvil')}${d.referenceNumber ? ` · ${t('referencia', 'reference')} ${d.referenceNumber}` : ''}`);
+          else payErr(t('No pudimos confirmar el pago de ATH Móvil. Si se cobró, escríbenos y lo resolvemos.', "We couldn't confirm the ATH Móvil payment. If you were charged, write to us and we'll fix it."));
+        } catch { payErr(t('No pudimos confirmar el pago de ATH Móvil. Si se cobró, escríbenos y lo resolvemos.', "We couldn't confirm the ATH Móvil payment. If you were charged, write to us and we'll fix it.")); }
+      };
+      w.cancelATHM = async () => payErr(t('Cancelaste el pago de ATH Móvil. Puedes intentarlo otra vez.', 'You canceled the ATH Móvil payment. You can try again.'));
+      w.expiredATHM = async () => payErr(t('Se acabó el tiempo para pagar con ATH Móvil. Intenta otra vez.', 'Time ran out to pay with ATH Móvil. Try again.'));
+      if (!athLoaded) { athLoaded = true; const sc = document.createElement('script'); sc.src = 'https://payments.athmovil.com/api/modal/js/athmovil_base.js'; document.body.append(sc); }
+    }
+
+    wf.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      for (let i = 1; i <= 4; i++) if (check(i)) { go(i); err(check(i)); return; }
+      // Their account, along the way (user, 2026-11-02): to follow the ad, see its results and order again. Signing up
+      // (or in) here carries on with the order by itself.
+      if (hasBackend() && !loggedIn()) {
+        waitingAccount = true;
+        err(t('Último paso: crea tu cuenta gratis (o entra) para enviar tu anuncio y seguir sus resultados.', 'Last step: create your free account (or sign in) to send your ad and follow its results.'));
+        askLogin(t('Crea tu cuenta para enviar tu anuncio. Con ella sigues sus resultados y pides el próximo más rápido.', 'Create your account to send your ad. With it you follow its results and order the next one faster.'), { mode: 'up', email: val('correo') });
+        return;
+      }
+      const mode = val('mode') as 'upload' | 'design';
+      const id = `NC-${Date.now().toString(36).toUpperCase()}`;
+      const designFiles: ArtFile[] = [];
+      if (mode === 'design') wf.querySelectorAll<HTMLCanvasElement>('[data-previews] canvas').forEach((c) => designFiles.push({ name: `${c.dataset.w}x${c.dataset.h}.png`, w: Number(c.dataset.w), h: Number(c.dataset.h), data: c.toDataURL('image/png') }));
+      // The first-time discount goes with the client's own sign-in, and only with their account's email
+      const firstTime = !!new FormData(wf).get('founder');
+      if (firstTime && founderEmail && val('correo').toLowerCase() !== founderEmail.toLowerCase()) { err(t(`El descuento de primera vez es para el correo de tu cuenta (${founderEmail}).`, `The first-time discount is for your account's email (${founderEmail}).`)); return; }
+      const userTok = firstTime ? await accountToken() : undefined;
+      const go4 = wf.querySelector<HTMLButtonElement>('button[type="submit"]'); if (go4) go4.disabled = true;
+      const sent = await saveRequest({
+        id, created: new Date().toISOString(), status: mode === 'design' ? 'disenar' : 'revisar', paid: false,
+        client: { name: val('nombre'), business: val('negocio'), email: val('correo'), phone: val('telefono'), who: val('who'), ...(EN ? { lang: 'en' as const } : {}) },
+        formats: picked().map((f) => f.id), where, start: val('start'), duration: durLabel(), views: viewsPicked() || undefined, takeoverViews: tkViews() || undefined, total: Math.round(total), lines: refCode ? [...summary, `Referido: ${refCode}`] : summary,
+        art: mode === 'upload' ? { mode, files } : { mode, files: designFiles, logo: logoData, title: val('title'), msg: val('msg'), cta: val('cta'), theme: val('theme'), notes: val('notes') },
+        link: val('link'),
+      }, userTok);
+      if (go4) go4.disabled = false;
+      if (sent === true && firstTime) { founderUsed = true; void founderCheck(); }
+      if (sent !== true) { err(sent || t('No pudimos enviar tu solicitud. Revisa tu conexión e intenta otra vez (las imágenes de hasta 5 MB).', "We couldn't send your request. Check your connection and try again (images up to 5 MB).")); return; }
+      const amount = amountOf(total);
+      const body = [...(EN ? ['(English-speaking client / Cliente en inglés)'] : []), `Solicitud: ${id}`, `Nombre: ${val('nombre')}`, `Negocio: ${val('negocio')}`, `Correo: ${val('correo')}`, `Teléfono: ${val('telefono')}`, '',
+        ...summary, `Dónde: ${where}`, `Empieza: ${val('start')} · ${durLabel()}`, `Total pagado: $${amount.toFixed(2)}`, `Enlace: ${val('link') || '—'}`, '',
+        mode === 'design' ? `Créenlo por mí:
+Título: ${val('title')}
+Mensaje: ${val('msg')}
+Botón: ${val('cta')}
+Colores: ${val('theme')}
+Notas: ${val('notes')}
+
+(Adjunto mi logo si tengo uno.)` : '(Adjunto las imágenes de mi anuncio.)'].join('\n');
+      pending = { id, email: val('correo'), business: val('negocio'), mode, amount, body, logo: !!logoData };
+      if (!canPay && sharedRequests()) {
+        // Online payments aren't set up yet, but the request reached the team: they contact the client to pay
+        show('done');
+        $('[data-done-h]').textContent = t('¡Recibimos tu solicitud!', 'We got your request!');
+        $('[data-done-ref]').textContent = `${t('Solicitud', 'Request')} ${id}`; $('[data-done-email]').textContent = val('correo'); $('[data-done-design]').hidden = mode !== 'design';
+        const n = $('[data-done-note]'); n.hidden = false;
+        n.textContent = t('Nuestro equipo de ventas la revisará y te escribirá en 1 día laborable para coordinar el pago y la fecha de salida. No se ha cobrado nada todavía.', 'Our sales team will review it and write to you, in English, within 1 business day to arrange payment and the start date. Nothing has been charged yet.');
+        return;
+      }
+      if (!canPay) {
+        // Preview: nothing is charged or sent
+        show('done');
+        $('[data-done-h]').textContent = t('Así funcionará (vista previa)', 'How it will work (preview)');
+        $('[data-done-ref]').textContent = ''; $('[data-done-email]').textContent = val('correo'); $('[data-done-design]').hidden = mode !== 'design';
+        const n = $('[data-done-note]'); n.hidden = false;
+        n.textContent = t('Los pagos en línea se activan muy pronto: no se cobró nada ni se envió tu anuncio. Para anunciarte hoy, usa “Prefiero hablar con alguien” más abajo.', 'Online payments are coming very soon: nothing was charged and your ad was not sent. To advertise today, use “I\'d rather talk to someone” below.');
+        return;
+      }
+      try { localStorage.setItem('nc-ad-pending', JSON.stringify(pending)); } catch { /* storage blocked */ }
+      // A subscription is charged every month by card: ATH Móvil only takes one-time payments
+      const sub = subOn();
+      $('[data-pay-total]').textContent = `$${amount.toFixed(2)}${sub ? t(' al mes', '/month') : ''}`;
+      wf.querySelectorAll<HTMLElement>('.wiz-method').forEach((m) => { if (m.querySelector('#ATHMovil_Checkout_Button_payment')) m.hidden = sub; });
+      payErr(''); if (!sub) setupATH(pending); show('pay');
+    });
+    wf.querySelector<HTMLButtonElement>('[data-stripe]')?.addEventListener('click', async (e) => {
+      if (!pending) return;
+      const b = e.currentTarget as HTMLButtonElement; b.disabled = true; payErr('');
+      const r = await cardPayment(pending.id);
+      if (r.url) { location.href = r.url; return; }
+      b.disabled = false;
+      payErr(r.error || t('No se pudo abrir la página de pago. Revisa tu conexión e intenta otra vez.', "The payment page couldn't open. Check your connection and try again."));
+    });
+    $('[data-pay-back]').addEventListener('click', () => { go(4); show('steps'); });
+    $('[data-again]').addEventListener('click', () => { files = []; paintThumbs(); go(1); show('steps'); });
+
+    // ---- First-time discount: signed in, and the account never ordered before ----
+    let founderEmail = '', founderUsed = false;
+    async function founderCheck() {
+      const box = wf.querySelector<HTMLInputElement>('[data-founder]')!, wrap = wf.querySelector<HTMLElement>('[data-founder-wrap]')!, note = wf.querySelector<HTMLElement>('[data-founder-note]')!;
+      const off = (msg: string) => { box.checked = false; box.disabled = true; note.innerHTML = msg; calc(); };
+      if (!sharedRequests()) { wrap.hidden = false; box.disabled = false; note.textContent = ''; return; } // preview without the database
+      if (!loggedIn()) {
+        wrap.hidden = false;
+        return off(`${t('¿Primera vez? Entra a tu cuenta para el descuento de primera vez.', 'First time? Sign in for the first-time discount.')} <button type="button" class="pnl-link" data-founder-login>${t('Entrar o crear cuenta', 'Sign in or create an account')}</button>`);
+      }
+      const info = await accountInfo(); founderEmail = info?.email ?? '';
+      // Their own orders (the database only shows a client the orders made with their account's email)
+      const r = founderUsed ? null : await api('ad_requests?select=status');
+      const mine: Array<{ status: string }> = r?.ok ? await r.json() : [];
+      if (founderUsed || mine.some((x) => x.status !== 'rechazada')) { wrap.hidden = true; box.checked = false; note.textContent = ''; calc(); return; } // already used
+      wrap.hidden = false; box.disabled = false; if (!box.dataset.touched) box.checked = true;
+      note.textContent = t(`Para tu cuenta (${founderEmail}): usa este mismo correo en el pedido.`, `For your account (${founderEmail}): use this same email in the order.`);
+      const mail = wf.querySelector<HTMLInputElement>('[name="correo"]')!; if (!mail.value) mail.value = founderEmail;
+      calc();
+    }
+    // "Crear mi anuncio": straight into step 1, its first choice ready to tap
+    document.querySelector('[data-start]')?.addEventListener('click', (e) => {
+      e.preventDefault(); go(1);
+      document.getElementById('campana')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => wf.querySelector<HTMLInputElement>('input[name="fmt"], input[type="radio"], input[type="checkbox"]')?.focus({ preventScroll: true }), 500);
+    });
+    wf.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('[data-founder-login]')) askLogin(t('Entra para usar el descuento de primera vez.', 'Sign in to use the first-time discount.')); });
+    wf.querySelector('[data-founder]')!.addEventListener('change', (e) => ((e.target as HTMLElement).dataset.touched = '1'));
+    let waitingAccount = false; // the order waits for the account it asked for
+    addEventListener('nc-profile-change', () => { void founderCheck(); if (waitingAccount && loggedIn()) { waitingAccount = false; err(''); wf.requestSubmit(); } });
+    void founderCheck();
+
+    go(1);
+
+    // ---- Comunicado de prensa: its own short order (src/lib/comunicados.ts) ----
+    const cform = document.querySelector<HTMLFormElement>('[data-com-form]')!;
+    const PRICE = { ready: Number(cfg.comunicado.ready), written: Number(cfg.comunicado.written) };
+    let comPhoto: ArtFile | null = null;
+    const comKind = () => (new FormData(cform).get('kind') === 'written' ? 'written' : 'ready');
+    const comPaint = () => {
+      const k = comKind();
+      cform.querySelector('[data-com-pay]')!.textContent = `${cfg.pay.stripe ? t('Pagar', 'Pay') : t('Enviar', 'Send')} ${money(PRICE[k])}`;
+      cform.querySelector('[data-com-text-l]')!.textContent = k === 'written' ? t('Los datos: qué pasó, cuándo, dónde, quién, y una cita si quieres', 'The facts: what, when, where, who, and a quote if you like') : t('El comunicado', 'The press release');
+    };
+    cform.addEventListener('change', comPaint); comPaint();
+    cform.querySelector<HTMLInputElement>('[data-com-photo]')!.addEventListener('change', async (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0]; comPhoto = null; if (!f) return;
+      if (f.size > 5 * 1048576) { (e.target as HTMLInputElement).value = ''; return void (cform.querySelector('[data-com-err]')!.textContent = t('La foto pesa más de 5 MB.', 'The photo is larger than 5 MB.')); }
+      const img = await loadImage(f); comPhoto = { name: f.name, w: img.naturalWidth, h: img.naturalHeight, data: shrink(img, 1600, 'image/jpeg') };
+    });
+    cform.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = new FormData(cform), v = (k: string) => String(d.get(k) ?? '').trim(), er = cform.querySelector<HTMLElement>('[data-com-err]')!;
+      const k = comKind();
+      const msg = v('title').length < 5 ? t('Escribe el título.', 'Write the headline.') : v('text').length < (k === 'written' ? 40 : 200) ? (k === 'written' ? t('Danos más datos para escribirlo (qué, cuándo, dónde, quién).', 'Give us more facts to write it (what, when, where, who).') : t('Pega el comunicado completo.', 'Paste the whole press release.'))
+        : !v('nombre') || !v('negocio') ? t('Escribe tu nombre y el de tu negocio.', 'Enter your name and your business name.') : !emailOk(v('correo')) ? t('Escribe un correo válido.', 'Enter a valid email.') : '';
+      er.textContent = msg; er.hidden = !msg; if (msg) return;
+      const btn = cform.querySelector<HTMLButtonElement>('[data-com-pay]')!; btn.disabled = true;
+      const id = `NX-${Date.now().toString(36).toUpperCase()}`;
+      const sent = await saveRequest({ id, created: new Date().toISOString(), status: k === 'written' ? 'disenar' : 'revisar', paid: false,
+        client: { name: v('nombre'), business: v('negocio'), email: v('correo'), phone: v('telefono'), who: 'retail', ...(EN ? { lang: 'en' as const } : {}) },
+        formats: ['comunicado'], where: '', start: new Date().toISOString().slice(0, 10), duration: k === 'written' ? 'Comunicado (lo escribimos)' : 'Comunicado (escrito por el cliente)', total: PRICE[k],
+        lines: [`Sección: ${v('section')}`, `Comunicado de prensa: ${k === 'written' ? 'lo escribimos nosotros' : 'escrito por el cliente'}`, ...(refCode ? [`Referido: ${refCode}`] : [])],
+        art: { mode: k === 'written' ? 'design' : 'upload', files: comPhoto ? [comPhoto] : [], title: v('title'), cta: v('summary'), msg: v('text') }, link: '' });
+      if (sent !== true) { btn.disabled = false; er.textContent = sent || t('No pudimos enviarlo. Revisa tu conexión e intenta otra vez.', "We couldn't send it. Check your connection and try again."); er.hidden = false; return; }
+      if (cfg.pay.stripe) {
+        const pay = await cardPayment(id);
+        if (pay.url) { location.href = pay.url; return; }
+        btn.disabled = false; er.textContent = pay.error || t('Recibimos tu comunicado, pero no se abrió el pago. Te escribiremos para cobrarlo.', 'We got your release, but the payment page did not open. We will write to you to collect.'); er.hidden = false; return;
+      }
+      cform.reset(); comPaint(); btn.disabled = false;
+      const dn = cform.querySelector<HTMLElement>('[data-com-done]')!; dn.hidden = false;
+      dn.textContent = t(`¡Recibimos tu comunicado (${id})! Ventas te escribirá en 1 día laborable para coordinar el pago. No se ha cobrado nada todavía.`, `We got your press release (${id})! Sales will write to you within 1 business day to arrange payment. Nothing has been charged yet.`);
+    });
+    // Back from Stripe's payment page: ?pagado=1 (paid; Stripe already told the database) or ?cancelado=1 (back to paying)
+    const back = new URLSearchParams(location.search);
+    if (back.has('pagado') || back.has('cancelado')) {
+      let p: Pending | null = null;
+      try { p = JSON.parse(localStorage.getItem('nc-ad-pending') || 'null'); } catch { /* storage blocked */ }
+      if (p && back.get('r') && back.get('r') !== p.id) p = null;
+      if (back.has('pagado')) {
+        // Another device or a cleared browser: no saved order here, so only the confirmation
+        p ??= { id: back.get('r') ?? '', email: '', business: '', mode: 'upload', amount: 0, body: '' };
+        pending = p; done(p, t('Pagado con tarjeta', 'Paid by card'), true);
+      } else if (p) {
+        pending = p; $('[data-pay-total]').textContent = `$${p.amount.toFixed(2)}`; setupATH(p); show('pay');
+        payErr(t('No se completó el pago. Puedes intentarlo otra vez.', 'The payment was not completed. You can try again.'));
+      }
+      history.replaceState(null, '', location.pathname + location.hash);
+    }
+
+  </script>
+</Base>

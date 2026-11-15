@@ -101,6 +101,8 @@ const TABS = [
     <div class="demo demo-guest" data-demo-bar hidden>Modo demostración: los anuncios, los comentarios y los números del panel marcados <b>EJEMPLO</b> o <b>DEMO</b> son de muestra. Las noticias son reales.</div>
     <script>
       import { isDemo } from '../lib/demo';
+      import { captureSource } from '../lib/source';
+      captureSource(); // where the visitor came from (social media links), for Ventas → Redes (src/lib/source.ts)
       if (isDemo()) {
         document.querySelector<HTMLElement>('[data-demo-bar]')!.hidden = false; document.documentElement.dataset.demo = '1';
         // Guests see the new NotiCel being built, not the current noticel.com

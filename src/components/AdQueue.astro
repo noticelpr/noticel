@@ -6,7 +6,7 @@
 // PREVIEW: until REQUESTS.url (src/lib/ads.ts) is set, it shows requests made on this device plus two examples.
 // The real version needs a login so only staff can open it.
 import { FORMATS } from '../lib/ads';
-import { url } from '../lib/site';
+import { url, SECTIONS } from '../lib/site';
 import { hasBackend } from '../lib/backend';
 const fmtInfo = FORMATS.map(({ id, name, slots, art, where }) => ({ id, name, slots, art, where }));
 const home = url();
@@ -14,7 +14,7 @@ interface Props { embedded?: boolean } // inside the staff panel (/redaccion/): 
 const { embedded = false } = Astro.props;
 const Tag = embedded ? 'section' : 'main';
 ---
-<Tag class:list={["apr", !embedded && "wrap"]} id={embedded ? undefined : "main"} data-apr data-formats={JSON.stringify(fmtInfo)} data-home={home}>
+<Tag class:list={["apr", !embedded && "wrap"]} id={embedded ? undefined : "main"} data-apr data-formats={JSON.stringify(fmtInfo)} data-home={home} data-secs={JSON.stringify(Object.fromEntries(SECTIONS.map((x) => [x.id, x.name])))}>
   {!hasBackend() && <p class="pf-demo"><span class="sp-demo">VISTA PREVIA</span> Página interna para quien aprueba los anuncios. Muestra las solicitudes hechas en este dispositivo y dos de ejemplo.</p>}
   <header class="apr-head">
     <h1>Aprobar anuncios</h1>
@@ -24,21 +24,74 @@ const Tag = embedded ? 'section' : 'main';
     <button type="button" role="tab" aria-selected="true" data-f="revisar">Por revisar <b data-n="revisar"></b></button>
     <button type="button" role="tab" aria-selected="false" data-f="disenar">Por diseñar <b data-n="disenar"></b></button>
     <button type="button" role="tab" aria-selected="false" data-f="cambios">Esperando al cliente <b data-n="cambios"></b></button>
-    <button type="button" role="tab" aria-selected="false" data-f="hechas">Listas <b data-n="hechas"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-f="hechas" title="Anuncios ya aprobados o rechazados">Terminadas <b data-n="hechas"></b></button>
   </nav>
+  {/* Crear anuncio: make an ad here (from text and logo, or from a finished image fitted to every size), then
+      download it or attach it to a request (e.g. one created from a Ventas client) */}
+  <details class="apr-maker" data-maker>
+    <summary>🎨 Crear anuncio</summary>
+    <div class="apr-design">
+      <div class="apr-fields">
+        <label>Negocio<input data-m="business" maxlength="40" placeholder="ej. Panadería La Esquina" /></label>
+        <label>Título<input data-m="title" maxlength="30" placeholder="ej. Pan caliente todo el día" /></label>
+        <label>Mensaje<textarea data-m="msg" rows="2" maxlength="80" placeholder="ej. Desayunos desde $3.99 en Bayamón"></textarea></label>
+        <label>Botón<input data-m="cta" maxlength="24" placeholder="ej. Ver menú" /></label>
+        <label>Teléfono o web (opcional)<input data-m="contact" maxlength="40" placeholder="ej. 787-555-0123 · panaderia.com" /></label>
+        <label>Etiqueta de oferta (opcional)<input data-m="badge" maxlength="14" placeholder="ej. −20%, Nuevo, Gratis" /></label>
+        <div class="apr-two">
+          <label>Letra<select data-m="font"><option value="moderna">Moderna</option><option value="clasica">Clásica</option><option value="fuerte">Fuerte</option></select></label>
+          <label>Texto<select data-m="align"><option value="center">Centrado</option><option value="left">A la izquierda</option></select></label>
+        </div>
+        <label>Colores<select data-m="theme"></select></label>
+        <details class="apr-colors"><summary>Mis colores</summary>
+          <div class="apr-swatches">
+            <label>Fondo<input type="color" data-c="a" /></label><label>Fondo 2<input type="color" data-c="b" /></label>
+            <label>Texto<input type="color" data-c="fg" /></label><label>Botón<input type="color" data-c="btn" /></label><label>Texto del botón<input type="color" data-c="btnFg" /></label>
+          </div>
+        </details>
+        <label>Logo (opcional)<input type="file" accept="image/*" data-m-logo /></label>
+        <label>Foto de fondo (opcional)<input type="file" accept="image/*" data-m-photo /></label>
+        <label data-m-dim-wrap hidden>Oscurecer la foto<input type="range" min="0" max="80" value="45" data-m="dim" /></label>
+        <label>O sube un diseño ya hecho<input type="file" accept="image/*" data-m-full /></label>
+        <p class="apn-small">Con un diseño ya hecho, el sitio lo acomoda solo en cada tamaño (sin estirarlo ni cortarlo).</p>
+        <fieldset class="apr-sizes"><legend>Tamaños</legend>
+          <label><input type="checkbox" data-sz="728x90" checked /> 728 × 90 banner</label>
+          <label><input type="checkbox" data-sz="320x100" checked /> 320 × 100 banner en celular</label>
+          <label><input type="checkbox" data-sz="300x250" checked /> 300 × 250 rectángulo</label>
+          <label><input type="checkbox" data-sz="300x600" checked /> 300 × 600 media página</label>
+        </fieldset>
+      </div>
+      <div>
+        <div class="apr-canvases" data-m-canvases></div>
+        <div class="apr-acts apr-maker-acts">
+          <button type="button" class="adp-btn ghost-dark" data-m-dl>Descargar todos</button>
+          <label class="apr-maker-to">Usar en la solicitud<select data-m-req></select></label>
+          <button type="button" class="adp-btn" data-m-use>Usar este anuncio</button>
+        </div>
+      </div>
+    </div>
+  </details>
   <div class="apr-list" data-list></div>
   <div class="apn-toast" data-toast role="status" hidden></div>
 </Tag>
 <script>
   import { ask, askText } from '../lib/dialogs';
-  import { drawAd, THEMES } from '../lib/adcreative';
-  import { listRequests, loadRequests, saveRequest, updateRequest, type AdRequest } from '../lib/adrequests';
-  import { hasBackend, publishCampaign, campaignStats } from '../lib/backend';
+  import { drawAd, THEMES, fitImage, imageFrom, loadImage, placeImage } from '../lib/adcreative';
+  import { listRequests, loadRequests, saveRequest, updateRequest, updateRequestLocal, refundRequest, deleteRequests, type AdRequest } from '../lib/adrequests';
+  import { hasBackend, publishCampaign, campaignStats, logActivity } from '../lib/backend';
   import type { Campaign, AdSize } from '../lib/ads';
+  import { mineRequest } from '../lib/sellers';
+  import { isComunicado, comunicadoSection, comunicadoToEscribir } from '../lib/comunicados';
+
   const page = document.querySelector<HTMLElement>('[data-apr]')!;
+  const SEC_NAMES: Record<string, string> = JSON.parse(page.dataset.secs || '{}');
   const FMT: Array<{ id: string; name: string; slots: string[]; art: number[][]; where: string }> = JSON.parse(page.dataset.formats!);
   const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
   const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  // The signed-in staff member (the panel keeps it in nc-staff); only the admin can delete requests
+  const isAdmin = () => { try { return ['admin', 'manager'].includes(JSON.parse(localStorage.getItem('nc-staff') || 'null')?.role); } catch { return false; } }; // the Gerente too (supabase/gerente-todo.sql)
+  // A salesperson's own direct sale ("Anuncio vendido") is approved by the administrator or the Gerente, never by Ventas
+  const sellerWaits = (r: AdRequest) => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null')?.role === 'ads' && (r.lines ?? []).includes('Venta directa'); } catch { return false; } };
   const toast = (m: string) => { const t = page.querySelector<HTMLElement>('[data-toast]')!; t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3500); };
   const ago = (iso: string) => { const h = Math.round((Date.now() - new Date(iso).valueOf()) / 36e5); return h < 1 ? 'hace un momento' : h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} días`; };
   const CHECKS = ['Tamaño y calidad de imagen bien', 'Texto claro y sin errores', 'Cumple las reglas (nada prohibido ni engañoso)', 'El enlace funciona'];
@@ -94,17 +147,32 @@ const Tag = embedded ? 'section' : 'main';
   };
 
   let filter = 'revisar';
+  // Finished designs staff uploaded for a size ("Subir diseño"): fitted into that space instead of the template
+  const uploads = new Map<string, HTMLImageElement>();
+  // How each uploaded design sits in its space: "completo" (whole, blurred sides) or "recortar" (fills it; zoom and drag to move)
+  const placing = new Map<string, { mode: 'fit' | 'fill'; zoom: number; x: number; y: number }>();
+  const placeOf = (k: string) => placing.get(k) ?? { mode: 'fit' as const, zoom: 1, x: 0, y: 0 };
   function render() {
-    const all = listRequests();
+    const all = listRequests().filter(mineRequest); // a salesperson: only their own orders (the administrator sees all)
     const groups: Record<string, AdRequest[]> = { revisar: all.filter((r) => r.status === 'revisar'), disenar: all.filter((r) => r.status === 'disenar'), cambios: all.filter((r) => r.status === 'cambios'), hechas: all.filter((r) => r.status === 'aprobada' || r.status === 'rechazada') };
     Object.entries(groups).forEach(([k, l]) => (page.querySelector(`[data-n="${k}"]`)!.textContent = l.length ? String(l.length) : ''));
     const list = groups[filter];
     const box = page.querySelector<HTMLElement>('[data-list]')!;
-    if (!list.length) { box.innerHTML = `<p class="apr-empty">${filter === 'hechas' ? 'Todavía no hay anuncios aprobados.' : '🎉 Nada pendiente aquí.'}</p>`; return; }
-    box.innerHTML = list.map((r) => {
+    if (!list.length) { box.innerHTML = `<p class="apr-empty">${filter === 'hechas' ? 'No hay anuncios terminados.' : '🎉 Nada pendiente aquí.'}</p>`; return; }
+    // Terminadas: the admin can empty the list (or delete one); a campaign already on the site stays
+    const tools = filter === 'hechas' && isAdmin() ? `<div class="apr-tools"><p class="apn-small">Solo el administrador y el Gerente ven esto. Borrar quita la solicitud de esta lista; un anuncio aprobado sigue saliendo en el sitio hasta su fecha final.</p><button type="button" class="apr-reject" data-empty>Vaciar terminadas (${list.length})</button></div>` : '';
+    box.innerHTML = tools + list.map((r) => {
       const design = r.art.mode === 'design';
       const sizes = [...new Map(FMT.filter((f) => r.formats.includes(f.id)).flatMap((f) => f.art).map((s) => [s.join('x'), s])).values()];
-      const art = design && r.status !== 'aprobada'
+      // A comunicado pagado: its text and photo; it goes to Escribir as a story instead of becoming an ad
+      const com = isComunicado(r);
+      const art = com
+        ? `<div class="apr-com"><p class="apn-small"><b>${design ? 'Lo escribimos nosotros' : 'Escrito por el cliente'}</b> · sección: <b>${esc(SEC_NAMES[comunicadoSection(r)] ?? comunicadoSection(r))}</b></p>
+            ${r.art.title ? `<h3>${esc(r.art.title)}</h3>` : ''}${r.art.cta ? `<p class="apr-com-dek">${esc(r.art.cta)}</p>` : ''}
+            <div class="apr-com-text">${esc(r.art.msg || '(sin texto)')}</div>
+            ${r.art.notes ? `<p class="apr-notes">📝 Nota del cliente: ${esc(r.art.notes)}</p>` : ''}
+            ${r.art.files.length ? `<div class="apr-files">${r.art.files.map((f) => `<figure><img src="${f.data}" alt="" /><figcaption>${f.w} × ${f.h}</figcaption></figure>`).join('')}</div>` : ''}</div>`
+        : design && r.status !== 'aprobada'
         ? `<div class="apr-design" data-design>
             <div class="apr-fields">
               <p class="apn-small">El cliente escribió lo siguiente. Ajústalo si hace falta:</p>
@@ -115,17 +183,17 @@ const Tag = embedded ? 'section' : 'main';
               ${r.art.notes ? `<p class="apr-notes">📝 Nota del cliente: ${esc(r.art.notes)}</p>` : ''}
               ${r.art.logo ? `<p class="apn-small">Logo del cliente:</p><img class="apr-logo" src="${r.art.logo}" alt="Logo" />` : '<p class="apn-small">Sin logo.</p>'}
             </div>
-            <div class="apr-canvases">${sizes.map(([w, h]) => `<figure><canvas data-w="${w}" data-h="${h}" style="aspect-ratio:${w}/${h};max-width:${w}px"></canvas><figcaption>${w} × ${h} · <a href="#" data-dl="${r.id.toLowerCase()}-${w}x${h}.png">Descargar</a></figcaption></figure>`).join('')}</div>
+            <div class="apr-canvases">${sizes.map(([w, h]) => `<figure><canvas data-w="${w}" data-h="${h}" style="aspect-ratio:${w}/${h};max-width:${w}px"></canvas><figcaption>${w} × ${h} · <a href="#" data-dl="${r.id.toLowerCase()}-${w}x${h}.png">Descargar</a> · <label class="apr-up">Subir diseño<input type="file" accept="image/*" data-up hidden /></label>${uploads.has(`${r.id}:${w}x${h}`) ? ' · <button type="button" class="pnl-link" data-up-clear>Quitar</button>' : ''}</figcaption>${uploads.has(`${r.id}:${w}x${h}`) ? (() => { const p = placeOf(`${r.id}:${w}x${h}`); return `<div class="apr-place" data-place><label><input type="radio" name="pl-${r.id}-${w}x${h}" value="fit" data-pl-mode${p.mode === 'fit' ? ' checked' : ''} /> Completo</label><label><input type="radio" name="pl-${r.id}-${w}x${h}" value="fill" data-pl-mode${p.mode === 'fill' ? ' checked' : ''} /> Recortar</label>${p.mode === 'fill' ? `<label class="apr-zoom">Zoom<input type="range" min="100" max="300" value="${Math.round(p.zoom * 100)}" data-pl-zoom /></label><small>Arrastra la imagen para moverla.</small>` : ''}</div>`; })() : ''}</figure>`).join('')}</div>
           </div>`
         : `<div class="apr-files">${r.art.files.map((f) => {
             const ok = sizes.some(([w, h]) => Math.abs(f.w / f.h - w / h) / (w / h) < 0.08);
-            return `<figure><img src="${f.data}" alt="${esc(f.name)}" /><figcaption>${f.w} × ${f.h} ${ok ? '✓' : '⚠ adaptar'} · <a href="${f.data}" download="${r.id.toLowerCase()}-${f.w}x${f.h}.png">Descargar</a></figcaption></figure>`;
+            return `<figure><img src="${f.data}" alt="${esc(f.name)}" /><figcaption>${f.w} × ${f.h} ${ok ? '✓' : '· se acomoda solo al aprobar'} · <a href="${f.data}" download="${r.id.toLowerCase()}-${f.w}x${f.h}.png">Descargar</a></figcaption></figure>`;
           }).join('') || '<p class="apn-small">Sin imágenes.</p>'}</div>`;
       const done = r.status === 'aprobada' || r.status === 'rechazada';
-      return `<article class="apr-card" data-id="${r.id}">
+      const card = `<article class="apr-card" data-id="${r.id}">
         <header class="apr-card-h">
-          <div><h2>${r.id.includes('EJEMPLO') ? '<span class="sp-demo">EJEMPLO</span> ' : ''}${esc(r.client.business)}</h2><p class="apn-small">${r.id} · ${ago(r.created)} · ${esc(r.client.name)} · <a href="mailto:${esc(r.client.email)}">${esc(r.client.email)}</a>${r.client.phone ? ` · ${esc(r.client.phone)}` : ''}</p></div>
-          <div class="apr-badges"><span class="apn-st ${r.paid ? 'on' : 'wait'}">${r.paid ? `Pagado ${money(r.total)}` : `Sin pagar · ${money(r.total)}`}</span><span class="apn-st ${design ? 'wait' : ''}">${design ? 'Lo diseñamos nosotros' : 'Arte del cliente'}</span>${r.status === 'aprobada' ? '<span class="apn-st on">Aprobado</span>' : r.status === 'rechazada' ? '<span class="apn-st">Rechazado · reembolsar</span>' : ''}</div>
+          <div><h2>${esc(r.client.business)}</h2><p class="apn-small">${r.id} · ${ago(r.created)} · ${esc(r.client.name)} · <a href="mailto:${esc(r.client.email)}">${esc(r.client.email)}</a>${r.client.phone ? ` · ${esc(r.client.phone)}` : ''}</p></div>
+          <div class="apr-badges"><span class="apn-st ${r.paid ? 'on' : 'wait'}">${r.paid ? `Pagado ${money(r.total)}` : `Sin pagar · ${money(r.total)}`}</span><span class="apn-st ${design ? 'wait' : ''}">${design ? 'Lo diseñamos nosotros' : 'Arte del cliente'}</span>${r.status === 'aprobada' ? '<span class="apn-st on">Aprobado</span>' : r.status === 'rechazada' ? (!r.paid ? '<span class="apn-st">Rechazado</span>' : (r.lines ?? []).some((l) => l.startsWith('Reembolso:')) ? '<span class="apn-st">Rechazado · reembolsado</span>' : '<span class="apn-st wait">Rechazado · reembolsar a mano</span>') : ''}</div>
         </header>
         <div class="apr-where"><b>Dónde sale:</b><ul>${FMT.filter((f) => r.formats.includes(f.id)).map((f) => `<li><b>${esc(f.name)}:</b> ${esc(f.where)}</li>`).join('')}</ul>
           ${r.status === 'aprobada' && !(paidViews(r) && delivered(r) >= paidViews(r)!) ? `<p>✅ Ya puedes verlo en el sitio <b>en este dispositivo</b> (marcado “Vista previa”). <a href="${page.dataset.home}" target="_blank" rel="noopener">Abrir la portada ↗</a></p>` : ''}</div>
@@ -133,14 +201,25 @@ const Tag = embedded ? 'section' : 'main';
         ${r.note ? `<p class="apr-notes">💬 ${esc(r.note)}</p>` : ''}
         ${art}
         ${r.status === 'aprobada' ? progress(r) : ''}
+        ${done && isAdmin() ? '<div class="apr-acts"><button type="button" class="apr-reject" data-act="delete">Borrar</button></div>' : ''}
         ${done ? (r.status === 'aprobada' && !hasBackend() ? `<details class="apr-code"><summary>Código para publicarlo</summary><p class="apn-small">1) Descarga las imágenes y guárdalas en <code>public/anuncios/</code>. 2) Pega esto dentro de <code>CAMPAIGNS</code> en <code>src/lib/ads.ts</code>. (Cuando conectemos la base de datos, esto será automático.)</p><textarea readonly rows="4">${esc(campaign(r))}</textarea><button type="button" class="adp-btn ghost-dark" data-copy>Copiar</button></details>` : '')
-        : `<fieldset class="apr-checks"><legend>Antes de aprobar</legend>${CHECKS.map((c) => `<label class="adb-check"><input type="checkbox" data-chk /> ${c}</label>`).join('')}</fieldset>
-        <div class="apr-acts">
-          <button type="button" class="adp-btn" data-act="approve" disabled>Aprobar y publicar</button>
+        : com ? `<div class="apr-acts">
+          <button type="button" class="adp-btn" data-act="comunicado">Pasar a Escribir</button>
           <button type="button" class="adp-btn ghost-dark" data-act="changes">Pedir cambios</button>
           <button type="button" class="apr-reject" data-act="reject">Rechazar y reembolsar</button>
+        </div><p class="apn-small">«Pasar a Escribir» lo deja «En revisión» para que un editor lo revise y lo publique con la etiqueta «Comunicado pagado».</p>`
+        : `${sellerWaits(r) ? '' : `<fieldset class="apr-checks"><legend>Antes de aprobar</legend>${CHECKS.map((c) => `<label class="adb-check"><input type="checkbox" data-chk /> ${c}</label>`).join('')}</fieldset>`}
+        <div class="apr-acts">
+          ${sellerWaits(r) ? '<p class="apn-small">⏳ Esperando aprobación del administrador o el Gerente. Sale en el sitio cuando lo aprueben.</p>' : `<button type="button" class="adp-btn" data-act="approve" disabled>Aprobar y publicar</button>
+          <button type="button" class="adp-btn ghost-dark" data-act="changes">Pedir cambios</button>
+          <button type="button" class="apr-reject" data-act="reject">Rechazar y reembolsar</button>`}
         </div>`}
       </article>`;
+      if (filter !== 'hechas') return card;
+      // Terminadas: one line each (who, what, when, how much); tapping it opens everything
+      const fm = com ? 'Comunicado de prensa' : FMT.filter((f) => r.formats.includes(f.id)).map((f) => f.name).join(', ');
+      return `<details class="apr-done"><summary class="apr-done-row"><span class="apr-done-who"><b>${esc(r.client.business || r.client.name)}</b><small>${esc(fm)} · ${new Date(r.created).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })} · ${r.id}</small></span>`
+        + `<span class="apn-st ${r.status === 'aprobada' ? 'on' : ''}">${r.status === 'aprobada' ? 'Aprobado' : 'Rechazado'}</span><span class="apn-st ${r.paid ? 'on' : 'wait'}">${r.paid ? 'Pagado' : 'Sin pagar'}</span><b class="apr-done-total">${money(r.total)}</b></summary>${card}</details>`;
     }).join('');
     box.querySelectorAll<HTMLElement>('[data-design]').forEach((d) => drawDesign(d));
   }
@@ -150,22 +229,67 @@ const Tag = embedded ? 'section' : 'main';
     const r = listRequests().find((x) => x.id === card.dataset.id)!;
     const v = (k: string) => d.querySelector<HTMLInputElement>(`[data-k="${k}"]`)!.value;
     const theme = THEMES.find((t) => t.id === v('theme')) ?? THEMES[0];
-    const go = (logo: HTMLImageElement | null) => d.querySelectorAll<HTMLCanvasElement>('canvas').forEach((c) => drawAd(c, Number(c.dataset.w), Number(c.dataset.h), { title: v('title'), msg: v('msg'), cta: v('cta'), business: r.client.business }, theme, logo));
+    const go = (logo: HTMLImageElement | null) => d.querySelectorAll<HTMLCanvasElement>('canvas').forEach((c) => { const key = `${r.id}:${c.dataset.w}x${c.dataset.h}`, up = uploads.get(key); if (up) { const p = placeOf(key); if (p.mode === 'fill') { const used = placeImage(c, Number(c.dataset.w), Number(c.dataset.h), up, p); placing.set(key, { ...p, ...used }); c.classList.add('apr-drag'); return; } c.classList.remove('apr-drag'); return fitImage(c, Number(c.dataset.w), Number(c.dataset.h), up); } drawAd(c, Number(c.dataset.w), Number(c.dataset.h), { title: v('title'), msg: v('msg'), cta: v('cta'), business: r.client.business }, theme, logo); });
     if (r.art.logo) { const img = new Image(); img.onload = () => go(img); img.src = r.art.logo; } else go(null);
   }
 
-  page.addEventListener('input', (e) => { const d = (e.target as HTMLElement).closest<HTMLElement>('[data-design]'); if (d) drawDesign(d); });
-  page.addEventListener('change', (e) => {
+  page.addEventListener('input', (e) => {
+    const t = e.target as HTMLInputElement;
+    if (t.matches('[data-pl-zoom]')) {
+      const card = t.closest<HTMLElement>('[data-id]')!, c = t.closest('figure')!.querySelector('canvas')!, key = `${card.dataset.id}:${c.dataset.w}x${c.dataset.h}`;
+      placing.set(key, { ...placeOf(key), zoom: Number(t.value) / 100 }); drawDesign(t.closest<HTMLElement>('[data-design]')!); return;
+    }
+    const d = t.closest<HTMLElement>('[data-design]'); if (d) drawDesign(d);
+  });
+  // Drag a cropped design to move it inside its space (mouse or finger)
+  let drag: { key: string; c: HTMLCanvasElement; sx: number; sy: number; ox: number; oy: number } | null = null;
+  page.addEventListener('pointerdown', (e) => {
+    const c = (e.target as HTMLElement).closest<HTMLCanvasElement>('canvas.apr-drag'); if (!c) return;
+    const card = c.closest<HTMLElement>('[data-id]')!, key = `${card.dataset.id}:${c.dataset.w}x${c.dataset.h}`, p = placeOf(key);
+    drag = { key, c, sx: e.clientX, sy: e.clientY, ox: p.x, oy: p.y }; c.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  page.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const k = Number(drag.c.dataset.w) / drag.c.getBoundingClientRect().width; // screen pixels → ad pixels
+    placing.set(drag.key, { ...placeOf(drag.key), x: drag.ox + (e.clientX - drag.sx) * k, y: drag.oy + (e.clientY - drag.sy) * k });
+    drawDesign(drag.c.closest<HTMLElement>('[data-design]')!);
+  });
+  addEventListener('pointerup', () => { drag = null; });
+  page.addEventListener('change', async (e) => {
     const t = e.target as HTMLElement;
+    // Completo / Recortar for an uploaded design
+    if (t.matches('[data-pl-mode]')) {
+      const card = t.closest<HTMLElement>('[data-id]')!, c = t.closest('figure')!.querySelector('canvas')!, key = `${card.dataset.id}:${c.dataset.w}x${c.dataset.h}`;
+      placing.set(key, { ...placeOf(key), mode: (t as HTMLInputElement).value as 'fit' | 'fill' }); render(); return;
+    }
+    // "Subir diseño": a finished image for one size, fitted to that space
+    if (t.matches('[data-up]')) {
+      const f = (t as HTMLInputElement).files?.[0]; if (!f) return;
+      const card = t.closest<HTMLElement>('[data-id]')!, c = t.closest('figure')!.querySelector('canvas')!;
+      try { uploads.set(`${card.dataset.id}:${c.dataset.w}x${c.dataset.h}`, await loadImage(f)); } catch { return toast('No se pudo abrir esa imagen.'); }
+      render(); return;
+    }
     const d = t.closest<HTMLElement>('[data-design]'); if (d) drawDesign(d);
     if (t.matches('[data-chk]')) { const card = t.closest<HTMLElement>('[data-id]')!; card.querySelector<HTMLButtonElement>('[data-act="approve"]')!.disabled = [...card.querySelectorAll<HTMLInputElement>('[data-chk]')].some((c) => !c.checked); }
   });
   page.addEventListener('click', async (e) => {
     const t = e.target as HTMLElement;
     const card = t.closest<HTMLElement>('[data-id]');
+    // Admin: delete one finished request, or empty Terminadas
+    if (t.closest('[data-empty]') || (card && t.closest('[data-act="delete"]'))) {
+      if (!isAdmin()) return toast('Solo el administrador o el Gerente pueden borrar.');
+      const ids = card ? [card.dataset.id!] : listRequests().filter((r) => r.status === 'aprobada' || r.status === 'rechazada').map((r) => r.id);
+      if (!(await ask(ids.length === 1 ? '¿Borrar esta solicitud? No se puede deshacer. Si el anuncio está aprobado, sigue saliendo en el sitio.' : `¿Borrar las ${ids.length} solicitudes terminadas? No se puede deshacer. Los anuncios aprobados siguen saliendo en el sitio.`, { ok: 'Borrar', danger: true }))) return;
+      if (await deleteRequests(ids)) { toast(ids.length === 1 ? 'Borrada.' : 'Terminadas vaciadas.'); render(); } else toast('No se pudo borrar. Solo el administrador o el Gerente pueden hacerlo.');
+      return;
+    }
     if (t.matches('[data-f]') || t.closest('[data-f]')) {
       const b = t.closest<HTMLElement>('[data-f]')!; filter = b.dataset.f!;
       page.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-selected', String(x === b))); render(); return;
+    }
+    if (t.matches('[data-up-clear]')) {
+      const c = t.closest('figure')!.querySelector('canvas')!;
+      uploads.delete(`${card!.dataset.id}:${c.dataset.w}x${c.dataset.h}`); render(); return;
     }
     if (t.matches('[data-dl]')) {
       e.preventDefault();
@@ -176,6 +300,15 @@ const Tag = embedded ? 'section' : 'main';
     if (!card || !t.matches('[data-act]')) return;
     const id = card.dataset.id!; const r = listRequests().find((x) => x.id === id)!;
     const act = t.dataset.act;
+    if (act === 'comunicado') {
+      (t as HTMLButtonElement).disabled = true;
+      let who = ''; try { who = JSON.parse(localStorage.getItem('nc-staff') || '{}').name ?? ''; } catch { /* storage blocked */ }
+      const sid = hasBackend() ? await comunicadoToEscribir(r, who) : 'preview';
+      if (!sid) { (t as HTMLButtonElement).disabled = false; toast('No se pudo pasar a Escribir. Intenta otra vez.'); return; }
+      updateRequest(id, { status: 'aprobada' }); render();
+      toast(hasBackend() ? 'Listo: está en Escribir → En revisión para que un editor lo publique.' : 'Vista previa: con la base de datos, pasa a Escribir.');
+      return;
+    }
     if (act === 'approve') {
       const d = card.querySelector<HTMLElement>('[data-design]');
       const patch: Partial<AdRequest> = { status: 'aprobada' };
@@ -183,22 +316,49 @@ const Tag = embedded ? 'section' : 'main';
         const v = (k: string) => d.querySelector<HTMLInputElement>(`[data-k="${k}"]`)!.value;
         patch.art = { ...r.art, title: v('title'), msg: v('msg'), cta: v('cta'), theme: v('theme'), files: [...d.querySelectorAll('canvas')].map((c) => ({ name: `${c.dataset.w}x${c.dataset.h}.png`, w: Number(c.dataset.w), h: Number(c.dataset.h), data: c.toDataURL('image/png') })) };
       }
+      // Client's own art: every space it bought gets an image of exactly its size (the closest-shaped file, fitted)
+      if (!d && r.art.mode === 'upload' && r.art.files.length) {
+        const need = [...new Map(FMT.filter((f) => r.formats.includes(f.id)).flatMap((f) => f.art).map((x) => [x.join('x'), x])).values()];
+        try {
+          const imgs = await Promise.all(r.art.files.map((f) => imageFrom(f.data)));
+          patch.art = { ...r.art, files: need.map(([w, h]) => {
+            let k = 0; r.art.files.forEach((f, j) => { if (Math.abs(f.w / f.h - w / h) < Math.abs(r.art.files[k].w / r.art.files[k].h - w / h)) k = j; });
+            const c = document.createElement('canvas'); fitImage(c, w, h, imgs[k], 1);
+            return { name: `${w}x${h}.png`, w, h, data: c.toDataURL('image/png') };
+          }) };
+        } catch { /* images from another site that can't be redrawn: the originals are used as they are */ }
+      }
       updateRequest(id, patch);
+      logActivity('Aprobó un anuncio', `${r.client.business} · ${r.id}`);
       if (hasBackend()) {
         // Automatic publishing: live for every reader right away
-        publishCampaign(campaignOf({ ...r, ...patch } as AdRequest)).then((ok) => toast(ok ? `Aprobado y publicado: ya sale para todos los lectores.` : 'Se aprobó, pero no se pudo publicar. Revisa tu sesión e intenta otra vez.'));
+        publishCampaign(campaignOf({ ...r, ...patch } as AdRequest)).then((ok) => {
+          toast(ok ? `Aprobado y publicado: ya sale para todos los lectores.` : 'Se aprobó, pero no se pudo publicar. Revisa tu sesión e intenta otra vez.');
+          if (ok) dispatchEvent(new Event('nc-campaigns')); // Ventas → Campañas shows it right away
+        });
       } else toast(`Aprobado. Ya lo ves en el sitio en este dispositivo (vista previa). Con la base de datos conectada, sale para todos al instante.`);
     } else if (act === 'changes') {
       const msg = await askText('¿Qué cambios necesita el cliente? Se le enviará por correo.', { value: 'Hola, ¿nos puedes enviar el anuncio en 300 × 250 píxeles?', ok: 'Escribir el correo', multiline: true });
       if (!msg) return;
-      updateRequest(id, { status: 'cambios', note: msg });
+      updateRequest(id, { status: 'cambios', note: msg }); logActivity('Pidió cambios a un anuncio', `${r.client.business} · ${r.id}`);
       location.href = `mailto:${r.client.email}?subject=${encodeURIComponent(`Tu anuncio en NotiCel (${r.id})`)}&body=${encodeURIComponent(msg)}`;
     } else if (act === 'reject') {
-      if (!(await ask(`¿Rechazar el anuncio de ${r.client.business}? Habrá que devolverle ${money(r.total)}.`, { ok: 'Rechazar', danger: true }))) return;
-      updateRequest(id, { status: 'rechazada' });
-      toast('Rechazado. Recuerda hacer el reembolso.');
+      const card = (r.lines ?? []).some((l) => l.startsWith('Pago: Tarjeta (Stripe)'));
+      if (!(await ask(r.paid ? `¿Rechazar el anuncio de ${r.client.business}? ${card ? `Se le devuelven ${money(r.total)} a su tarjeta automáticamente${/se renueva cada mes/.test(r.duration ?? '') ? ' y se cancela el cobro mensual' : ''}.` : `Pagó sin tarjeta: habrá que devolverle ${money(r.total)} a mano.`}` : `¿Rechazar el anuncio de ${r.client.business}?`, { ok: 'Rechazar', danger: true }))) return;
+      // Refund first (the function also marks it rejected), then the status, so the client's email says it's refunded
+      let msg = 'Rechazado.';
+      if (r.paid) {
+        (t as HTMLButtonElement).disabled = true; (t as HTMLButtonElement).textContent = 'Reembolsando…';
+        const rf = await refundRequest(id);
+        if (rf.error && !rf.manual) { (t as HTMLButtonElement).disabled = false; (t as HTMLButtonElement).textContent = 'Rechazar y reembolsar'; toast(`No se pudo reembolsar: ${rf.error}. No se rechazó; intenta otra vez.`); return; }
+        msg = rf.manual ? `Rechazado. Pagó sin tarjeta: devuélvele ${money(r.total)} a mano (ATH Móvil o como pagó).` : rf.already ? 'Rechazado. Ya estaba reembolsado.' : `Rechazado y reembolsado: ${money(rf.refunded ?? r.total)} a su tarjeta.`;
+        if (!rf.manual) { const l = `Reembolso: Tarjeta (Stripe) · ${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' })} · ${money(rf.refunded ?? r.total)}`; updateRequestLocal(id, { lines: [...(r.lines ?? []), l] }); }
+      }
+      updateRequest(id, { status: 'rechazada' }); logActivity('Rechazó un anuncio', `${r.client.business} · ${r.id}`);
+      toast(msg);
     }
     render();
+    dispatchEvent(new Event('nc-ad-requests')); // the Anuncios badge and Inicio's count update at once
   });
 
   seed().then(async () => {
@@ -212,4 +372,69 @@ const Tag = embedded ? 'section' : 'main';
     const now = localStorage.getItem('nc-staff'); if (now === who && Date.now() - last < 30000) return;
     who = now; last = Date.now(); void loadRequests().then(render);
   });
+
+  // ---- Crear anuncio ----
+  {
+    const mk = page.querySelector<HTMLElement>('[data-maker]')!;
+    const SIZES: Array<[number, number]> = [[728, 90], [320, 100], [300, 250], [300, 600]];
+    const box = mk.querySelector<HTMLElement>('[data-m-canvases]')!;
+    box.innerHTML = SIZES.map(([w, h]) => `<figure><canvas data-w="${w}" data-h="${h}" style="aspect-ratio:${w}/${h};max-width:${w}px"></canvas><figcaption>${w} × ${h}</figcaption></figure>`).join('');
+    const sel = mk.querySelector<HTMLSelectElement>('[data-m="theme"]')!;
+    sel.innerHTML = THEMES.map((t) => `<option value="${t.id}">${t.name}</option>`).join('');
+    let logo: HTMLImageElement | null = null, full: HTMLImageElement | null = null, photo: HTMLImageElement | null = null;
+    const swatch = (k: string) => mk.querySelector<HTMLInputElement>(`[data-c="${k}"]`)!;
+    const COLOR_KEYS = ['a', 'b', 'fg', 'btn', 'btnFg'] as const;
+    // "Mis colores" start from the chosen colors; changing the colors list resets them
+    const fillSwatches = () => { const t = THEMES.find((x) => x.id === sel.value) ?? THEMES[0]; COLOR_KEYS.forEach((k) => (swatch(k).value = t[k])); };
+    const sizeOn = (w: number, h: number) => mk.querySelector<HTMLInputElement>(`[data-sz="${w}x${h}"]`)!.checked;
+    const v = (k: string) => mk.querySelector<HTMLInputElement>(`[data-m="${k}"]`)!.value.trim();
+    const draw = () => mk.querySelectorAll<HTMLCanvasElement>('canvas').forEach((c) => {
+      const w = Number(c.dataset.w), h = Number(c.dataset.h);
+      c.closest('figure')!.hidden = !sizeOn(w, h);
+      if (full) return fitImage(c, w, h, full);
+      const base = THEMES.find((t) => t.id === sel.value) ?? THEMES[0];
+      const theme = { ...base, ...Object.fromEntries(COLOR_KEYS.map((k) => [k, swatch(k).value])) };
+      drawAd(c, w, h, { title: v('title') || 'Tu título aquí', msg: v('msg') || 'Tu mensaje', cta: v('cta') || 'Ver más', business: v('business') || 'Tu negocio' }, theme, logo, 2,
+        { photo, dim: Number(v('dim')) / 100, badge: v('badge'), contact: v('contact'), font: v('font') as 'moderna', align: v('align') as 'center' });
+    });
+    fillSwatches();
+    // Requests that can still take art: waiting for review or for a design
+    const fillReqs = () => {
+      const open = listRequests().filter(mineRequest).filter((r) => r.status === 'revisar' || r.status === 'disenar' || r.status === 'cambios');
+      mk.querySelector<HTMLSelectElement>('[data-m-req]')!.innerHTML = open.length
+        ? open.map((r) => `<option value="${r.id}">${esc(r.client.business)} · ${r.id}</option>`).join('')
+        : '<option value="">(no hay solicitudes abiertas)</option>';
+    };
+    mk.addEventListener('toggle', () => { if ((mk as HTMLDetailsElement).open) { fillReqs(); draw(); } });
+    mk.addEventListener('input', draw);
+    mk.addEventListener('change', async (e) => {
+      const t = e.target as HTMLInputElement;
+      try {
+        if (t.matches('[data-m-logo]')) logo = t.files?.[0] ? await loadImage(t.files[0]) : null;
+        if (t.matches('[data-m-full]')) full = t.files?.[0] ? await loadImage(t.files[0]) : null;
+        if (t.matches('[data-m-photo]')) { photo = t.files?.[0] ? await loadImage(t.files[0]) : null; mk.querySelector<HTMLElement>('[data-m-dim-wrap]')!.hidden = !photo; }
+        if (t.matches('[data-m="theme"]')) fillSwatches();
+      } catch { toast('No se pudo abrir esa imagen.'); }
+      draw();
+    });
+    mk.querySelector('[data-m-dl]')!.addEventListener('click', () => {
+      const name = (v('business') || 'anuncio').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      [...mk.querySelectorAll<HTMLCanvasElement>('canvas')].filter((c) => sizeOn(Number(c.dataset.w), Number(c.dataset.h))).forEach((c) => { const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `${name}-${c.dataset.w}x${c.dataset.h}.png`; a.click(); });
+    });
+    mk.querySelector('[data-m-use]')!.addEventListener('click', async () => {
+      const id = mk.querySelector<HTMLSelectElement>('[data-m-req]')!.value; const r = listRequests().find((x) => x.id === id);
+      if (!r) return toast('Primero crea la solicitud (por ejemplo, desde el cliente en Ventas → Convertir).');
+      if (!(await ask(`¿Usar este anuncio en la solicitud de ${r.client.business}? Reemplaza las imágenes que tenga.`, { ok: 'Usar' }))) return;
+      // Smaller copies (one pixel per pixel) keep the request light; the approval uploads them as the ad images
+      const files = [...mk.querySelectorAll<HTMLCanvasElement>('canvas')].filter((c) => sizeOn(Number(c.dataset.w), Number(c.dataset.h))).map((c) => {
+        const w = Number(c.dataset.w), h = Number(c.dataset.h), o = document.createElement('canvas');
+        o.width = w; o.height = h; o.getContext('2d')!.drawImage(c, 0, 0, w, h);
+        return { name: `${w}x${h}.png`, w, h, data: o.toDataURL('image/png') };
+      });
+      updateRequest(id, { status: r.status === 'disenar' ? 'revisar' : r.status, art: { mode: 'upload', files } });
+      (mk as HTMLDetailsElement).open = false; filter = 'revisar';
+      page.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-selected', String((x as HTMLElement).dataset.f === 'revisar')));
+      render(); toast(`Listo: el anuncio está en la solicitud de ${r.client.business}, en Por revisar. Apruébalo cuando esté todo bien.`);
+    });
+  }
 </script>

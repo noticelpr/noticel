@@ -1,0 +1,212 @@
+---
+// Ventas → Facturas (user, 2026-11-03): the administrator and the Gerente create an invoice for any ad sale, numbered
+// automatically from 1001 (table invoices, supabase/permisos-equipo.sql), and keep the list: what was billed, paid and
+// owed, with a spreadsheet download. Each invoice opens as a branded page to save as PDF, print, or email.
+// An invoice is a copy as issued (client, what was sold, amount); «Pagada» follows the order's payment. Never deleted:
+// a mistake is «Anulada» and a new one is made. Demo mode: sample invoices labeled EJEMPLO, nothing saved.
+import { FORMATS } from '../../lib/ads';
+import { SITE, url } from '../../lib/site';
+const names = Object.fromEntries(FORMATS.map((f) => [f.id, f.name]));
+---
+<section class="inv" data-inv data-fmts={JSON.stringify(names)} data-logo={url('email/logo-card.png')} data-email={SITE.salesEmail || SITE.email} data-legal={SITE.legalName || SITE.name} data-address={SITE.address} data-phone={SITE.phone} data-days={SITE.invoiceDays}>
+  <div class="inv-head">
+    <h2 class="pnl-h3">Facturas <span class="sp-demo" data-inv-demo hidden>DEMO</span></h2>
+    <div class="pnl-range" role="group" aria-label="Período">
+      <button type="button" data-inv-range="mes" aria-pressed="true">Este mes</button>
+      <button type="button" data-inv-range="pasado" aria-pressed="false">Mes pasado</button>
+      <button type="button" data-inv-range="ano" aria-pressed="false">Este año</button>
+      <button type="button" data-inv-range="todo" aria-pressed="false">Todo</button>
+    </div>
+  </div>
+  <div class="pnl-kpis" data-inv-kpis></div>
+  <div class="inv-tools"><button type="button" class="adp-btn ghost-dark" data-inv-csv>Descargar (CSV)</button></div>
+  <div class="inv-list" data-inv-list></div>
+  <div data-inv-admin>
+    <h3 class="pnl-h3 inv-sub">Ventas sin factura <b data-inv-nn></b></h3>
+    <p class="pnl-muted pnl-small">Pedidos aprobados que todavía no tienen factura. «Crear factura» le da el próximo número.</p>
+    <div class="inv-list" data-inv-todo></div>
+  </div>
+
+  <dialog class="sd-dlg inv-dlg" data-inv-dlg aria-label="Factura">
+    <header class="sd-dlg-h"><h2 data-inv-h>Factura</h2><button type="button" class="sd-x" data-inv-x aria-label="Cerrar">✕</button></header>
+    <iframe class="inv-frame" data-inv-frame title="Factura"></iframe>
+    <footer class="sd-dlg-f">
+      <button type="button" class="adp-btn ghost-dark" data-inv-mail>Enviar por correo</button>
+      <button type="button" class="adp-btn" data-inv-pdf>Descargar PDF</button>
+    </footer>
+  </dialog>
+</section>
+
+<script>
+  import { hasBackend, staffApi, logActivity } from '../../lib/backend';
+  import { loadRequests, listRequests, type AdRequest } from '../../lib/adrequests';
+  import { isDemo } from '../../lib/demo';
+  import { ask } from '../../lib/dialogs';
+  import { mineRequest } from '../../lib/sellers';
+
+  type Inv = { number: number; request_id: string; created_at: string; issued_by: string; void: boolean;
+    data: { client: AdRequest['client']; lines: Array<{ what: string; detail: string; amount: number }>; total: number; due: string; paid: boolean; method: string } };
+  const root = document.querySelector<HTMLElement>('[data-inv]')!;
+  const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const $$ = <T extends Element = HTMLElement>(s: string) => [...root.querySelectorAll<T>(s)];
+  const NAMES: Record<string, string> = JSON.parse(root.dataset.fmts!);
+  const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const money = (n: number) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const day = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const ymd = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+  const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
+  const toast = (m: string) => dispatchEvent(new CustomEvent('nc-toast', { detail: m }));
+  const LOCAL = 'nc-invoices'; // the preview without the database
+  let invoices: Inv[] = [], orders: AdRequest[] = [], range = 'mes';
+  const demo = () => isDemo();
+
+  /** The order's payment line ("Pago: ATH Móvil · 2026-11-01") without the date. */
+  const methodOf = (r: AdRequest) => ((r.lines ?? []).find((l) => l.startsWith('Pago: '))?.slice(6) ?? '').split('·')[0].trim();
+  const paidOf = (i: Inv) => { const r = orders.find((o) => o.id === i.request_id); return r ? r.paid : i.data.paid; };
+  const stateOf = (i: Inv): [string, string] => i.void ? ['Anulada', ''] : paidOf(i) ? ['Pagada', 'ok'] : i.data.due < ymd(new Date()) ? ['Vencida', 'bad'] : ['Pendiente', 'warn'];
+
+  function sample(): { inv: Inv[]; ord: AdRequest[] } {
+    const biz = ['Panadería La Esquina', 'Ferretería El Martillo', 'Clínica Dental Sonrisa', 'Gimnasio Fuerza', 'Café del Barrio', 'Mueblería Don Pepe', 'Óptica Visión Clara'];
+    const ord: AdRequest[] = Array.from({ length: 9 }, (_, i) => ({ id: `NX-EJF${i}`, created: new Date(Date.now() - i * 3.5 * 864e5).toISOString(), status: 'aprobada', paid: i % 3 !== 1,
+      client: { name: 'Contacto (ejemplo)', business: `${biz[i % biz.length]} (ejemplo)`, email: 'cliente@ejemplo.com', phone: '787-555-0100', who: 'retail' },
+      formats: [['rectangle'], ['valla', 'cuadrado'], ['leaderboard'], ['patrocinio']][i % 4], where: 'Puerto Rico y la diáspora', start: ymd(new Date(Date.now() - i * 3 * 864e5)), duration: ['1 mes', '2 meses', '3 meses'][i % 3],
+      total: [149, 420, 350, 640, 210][i % 5], lines: ['Venta directa', `Pago: ${['ATH Móvil', 'Transferencia', 'Tarjeta'][i % 3]}`], art: { mode: 'upload', files: [] }, link: '' } as AdRequest));
+    const inv = ord.slice(0, 6).map((r, i) => build(r, 1001 + i, 'Administración (ejemplo)', r.created));
+    return { inv, ord };
+  }
+  function build(r: AdRequest, number: number, by: string, at = new Date().toISOString()): Inv {
+    const what = r.formats.map((f) => NAMES[f] ?? f).join(', ');
+    return { number, request_id: r.id, created_at: at, issued_by: by, void: false,
+      data: { client: r.client, lines: [{ what: `Publicidad en NotiCel: ${what}`, detail: [r.where, r.start ? `desde el ${day(r.start)}` : '', r.duration].filter(Boolean).join(' · '), amount: Number(r.total || 0) }],
+        total: Number(r.total || 0), due: ymd(new Date(Date.parse(at) + Number(root.dataset.days || 15) * 864e5)), paid: r.paid, method: methodOf(r) } };
+  }
+
+  async function load() {
+    const s = me(); if (!s || !['admin', 'manager', 'ads'].includes(s.role)) { root.hidden = true; return; }
+    root.hidden = false; $('[data-inv-demo]').hidden = !demo();
+    if (demo()) { const x = sample(); invoices = x.inv; orders = x.ord; }
+    else if (hasBackend()) {
+      const [r, list] = await Promise.all([staffApi('invoices?select=*&order=number.desc'), loadRequests()]);
+      invoices = r?.ok ? await r.json() : []; orders = list;
+      if (r && r.status === 404) $('[data-inv-list]').innerHTML = '<p class="pnl-muted">Falta un paso en la base de datos: corre supabase/permisos-equipo.sql en Supabase.</p>';
+    } else { try { invoices = JSON.parse(localStorage.getItem(LOCAL) || '[]'); } catch { invoices = []; } orders = listRequests(); }
+    // Ventas (user, 2026-11-03): only the invoices of their own sales, to send to their clients; no creating or voiding
+    if (seller()) { const mine = new Set(orders.filter(mineRequest).map((r) => r.id)); invoices = invoices.filter((i) => mine.has(i.request_id)); orders = orders.filter(mineRequest); }
+    $$('[data-inv-admin]').forEach((e) => (e.hidden = seller()));
+    paint();
+  }
+  const seller = () => me()?.role === 'ads';
+  function inRange(iso: string) {
+    if (range === 'todo') return true;
+    const d = new Date(iso), n = new Date(), y = n.getFullYear(), m = n.getMonth();
+    if (range === 'ano') return d.getFullYear() === y;
+    const [from, to] = range === 'mes' ? [new Date(y, m, 1), new Date(y, m + 1, 1)] : [new Date(y, m - 1, 1), new Date(y, m, 1)];
+    return d >= from && d < to;
+  }
+  function paint() {
+    $$('[data-inv-range]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.invRange === range)));
+    const list = invoices.filter((i) => inRange(i.created_at)), live = list.filter((i) => !i.void);
+    const sum = (l: Inv[]) => l.reduce((a, i) => a + Number(i.data.total || 0), 0);
+    const paid = live.filter(paidOf), owed = live.filter((i) => !paidOf(i)), late = owed.filter((i) => i.data.due < ymd(new Date()));
+    const tag = demo() ? 'DEMO · ' : '';
+    $('[data-inv-kpis]').innerHTML = [
+      ['Facturado', money(sum(live)), `${tag}${live.length} ${live.length === 1 ? 'factura' : 'facturas'}`, ''],
+      ['Cobrado', money(sum(paid)), `${tag}${paid.length} pagadas`, 'good'],
+      ['Por cobrar', money(sum(owed)), `${tag}${late.length ? `${late.length} vencidas` : 'ninguna vencida'}`, late.length ? 'warn' : ''],
+    ].map(([l, v, s, t]) => `<div class="pnl-kpi ${t}"><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join('');
+    $('[data-inv-list]').innerHTML = list.length ? `<table class="inv-table"><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody>${list.map((i) => {
+      const [st, tone] = stateOf(i);
+      return `<tr class="${i.void ? 'inv-void' : ''}"><td><b>${i.number}</b></td><td>${new Date(i.created_at).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}</td><td>${esc(i.data.client?.business || i.data.client?.name || '')}</td><td>${money(i.data.total)}</td>
+        <td><span class="pnl-chip ${tone}">${st}</span></td><td class="inv-acts"><button type="button" class="pnl-link" data-inv-open="${i.number}">Ver / PDF</button>${i.void || seller() ? '' : `<button type="button" class="pnl-link danger" data-inv-void="${i.number}">Anular</button>`}</td></tr>`;
+    }).join('')}</tbody></table>` : '<p class="pnl-muted">No hay facturas en este período.</p>';
+    const billed = new Set(invoices.filter((i) => !i.void).map((i) => i.request_id));
+    const todo = orders.filter((r) => r.status === 'aprobada' && Number(r.total) > 0 && !billed.has(r.id)).sort((a, b) => Date.parse(b.created) - Date.parse(a.created)).slice(0, 40);
+    $('[data-inv-nn]').textContent = todo.length ? `(${todo.length})` : '';
+    $('[data-inv-todo]').innerHTML = todo.map((r) => `<div class="inv-row"><span><b>${esc(r.client.business || r.client.name)}</b><small>${new Date(r.created).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })} · ${esc(r.formats.map((f) => NAMES[f] ?? f).join(', '))} · ${r.paid ? 'pagado' : 'por cobrar'}</small></span>
+      <b>${money(r.total)}</b><button type="button" class="adp-btn ghost-dark" data-inv-new="${esc(r.id)}">Crear factura</button></div>`).join('') || '<p class="pnl-muted">Todas las ventas aprobadas tienen factura.</p>';
+  }
+
+  /** The invoice as a page (in the window, and what «Descargar PDF» prints). */
+  function page(i: Inv): string {
+    const [st] = stateOf(i), c = i.data.client ?? ({} as AdRequest['client']);
+    return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Factura ${i.number} · ${esc(root.dataset.legal!)}</title>
+<style>body{font-family:Arial,Helvetica,sans-serif;color:#16161D;max-width:760px;margin:28px auto;padding:0 28px;line-height:1.45;background:#fff}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:4px solid #000000;padding-bottom:16px}
+.top img{width:150px;height:auto}.who{font-size:13px;color:#5C5F6E;text-align:right}
+h1{font-size:28px;color:#000000;margin:22px 0 4px}.meta{display:flex;gap:28px;flex-wrap:wrap;font-size:14px;color:#33343D;margin-bottom:18px}
+.meta b{display:block;color:#16161D}.to{background:#F3F3F8;border-radius:10px;padding:14px 16px;font-size:14px;margin-bottom:18px}
+table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;color:#5C5F6E;font-weight:600;border-bottom:1px solid #E2E3EA;padding:8px 6px}
+td{padding:10px 6px;border-bottom:1px solid #E2E3EA;vertical-align:top}td small{color:#5C5F6E}.n{text-align:right;white-space:nowrap}
+.total td{font-size:17px;font-weight:bold;border-bottom:0}.state{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:bold;font-size:13px;background:${st === 'Pagada' ? '#E1F5EE;color:#085041' : st === 'Anulada' ? '#EEE;color:#555' : '#FAEEDA;color:#633806'}}
+.foot{margin-top:26px;font-size:12px;color:#5C5F6E;border-top:1px solid #E2E3EA;padding-top:12px}${demo() ? '.demo{color:#B42318;font-weight:bold}' : ''}
+@media print{body{margin:0}}</style></head><body>
+<div class="top"><img src="${root.dataset.logo}" alt="NotiCel"><div class="who"><b style="color:#16161D">${esc(root.dataset.legal!)}</b><br>${esc(root.dataset.address || 'San Juan, Puerto Rico')}${root.dataset.phone ? `<br>${esc(root.dataset.phone)}` : ''}<br>${esc(root.dataset.email!)}<br>noticel.com</div></div>
+<h1>Factura #${i.number}</h1>${demo() ? '<p class="demo">EJEMPLO · factura de muestra</p>' : ''}
+<div class="meta"><span>Fecha<b>${day(i.created_at)}</b></span><span>Vence<b>${day(i.data.due)}</b></span><span>Pedido<b>${esc(i.request_id)}</b></span><span>Estado<b><span class="state">${st}</span></b></span></div>
+<div class="to"><b>Facturar a</b><br>${esc(c.business || '')}${c.name ? `<br>${esc(c.name)}` : ''}${c.email ? `<br>${esc(c.email)}` : ''}${c.phone ? `<br>${esc(c.phone)}` : ''}</div>
+<table><thead><tr><th>Descripción</th><th class="n">Monto</th></tr></thead><tbody>
+${i.data.lines.map((l) => `<tr><td>${esc(l.what)}${l.detail ? `<br><small>${esc(l.detail)}</small>` : ''}</td><td class="n">${money(l.amount)}</td></tr>`).join('')}
+<tr class="total"><td>Total</td><td class="n">${money(i.data.total)}</td></tr></tbody></table>
+<p style="font-size:14px;margin-top:14px">${paidOf(i) ? `Pagada${i.data.method ? ` (${esc(i.data.method)})` : ''}. ¡Gracias!` : `Favor de pagar en o antes del ${day(i.data.due)}.${i.data.method ? ` Forma de pago acordada: ${esc(i.data.method)}.` : ''}`}</p>
+<div class="foot">Emitida por ${esc(i.issued_by || root.dataset.legal!)} · ${esc(root.dataset.legal!)} · ¿Preguntas? Escríbenos a ${esc(root.dataset.email!)}.</div>
+</body></html>`;
+  }
+  let showing: Inv | null = null;
+  function open(i: Inv) {
+    showing = i; $('[data-inv-h]').textContent = `Factura #${i.number}`;
+    $<HTMLIFrameElement>('[data-inv-frame]').srcdoc = page(i);
+    $<HTMLDialogElement>('[data-inv-dlg]').showModal();
+  }
+  async function create(r: AdRequest) {
+    const by = me()?.name || 'NotiCel';
+    if (demo()) { toast('Modo demo: en el panel real, la factura se guarda con el próximo número.'); return; }
+    let inv: Inv;
+    if (hasBackend()) {
+      const draft = build(r, 0, by);
+      const res = await staffApi('invoices', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ request_id: r.id, issued_by: by, data: draft.data }) });
+      if (!res?.ok) { toast(res?.status === 409 ? 'Ese pedido ya tiene factura.' : 'No se pudo crear la factura. Corre supabase/permisos-equipo.sql si es la primera vez.'); return; }
+      inv = (await res.json())[0]; invoices.unshift(inv);
+      logActivity('Creó una factura', `#${inv.number} · ${r.client.business} · ${money(inv.data.total)}`);
+    } else {
+      const n = Math.max(1000, ...invoices.map((i) => i.number)) + 1;
+      inv = build(r, n, by); invoices.unshift(inv);
+      try { localStorage.setItem(LOCAL, JSON.stringify(invoices)); } catch { /* storage blocked */ }
+    }
+    paint(); open(inv);
+  }
+  async function voidIt(i: Inv) {
+    if (!(await ask(`¿Anular la factura #${i.number}? Queda en la lista como «Anulada» (no se borra) y el pedido vuelve a «Ventas sin factura» para hacerle una nueva.`, { ok: 'Anular', danger: true }))) return;
+    if (demo()) { toast('Modo demo: no se anula nada.'); return; }
+    if (hasBackend()) { const r = await staffApi(`invoices?number=eq.${i.number}`, { method: 'PATCH', body: JSON.stringify({ void: true }) }); if (!r?.ok) { toast('No se pudo anular.'); return; } logActivity('Anuló una factura', `#${i.number} · ${i.data.client?.business ?? ''}`); }
+    i.void = true; if (!hasBackend()) { try { localStorage.setItem(LOCAL, JSON.stringify(invoices)); } catch { /* storage blocked */ } }
+    paint();
+  }
+  function csv() {
+    const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = invoices.filter((i) => inRange(i.created_at)).map((i) => [i.number, i.created_at.slice(0, 10), i.data.client?.business, i.data.client?.name, i.data.client?.email, i.request_id, i.data.total.toFixed(2), stateOf(i)[0], i.data.due, i.data.method, i.issued_by].map(q).join(','));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([`﻿${[['Factura', 'Fecha', 'Negocio', 'Contacto', 'Correo', 'Pedido', 'Total', 'Estado', 'Vence', 'Forma de pago', 'Emitida por'].map(q).join(','), ...rows].join('\n')}`], { type: 'text/csv' }));
+    a.download = `facturas-${range}-${ymd(new Date())}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  root.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const rg = t.closest<HTMLElement>('[data-inv-range]'); if (rg) { range = rg.dataset.invRange!; paint(); return; }
+    if (t.closest('[data-inv-csv]')) { csv(); return; }
+    const op = t.closest<HTMLElement>('[data-inv-open]'); if (op) { const i = invoices.find((x) => x.number === Number(op.dataset.invOpen)); if (i) open(i); return; }
+    const vd = t.closest<HTMLElement>('[data-inv-void]'); if (vd) { const i = invoices.find((x) => x.number === Number(vd.dataset.invVoid)); if (i) void voidIt(i); return; }
+    const nw = t.closest<HTMLElement>('[data-inv-new]'); if (nw) { const r = orders.find((o) => o.id === nw.dataset.invNew); if (r) void create(r); return; }
+    if (t.closest('[data-inv-x]')) { $<HTMLDialogElement>('[data-inv-dlg]').close(); return; }
+    if (t.closest('[data-inv-pdf]')) { $<HTMLIFrameElement>('[data-inv-frame]').contentWindow?.print(); return; }
+    if (t.closest('[data-inv-mail]') && showing) {
+      // The email app opens with the client and a short message; attach the PDF from «Descargar PDF»
+      const i = showing, c = i.data.client ?? ({} as AdRequest['client']);
+      const body = `Hola${c.name ? ` ${c.name.split(' ')[0]}` : ''}:\n\nTe enviamos la factura #${i.number} de ${root.dataset.legal} por ${money(i.data.total)}${paidOf(i) ? ' (pagada, gracias)' : `, con vencimiento el ${day(i.data.due)}`}. La encuentras en el PDF adjunto.\n\nGracias por anunciarte con nosotros.\n${me()?.name ?? ''}\n${root.dataset.legal}`;
+      location.href = `mailto:${encodeURIComponent(c.email || '')}?subject=${encodeURIComponent(`Factura #${i.number} de NotiCel`)}&body=${encodeURIComponent(body)}`;
+    }
+  });
+  $<HTMLDialogElement>('[data-inv-dlg]').addEventListener('click', (e) => { const d = e.currentTarget as HTMLDialogElement; if (e.target === d) d.close(); });
+  addEventListener('nc-staff-change', () => void load());
+  addEventListener('nc-inv-load', () => void load()); // Ventas → Facturas opened
+  void load();
+</script>

@@ -1,0 +1,418 @@
+---
+// Ventas → "+ Anuncio vendido": the sales team puts a directly sold ad on the site by itself, with whatever terms were
+// agreed (each deal is different): the spaces, the images, by dates or by views, and where it shows. Saving publishes
+// the campaign right away (ad_campaigns, like approving a request) and keeps the deal on record in the team's client
+// list (sales_leads, as a won sale): amount paid, how and when, invoice number, salesperson and the agreed terms.
+// It also adds an approved request for the client (ad_requests, lines starting "Venta directa"), so the automatic emails
+// go out (the deal in writing, live, ending soon, results: supabase/functions/correos) and the client sees the campaign
+// in the advertiser panel with their email. "Idioma de los correos al cliente" → English saves client.lang 'en', so those emails go in English.
+import { VOLUME_TIERS, PREPAY_DISCOUNT, DIRECT_MAX_DISCOUNT, COMUNICADO_PRICES } from '../../lib/ads';
+import { SECTIONS } from '../../lib/site';
+const money = (n: number) => `$${n.toLocaleString('en-US')}`;
+---
+<button type="button" class="adp-btn" data-ds-open>+ Anuncio vendido</button>
+<dialog class="sd-dlg ds-dlg" data-ds-dlg aria-labelledby="ds-h">
+  <form method="dialog" class="sd-form" data-ds-form novalidate>
+    <header class="sd-dlg-h"><h2 id="ds-h">Anuncio vendido</h2><button type="button" class="sd-x" data-ds-close aria-label="Cerrar">✕</button></header>
+    <p class="pnl-muted pnl-small ds-intro">Para ventas que cerraste directamente. Antes de guardar verás un resumen para revisarlo. <span data-ds-intro>El anuncio sale en el sitio en la fecha que pongas</span> y la venta queda en <b>Ganadas</b> con sus datos.</p>
+    <div class="ds-mode ds-what" role="radiogroup" aria-label="Qué vendiste">
+      <label class="sd-chk"><input type="radio" name="what" value="ad" checked /><span>Anuncio<small>banner, rectángulo, toma…</small></span></label>
+      <label class="sd-chk"><input type="radio" name="what" value="com" /><span>Comunicado de prensa<small>sale como «Comunicado pagado»</small></span></label>
+    </div>
+    <div class="sd-fields">
+      <fieldset><legend>Cliente</legend>
+        <div class="sd-2">
+          <label>Negocio<input name="business" required maxlength="60" /></label>
+          <label>Persona de contacto<input name="contact" maxlength="60" /></label>
+          <label>Teléfono<input name="phone" type="tel" maxlength="20" /></label>
+          <label>Correo <small>(le llegan la confirmación y los resultados)</small><input name="email" type="email" maxlength="80" /></label>
+          <label>Idioma de los correos al cliente<select name="lang"><option value="es" selected>Español</option><option value="en">English</option></select></label>
+          <label>Referido por <small>(si un periodista te pasó el cliente)</small><select name="ref" data-ds-ref><option value="">Nadie</option></select></label>
+        </div>
+      </fieldset>
+      {/* Comunicado pagado: goes to Escribir "En revisión" for an editor to publish (src/lib/comunicados.ts) */}
+      <fieldset data-ds-com hidden><legend>El comunicado</legend>
+        <div class="ds-mode" role="radiogroup">
+          <label class="sd-chk"><input type="radio" name="comKind" value="ready" checked /><span>Ya lo tiene escrito<small>{money(COMUNICADO_PRICES.ready)} · lo revisamos y le damos formato</small></span></label>
+          <label class="sd-chk"><input type="radio" name="comKind" value="written" /><span>Lo escribimos nosotros<small>{money(COMUNICADO_PRICES.written)} · con los datos del cliente</small></span></label>
+        </div>
+        <div class="sd-2">
+          <label>Sección<select name="comSection">{SECTIONS.filter((x) => x.id !== 'opinion').map((x) => <option value={x.id}>{x.name}</option>)}</select></label>
+          <label>Título<input name="comTitle" maxlength="140" /></label>
+        </div>
+        <label>Resumen en una oración<input name="comSummary" maxlength="220" /></label>
+        <label>Texto del comunicado, o los datos para escribirlo<textarea name="comText" rows="6" maxlength="8000"></textarea></label>
+        <label class="ds-lab">Foto (opcional)<input type="file" accept="image/jpeg,image/png,image/webp" data-ds-com-photo /></label>
+      </fieldset>
+      <fieldset data-ds-ad><legend>El anuncio</legend>
+        <p class="ds-lab">Espacios</p>
+        <div class="sd-fmts ds-sizes">
+          <label class="sd-chk"><input type="checkbox" name="size" value="leaderboard" /><span>Banner de arriba<small>728 × 90 · celular 320 × 100</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="size" value="rectangle" checked /><span>Rectángulo o cuadrado<small>300 × 250 · 600 × 600</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="size" value="halfpage" /><span>Media página<small>300 × 600</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="size" value="infeed" /><span>Entre noticias<small>728 × 90 · celular 320 × 100</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="takeover" /><span>Toma de portada<small>todos los espacios del sitio</small></span></label>
+        </div>
+        <label class="ds-lab">Imágenes del anuncio <small>(una por tamaño; cada espacio usa la que le queda)</small>
+          <input name="files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple data-ds-files /></label>
+        <div class="ds-thumbs" data-ds-thumbs></div>
+        <p class="sd-warn" data-ds-fitwarn hidden></p>
+        {/* Ajustar: makes a version of an uploaded image for each space that has none (whole + blurred edges, or cropped) */}
+        <div class="ds-fit" data-ds-fit hidden></div>
+        <div class="sd-2">
+          <label>Enlace al tocar el anuncio<input name="link" type="url" maxlength="300" placeholder="https://…" /></label>
+          <label>Dónde sale<select name="regions"><option value="all">Puerto Rico y la diáspora</option><option value="island">Solo Puerto Rico</option><option value="diaspora">Solo la diáspora</option></select></label>
+        </div>
+        <p class="ds-lab">Cómo se vendió</p>
+        <div class="ds-mode" role="radiogroup">
+          <label class="sd-chk"><input type="radio" name="mode" value="time" checked /><span>Por tiempo<small>sale entre dos fechas</small></span></label>
+          <label class="sd-chk"><input type="radio" name="mode" value="views" /><span>Por vistas<small>termina sola al cumplirlas</small></span></label>
+        </div>
+        <div class="sd-2">
+          <label>Empieza<input name="start" type="date" required /></label>
+          <label data-ds-end>Termina<input name="end" type="date" /></label>
+          <label data-ds-views hidden>Vistas vendidas<input name="views" type="number" min="1000" step="1000" value="10000" /></label>
+        </div>
+      </fieldset>
+      <fieldset><legend>Precio y pago</legend>
+        <div class="ds-mode" role="radiogroup" aria-label="¿Ya pagó?">
+          <label class="sd-chk"><input type="radio" name="state" value="paid" checked /><span>Pagada<small>el cliente ya pagó</small></span></label>
+          <label class="sd-chk"><input type="radio" name="state" value="due" /><span>Por pagar<small>queda en «Por cobrar»</small></span></label>
+        </div>
+        <div class="sd-2">
+          <label>Precio del anuncio ($)<input name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="antes de descuentos" /></label>
+          <label><span data-ds-method-l>Forma de pago</span><select name="method"><option>ATH Móvil</option><option>Tarjeta</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Factura a la agencia</option><option>Intercambio (canje)</option><option>Cortesía</option><option>Otra</option></select></label>
+        </div>
+        <div class="ds-disc">
+          <p class="ds-lab">Descuentos <small>(hasta {DIRECT_MAX_DISCOUNT}% en total)</small></p>
+          <label>Por volumen<select name="volume" data-ds-volume><option value="0">Sin descuento</option>{VOLUME_TIERS.map((t) => <option value={t.pct} data-from={t.from}>{t.pct}% · desde {money(t.from)}</option>)}</select></label>
+          <label class="sd-chk sm"><input type="checkbox" name="prepay" data-ds-prepay /><span>Pronto pago: pagó todo por adelantado (−{PREPAY_DISCOUNT}%)</span></label>
+          <p class="pnl-muted pnl-small" data-ds-disc-hint></p>
+          <p class="ds-total"><span>Total a cobrar</span><b data-ds-total>$0</b></p>
+        </div>
+        <div class="sd-2">
+          <label data-ds-paidon>Fecha del pago<input name="paidOn" type="date" /></label>
+          <label>Factura o recibo #<input name="invoice" maxlength="40" /></label>
+        </div>
+        <label>Lo que se acordó<textarea name="terms" rows="3" maxlength="800" placeholder="ej. 2 meses + 2 semanas gratis; cambia el arte a mitad de campaña; paga la mitad ahora y la mitad el 15…"></textarea></label>
+      </fieldset>
+    </div>
+    <p class="cm-err" data-ds-err hidden></p>
+    <footer class="sd-dlg-f">
+      <button type="button" class="adp-btn ghost-dark" data-ds-close>Cancelar</button>
+      <button type="submit" class="adp-btn" data-ds-save>Guardar y publicar</button>
+    </footer>
+  </form>
+</dialog>
+
+<script>
+  import { publishCampaign, hasBackend, staffApi, uploadStoryFile, uploadAdImage } from '../../lib/backend';
+  import { comunicadoToEscribir } from '../../lib/comunicados';
+  import type { AdRequest } from '../../lib/adrequests';
+  import { kickEmails } from '../../lib/adrequests';
+  import { sharedList } from '../../lib/shared';
+  import { myId, teamList, codeOf, isReferrer } from '../../lib/sellers';
+  import type { AdSize, Campaign } from '../../lib/ads';
+  import { VOLUME_TIERS, PREPAY_DISCOUNT, DIRECT_MAX_DISCOUNT, COMUNICADO_PRICES } from '../../lib/ads';
+  import { fitImage, placeImage, imageFrom } from '../../lib/adcreative';
+  import { tell, ask } from '../../lib/dialogs';
+  const dlg = document.querySelector<HTMLDialogElement>('[data-ds-dlg]');
+  const form = document.querySelector<HTMLFormElement>('[data-ds-form]');
+  if (dlg && form) {
+    const $ = <T extends Element = HTMLElement>(s: string) => form.querySelector<T>(s)!;
+    const iso = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+    const today = iso(new Date());
+    const addDays = (s: string, n: number) => { const d = new Date(`${s}T12:00:00`); d.setDate(d.getDate() + n); return iso(d); };
+    const money = (n: number) => `$${(Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    // Which spaces an image fits (same shapes and tolerance the site uses to place it, AdSlot.astro)
+    const RATIO: Record<AdSize, number[]> = { leaderboard: [728 / 90, 320 / 100], infeed: [728 / 90, 320 / 100], rectangle: [300 / 250, 1], halfpage: [300 / 600] };
+    const NAME: Record<AdSize, string> = { leaderboard: 'Banner de arriba', infeed: 'Entre noticias', rectangle: 'Rectángulo', halfpage: 'Media página' };
+    const fits = (w: number, h: number, s: AdSize) => RATIO[s].some((r) => Math.abs(w / h - r) / r < 0.15);
+    type Img = { data: string; w: number; h: number; name: string };
+    let imgs: Img[] = [];
+    const leads = sharedList<any>('sales_leads', 'nc-leads', 'nc-leads');
+
+    const sizes = (): AdSize[] => ($<HTMLInputElement>('[name="takeover"]').checked ? ['leaderboard', 'rectangle', 'halfpage', 'infeed'] : [...form.querySelectorAll<HTMLInputElement>('[name="size"]:checked')].map((c) => c.value as AdSize));
+    /** Price, discounts (volume by the price's tier, fast pay only when paid up front, capped) and the total. */
+    function pricing() {
+      const d = new FormData(form), price = Math.max(0, Number(d.get('price')) || 0), paidState = d.get('state') === 'paid';
+      const best = [...VOLUME_TIERS].reverse().find((t) => price >= t.from)?.pct ?? 0;
+      const vol = Math.min(Number(d.get('volume')) || 0, best), prepay = paidState && !!d.get('prepay') ? PREPAY_DISCOUNT : 0;
+      const pct = Math.min(DIRECT_MAX_DISCOUNT, vol + prepay);
+      const total = Math.round(price * (1 - pct / 100) * 100) / 100;
+      return { price, best, vol, prepay, pct, total, paidState };
+    }
+    function paintPrice() {
+      const p = pricing();
+      // Only the tiers this price reaches can be chosen; picked automatically the first time it qualifies
+      const sel = $<HTMLSelectElement>('[data-ds-volume]');
+      [...sel.options].forEach((o) => (o.disabled = Number(o.value) > p.best));
+      if (Number(sel.value) > p.best) sel.value = String(p.best);
+      if (p.best && sel.dataset.auto !== String(p.best)) { sel.value = String(p.best); sel.dataset.auto = String(p.best); }
+      const pp = $<HTMLInputElement>('[data-ds-prepay]'); pp.disabled = !p.paidState; if (!p.paidState) pp.checked = false;
+      $('[data-ds-paidon]').hidden = !p.paidState;
+      $('[data-ds-method-l]').textContent = p.paidState ? 'Forma de pago' : 'Cómo va a pagar';
+      const q = pricing();
+      $('[data-ds-disc-hint]').textContent = !q.price ? 'Escribe el precio para ver los descuentos.' : `${q.best ? `Por este precio le toca hasta ${q.best}% por volumen.` : `Por volumen: desde ${money(VOLUME_TIERS[0].from)}.`}${q.paidState ? '' : ' Pronto pago solo si paga todo por adelantado.'}${q.pct ? ` Descuento total: ${q.pct}% (−${money(q.price - q.total)}).` : ''}`;
+      $('[data-ds-total]').textContent = money(q.total);
+    }
+    const isCom = () => (form.elements.namedItem('what') as RadioNodeList).value === 'com';
+    let comPhoto = '';
+    function paint() {
+      // Anuncio or Comunicado: each shows its own part of the form; a comunicado starts at its price
+      const com = isCom(); $('[data-ds-com]').hidden = !com; $('[data-ds-ad]').hidden = com;
+      const priceIn = $<HTMLInputElement>('[name="price"]'), kindPrice = String(COMUNICADO_PRICES[(new FormData(form).get('comKind') === 'written' ? 'written' : 'ready')]);
+      if (com && (!priceIn.value || priceIn.dataset.auto === priceIn.value)) { priceIn.value = kindPrice; priceIn.dataset.auto = kindPrice; }
+      paintPrice();
+      const byViews = (form.elements.namedItem('mode') as RadioNodeList).value === 'views';
+      $('[data-ds-end]').hidden = byViews; $('[data-ds-views]').hidden = !byViews;
+      $('[data-ds-thumbs]').innerHTML = imgs.map((m, i) => {
+        const where = (Object.keys(RATIO) as AdSize[]).filter((s) => fits(m.w, m.h, s)).map((s) => NAME[s]);
+        return `<figure><img src="${m.data}" alt=""><figcaption>${m.w} × ${m.h}<br><small>${where.length ? esc(where.join(', ')) : 'No le queda a ningún espacio'}</small></figcaption><button type="button" class="sd-x sm" data-ds-rm="${i}" aria-label="Quitar">✕</button></figure>`;
+      }).join('');
+      const missing = imgs.length ? sizes().filter((s) => !imgs.some((m) => fits(m.w, m.h, s))) : [];
+      const w = $('[data-ds-fitwarn]'); w.hidden = !missing.length;
+      if (missing.length) w.textContent = `Falta una imagen para: ${missing.map((s) => NAME[s]).join(', ')}. Ajústala aquí abajo o sube una de ese tamaño.`;
+      paintFit(missing);
+    }
+
+    // ---- Ajustar: a version of an uploaded image for a space it doesn't fit ----
+    // One box per missing space; banners get both the computer (728 × 90) and the phone (320 × 100) version.
+    const TARGET: Record<AdSize, Array<[number, number]>> = { leaderboard: [[728, 90], [320, 100]], infeed: [[728, 90], [320, 100]], rectangle: [[300, 250]], halfpage: [[300, 600]] };
+    type Fit = { src: number; mode: 'fit' | 'fill'; zoom: number; x: number; y: number };
+    const fitState = new Map<AdSize, Fit>();
+    const fitOf = (sp: AdSize) => fitState.get(sp) ?? (fitState.set(sp, { src: 0, mode: 'fit', zoom: 1, x: 0, y: 0 }), fitState.get(sp)!);
+    function paintFit(missing: AdSize[]) {
+      const box = $('[data-ds-fit]');
+      // Banner de arriba and Entre noticias share the same shapes: one box covers both
+      const list = missing.filter((sp, i) => !(sp === 'infeed' && missing.includes('leaderboard')) || i < 0);
+      box.hidden = !list.length || !imgs.length;
+      if (box.hidden) { box.innerHTML = ''; return; }
+      box.innerHTML = list.map((sp) => { const f = fitOf(sp); return `<div class="ds-fit-card" data-fit="${sp}">
+        <p class="ds-fit-h"><b>Ajustar para ${esc(NAME[sp])}${sp === 'leaderboard' && missing.includes('infeed') ? ' y Entre noticias' : ''}</b>${imgs.length > 1 ? ` <select data-fit-src aria-label="Imagen">${imgs.map((m, i) => `<option value="${i}" ${i === f.src ? 'selected' : ''}>${esc(m.name || `Imagen ${i + 1}`)}</option>`).join('')}</select>` : ''}</p>
+        <div class="ds-fit-modes" role="group"><button type="button" data-fit-mode="fit" aria-pressed="${f.mode === 'fit'}">Completa</button><button type="button" data-fit-mode="fill" aria-pressed="${f.mode === 'fill'}">Recortar</button></div>
+        <div class="ds-fit-prev">${TARGET[sp].map(([w, h]) => `<figure><canvas data-fit-c="${w}x${h}" style="aspect-ratio:${w}/${h};max-width:${Math.min(w, 520)}px"></canvas><figcaption>${w} × ${h}${w === 320 ? ' (celular)' : ''}</figcaption></figure>`).join('')}</div>
+        <label class="ds-fit-zoom" ${f.mode === 'fill' ? '' : 'hidden'}>Zoom <input type="range" min="1" max="3" step="0.05" value="${f.zoom}" data-fit-zoom /> <small>Arrastra la imagen para moverla</small></label>
+        <p class="pnl-muted pnl-small">${f.mode === 'fit' ? 'Completa: se ve toda la imagen; los lados se llenan con la misma imagen difuminada.' : 'Recortar: la imagen llena el espacio; lo que sobra se corta.'}</p>
+        <button type="button" class="adp-btn" data-fit-use>Usar esta versión</button>
+      </div>`; }).join('');
+      list.forEach((sp) => void drawFit(sp));
+    }
+    async function drawFit(sp: AdSize) {
+      const card = $(`[data-fit="${sp}"]`), f = fitOf(sp), src = imgs[f.src] ?? imgs[0]; if (!card || !src) return;
+      const img = await imageFrom(src.data);
+      card.querySelectorAll<HTMLCanvasElement>('[data-fit-c]').forEach((c) => {
+        const [w, h] = c.dataset.fitC!.split('x').map(Number);
+        if (f.mode === 'fit') fitImage(c, w, h, img);
+        else { const used = placeImage(c, w, h, img, { zoom: f.zoom, x: f.x * w, y: f.y * h }); if (w === TARGET[sp][0][0]) { f.x = used.x / w; f.y = used.y / h; } }
+      });
+    }
+    // Controls (they don't go through the form's change → paint, so the boxes stay open while adjusting)
+    const fitBox = $('[data-ds-fit]');
+    fitBox.addEventListener('change', (e) => e.stopPropagation());
+    fitBox.addEventListener('input', (e) => {
+      e.stopPropagation();
+      const t = e.target as HTMLInputElement, sp = t.closest<HTMLElement>('[data-fit]')?.dataset.fit as AdSize; if (!sp) return;
+      const f = fitOf(sp);
+      if (t.matches('[data-fit-zoom]')) f.zoom = Number(t.value);
+      if (t.matches('[data-fit-src]')) { f.src = Number(t.value); f.x = f.y = 0; }
+      void drawFit(sp);
+    });
+    fitBox.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement, sp = t.closest<HTMLElement>('[data-fit]')?.dataset.fit as AdSize; if (!sp) return;
+      const mb = t.closest<HTMLElement>('[data-fit-mode]');
+      if (mb) { fitOf(sp).mode = mb.dataset.fitMode as Fit['mode']; paint(); return; }
+      if (t.closest('[data-fit-use]')) {
+        // Each preview becomes an image of its own size (sharp: drawn at twice the size)
+        $(`[data-fit="${sp}"]`).querySelectorAll<HTMLCanvasElement>('[data-fit-c]').forEach((c) => {
+          const [w, h] = c.dataset.fitC!.split('x').map(Number), src = imgs[fitOf(sp).src] ?? imgs[0];
+          imgs.push({ data: c.toDataURL(src.data.startsWith('data:image/png') ? 'image/png' : 'image/jpeg', 0.9), w, h, name: `${(src.name || 'anuncio').replace(/\.\w+$/, '')}-${w}x${h}` });
+        });
+        fitState.delete(sp); paint();
+      }
+    });
+    // Recortar: drag the picture to choose what shows
+    let drag: { sp: AdSize; x0: number; y0: number; fx: number; fy: number; w: number; h: number; cw: number } | null = null;
+    fitBox.addEventListener('pointerdown', (e) => {
+      const c = (e.target as HTMLElement).closest<HTMLCanvasElement>('[data-fit-c]'), sp = c?.closest<HTMLElement>('[data-fit]')?.dataset.fit as AdSize;
+      if (!c || !sp || fitOf(sp).mode !== 'fill') return;
+      const [w, h] = c.dataset.fitC!.split('x').map(Number), f = fitOf(sp);
+      drag = { sp, x0: e.clientX, y0: e.clientY, fx: f.x, fy: f.y, w, h, cw: c.clientWidth }; c.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    fitBox.addEventListener('pointermove', (e) => {
+      if (!drag) return; const f = fitOf(drag.sp), k = drag.w / drag.cw;
+      f.x = drag.fx + ((e.clientX - drag.x0) * k) / drag.w; f.y = drag.fy + ((e.clientY - drag.y0) * k) / drag.h; void drawFit(drag.sp);
+    });
+    fitBox.addEventListener('pointerup', () => (drag = null));
+    const read = (f: File) => new Promise<Img>((ok, bad) => {
+      const r = new FileReader();
+      r.onload = () => { const im = new Image(); im.onload = () => ok({ data: String(r.result), w: im.naturalWidth, h: im.naturalHeight, name: f.name }); im.onerror = bad; im.src = String(r.result); };
+      r.onerror = bad; r.readAsDataURL(f);
+    });
+    $<HTMLInputElement>('[data-ds-files]').addEventListener('change', async (e) => {
+      const input = e.target as HTMLInputElement;
+      for (const f of [...(input.files ?? [])]) { if (f.size > 5 * 1024 * 1024) { void tell(`${f.name} pesa más de 5 MB. Usa una imagen más liviana.`); continue; } imgs.push(await read(f)); }
+      input.value = ''; paint();
+    });
+    form.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds-rm]'); if (b) { imgs.splice(Number(b.dataset.dsRm), 1); paint(); } });
+    form.addEventListener('change', paint);
+    form.addEventListener('change', () => ($('[data-ds-save]').textContent = saveLabel())); // Anuncio or Comunicado
+    form.addEventListener('input', (e) => { if ((e.target as HTMLElement).matches('[name="price"]')) paintPrice(); }); // the total follows the price as it's typed
+    document.querySelector('[data-ds-open]')!.addEventListener('click', () => {
+      form.reset(); imgs = []; $('[data-ds-err]').hidden = true; delete $<HTMLSelectElement>('[data-ds-volume]').dataset.auto;
+      (form.elements.namedItem('start') as HTMLInputElement).value = today;
+      (form.elements.namedItem('end') as HTMLInputElement).value = addDays(today, 29);
+      (form.elements.namedItem('paidOn') as HTMLInputElement).value = today;
+      // Periodistas who can be credited for referring the client (referral rate; src/lib/sellers.ts)
+      $('[data-ds-ref]').innerHTML = '<option value="">Nadie</option>' + teamList().filter((m) => m.id && isReferrer(m.role)).map((m) => `<option value="${codeOf(m.id!)}">${esc(m.name)}</option>`).join('');
+      $('[data-ds-save]').textContent = saveLabel();
+      $('[data-ds-intro]').textContent = needsApproval() ? 'El anuncio sale en el sitio cuando el administrador o el Gerente lo apruebe' : 'El anuncio sale en el sitio en la fecha que pongas';
+      paint(); dlg.showModal();
+    });
+    form.querySelectorAll('[data-ds-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
+    $<HTMLInputElement>('[data-ds-com-photo]').addEventListener('change', async (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0]; comPhoto = ''; if (!f) return;
+      if (f.size > 5 * 1024 * 1024) { (e.target as HTMLInputElement).value = ''; void tell('La foto pesa más de 5 MB.'); return; }
+      comPhoto = (await read(f)).data;
+    });
+
+    // A salesperson's ad waits for the administrator or the Gerente to approve it in Anuncios (user, 2026-11-02:
+    // nothing a salesperson types goes on the site unchecked); theirs goes up on the date as before.
+    const needsApproval = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || '{}').role === 'ads'; } catch { return false; } };
+    const saveLabel = () => (isCom() ? 'Guardar' : needsApproval() ? 'Revisar y enviar a aprobación' : 'Revisar y publicar');
+    /** The link people go to when they tap the ad: adds https:// when it's missing; '' = none, null = not a web address. */
+    function cleanLink(v: string): string | null {
+      if (!v) return '';
+      const u = /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/+/, '')}`;
+      try { const x = new URL(u); return /\./.test(x.hostname) && !/\s/.test(v) ? x.href : null; } catch { return null; }
+    }
+    /** A comunicado sold by Ventas: the order (commissions, Ingresos, emails) and the story in Escribir for an editor. */
+    async function saveComunicado(s: (k: string) => string, fail: (m: string) => void) {
+      const pr = pricing(), written = s('comKind') === 'written';
+      if (s('comTitle').length < 5) return fail('Escribe el título del comunicado.');
+      if (s('comText').length < 40) return fail(written ? 'Escribe los datos para redactarlo (qué, cuándo, dónde, quién).' : 'Pega el texto del comunicado.');
+      if (!pr.price && s('method') !== 'Cortesía') return fail('Escribe el precio (o escoge «Cortesía» si es gratis).');
+      if (!hasBackend()) return fail('Para guardarlo hace falta la base de datos (no funciona en modo demostración).');
+      const btn = $<HTMLButtonElement>('[data-ds-save]'); btn.disabled = true; btn.textContent = 'Guardando…';
+      const rid = `V-${Date.now().toString(36)}`.toUpperCase();
+      let seller = ''; try { seller = JSON.parse(localStorage.getItem('nc-staff') || '{}').name ?? ''; } catch { /* storage blocked */ }
+      const photo = comPhoto ? await uploadStoryFile(`comunicados/${rid.toLowerCase()}.jpg`, comPhoto) : '';
+      const pagoTxt = pr.paidState ? `${s('method')}${s('paidOn') ? ` · ${s('paidOn')}` : ''}` : `Pendiente (pagará con ${s('method')})`;
+      const lines = ['Venta directa', `Pago: ${pagoTxt}`, `Precio: $${pr.price.toFixed(2)}`,
+        ...(pr.vol ? [`Descuento por volumen (${pr.vol}%)`] : []), ...(pr.prepay ? [`Descuento por pronto pago (${pr.prepay}%)`] : []),
+        `Sección: ${s('comSection')}`, `Comunicado de prensa: ${written ? 'lo escribimos nosotros' : 'escrito por el cliente'}`,
+        ...(s('invoice') ? [`Factura: ${s('invoice')}`] : []), ...(s('terms') ? [`Acordado: ${s('terms')}`] : []), ...(seller ? [`Vendido por: ${seller}`] : []), ...(s('ref') ? [`Referido: ${s('ref')}`] : [])];
+      const req = { id: rid, status: 'revisar', paid: false,
+        client: { name: s('contact') || s('business'), business: s('business'), email: s('email'), phone: s('phone'), who: 'retail', ...(s('lang') === 'en' ? { lang: 'en' } : {}) },
+        formats: ['comunicado'], placement: '', start: today, duration: written ? 'Comunicado (lo escribimos)' : 'Comunicado (escrito por el cliente)', total: pr.total, lines, views: null,
+        art: { mode: written ? 'design' : 'upload', files: photo ? [{ name: 'foto.jpg', w: 0, h: 0, data: photo }] : [], title: s('comTitle'), cta: s('comSummary'), msg: s('comText') }, link: null };
+      const made = await staffApi('ad_requests', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(req) });
+      if (!made?.ok) { btn.disabled = false; btn.textContent = saveLabel(); return fail('No se pudo guardar. Revisa tu sesión (sal y vuelve a entrar) e intenta otra vez.'); }
+      const paidNow = pr.paidState && pr.total > 0 && s('method') !== 'Cortesía';
+      await staffApi(`ad_requests?id=eq.${rid}`, { method: 'PATCH', body: JSON.stringify({ status: 'aprobada', paid: paidNow }) });
+      const story = await comunicadoToEscribir({ ...req, created: new Date().toISOString(), where: '', paid: paidNow, status: 'aprobada' } as unknown as AdRequest, seller);
+      leads.save([{ id: `L-${rid.slice(2)}`, created: Date.now(), business: s('business'), contact: s('contact'), phone: s('phone'), email: s('email'), who: 'retail', channel: 'Venta directa',
+        fmt: [], start: today, end: today, days: 1, aud: 'all', reg: [], design: false, prepay: false, founder: false, requests: s('comTitle'), budget: '', follow: '', stage: 'won', extra: 0, extraAmt: 0, custom: [],
+        notes: [{ at: Date.now(), text: `Comunicado de prensa vendido: «${s('comTitle')}». ${pr.paidState ? 'Pagado' : 'Por cobrar'} $${pr.total}.` }], total: pr.total, converted: new Date().toISOString(),
+        sale: { campaignId: rid.toLowerCase(), paid: pr.total, due: !pr.paidState, price: pr.price, discount: pr.pct, method: s('method'), paidOn: s('paidOn'), invoice: s('invoice'), terms: s('terms'), soldBy: seller, byViews: false, sizes: [], takeover: false },
+        owner: myId(), ownerName: seller }, ...leads.load()]);
+      if (s('email')) kickEmails(2000);
+      btn.disabled = false; btn.textContent = saveLabel();
+      dlg.close(); dispatchEvent(new Event('nc-sale'));
+      void tell(story ? `✓ Listo: el comunicado de ${s('business')} quedó en Escribir → En revisión. Un editor lo revisa y lo publica con la etiqueta «Comunicado pagado». La venta quedó en tus comisiones.` : `La venta quedó guardada, pero no se pudo pasar a Escribir. Ábrelo en Anuncios y toca «Pasar a Escribir».`, 'Perfecto');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = new FormData(form); const s = (k: string) => String(d.get(k) ?? '').trim();
+      const err = $('[data-ds-err]'); const fail = (m: string) => { err.textContent = m; err.hidden = false; };
+      const byViews = s('mode') === 'views', sz = sizes(), takeover = !!d.get('takeover');
+      if (s('business').length < 2) return fail('Escribe el nombre del negocio.');
+      if (isCom()) return void saveComunicado(s, fail);
+      if (!sz.length) return fail('Escoge al menos un espacio.');
+      if (!imgs.length) return fail('Sube la imagen del anuncio.');
+      if (!sz.some((x) => imgs.some((m) => fits(m.w, m.h, x)))) return fail('Ninguna imagen le queda a los espacios escogidos. Revisa los tamaños.');
+      if (!s('start')) return fail('Escoge la fecha en que empieza.');
+      if (!byViews && (!s('end') || s('end') < s('start'))) return fail('La fecha final tiene que ser después de la de inicio.');
+      const views = byViews ? Math.max(1000, Number(s('views')) || 0) : undefined;
+      if (s('start') < today) return fail('La fecha de inicio no puede ser antes de hoy.');
+      const pr = pricing();
+      if (!pr.price && s('method') !== 'Cortesía') return fail('Escribe el precio del anuncio (o escoge «Cortesía» si es gratis).');
+      const cleanL = cleanLink(s('link'));
+      if (cleanL === null) return fail('El enlace no es una dirección de internet. Ejemplo: https://minegocio.com');
+      if (s('email') && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s('email'))) return fail('El correo del cliente no se ve bien. Revísalo.');
+      err.hidden = true;
+      // Check before saving: what goes up, where, when, and for how much
+      const wait = needsApproval();
+      const used = imgs.filter((m) => sz.some((x) => fits(m.w, m.h, x)));
+      const left = sz.filter((x) => !imgs.some((m) => fits(m.w, m.h, x)));
+      const row = (k: string, v: string, warn = false) => `<li${warn ? ' class="warn"' : ''}><span>${k}</span><b>${v}</b></li>`;
+      const sum = `<div class="ds-rev-imgs">${used.map((m) => `<img src="${m.data}" alt="" />`).join('')}</div><ul class="ds-rev">${[
+        row('Cliente', esc(s('business'))),
+        row('Espacios', esc(takeover ? 'Toma de portada (todos)' : sz.map((x) => NAME[x]).join(', '))),
+        ...(left.length && !takeover ? [row('Sin imagen', `${esc(left.map((x) => NAME[x]).join(', '))}: no saldrá ahí`, true)] : []),
+        row('Cuándo', byViews ? `${(Math.max(1000, Number(s('views')) || 0)).toLocaleString('es-PR')} vistas desde el ${s('start')}` : `del ${s('start')} al ${s('end')}`),
+        row('Dónde', esc(({ all: 'Puerto Rico y la diáspora', island: 'Solo Puerto Rico', diaspora: 'Solo la diáspora' } as Record<string, string>)[s('regions')] ?? '')),
+        row('Al tocarlo', cleanL ? esc(cleanL) : 'no lleva a ningún sitio (sin enlace)', !cleanL),
+        row('Total', `$${pr.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${pr.paidState ? `pagado (${esc(s('method'))})` : 'por cobrar'}`),
+        row('Correo del cliente', s('email') ? esc(s('email')) : 'ninguno: no recibirá la confirmación', !s('email')),
+      ].join('')}</ul>${wait ? '<p class="pnl-muted pnl-small">Va a <b>Anuncios → Por revisar</b>. Sale en el sitio cuando el administrador o el Gerente lo apruebe.</p>' : ''}`;
+      if (!(await ask('Revisa antes de guardar', { html: sum, ok: wait ? 'Enviar a aprobación' : 'Confirmar y publicar', cancel: 'Corregir' }))) return;
+      if (!hasBackend()) return fail('Para publicar hace falta la base de datos (no funciona en modo demostración).');
+      const id = `v-${Date.now().toString(36)}`;
+      const link = cleanL || '#';
+      const camp: Campaign = { id, client: s('business'), sizes: sz, start: s('start'), end: byViews ? addDays(s('start'), 365) : s('end'),
+        regions: s('regions') as Campaign['regions'], takeover: takeover || undefined, views,
+        creatives: imgs.filter((m) => sz.some((x) => fits(m.w, m.h, x))).map((m) => ({ img: m.data, url: link, alt: s('business'), w: m.w, h: m.h })) };
+      const btn = $<HTMLButtonElement>('[data-ds-save]'); btn.disabled = true; btn.textContent = wait ? 'Enviando…' : 'Publicando…';
+      // Waiting for approval: the images are stored with the order, and approving it in Anuncios puts it up
+      const files = wait ? await Promise.all(camp.creatives.map(async (c, i) => ({ name: `${c.w}x${c.h}.png`, w: c.w ?? 0, h: c.h ?? 0, data: (await uploadAdImage(`${id}-${c.w}x${c.h}-${i}.png`, c.img)) ?? '' }))) : [];
+      const ok = wait ? files.every((f) => f.data) : await publishCampaign(camp).catch(() => false);
+      btn.disabled = false; btn.textContent = saveLabel();
+      if (!ok) return fail(wait ? 'No se pudieron subir las imágenes. Revisa tu sesión (sal y vuelve a entrar) e intenta otra vez.' : 'No se pudo publicar. Revisa tu sesión (sal y vuelve a entrar) e intenta otra vez.');
+      // The client's record for the emails and the advertiser panel: saved as a request (the database only takes new
+      // ones as "por revisar"), then marked approved; the campaign above has the same id in lowercase
+      const rid = id.toUpperCase();
+      // "Pago: Pendiente (…)" marks it por cobrar (Ingresos and the emails read it)
+      const pagoTxt = pr.paidState ? `${s('method')}${s('paidOn') ? ` · ${s('paidOn')}` : ''}` : `Pendiente (pagará con ${s('method')})`;
+      const lines = ['Venta directa', `Pago: ${pagoTxt}`, `Precio: $${pr.price.toFixed(2)}`,
+        ...(pr.vol ? [`Descuento por volumen (${pr.vol}%)`] : []), ...(pr.prepay ? [`Descuento por pronto pago (${pr.prepay}%)`] : []),
+        ...(pr.pct ? [`Total con ${pr.pct}% de descuento: $${pr.total.toFixed(2)}`] : []),
+        ...(s('invoice') ? [`Factura: ${s('invoice')}`] : []), ...(s('terms') ? [`Acordado: ${s('terms')}`] : [])];
+      const fmtIds = takeover ? ['takeover'] : sz;
+      const where = s('regions') === 'island' ? 'Solo Puerto Rico' : s('regions') === 'diaspora' ? 'Solo la diáspora' : 'Puerto Rico y la diáspora';
+      const duration = byViews ? `${views!.toLocaleString('en-US')} vistas` : `${Math.round((Date.parse(`${camp.end}T12:00:00`) - Date.parse(`${camp.start}T12:00:00`)) / 864e5) + 1} días`;
+      // Who sold it goes in too, read below
+      let seller = ''; try { seller = JSON.parse(localStorage.getItem('nc-staff') || '{}').name ?? ''; } catch { /* storage blocked */ }
+      if (seller) lines.push(`Vendido por: ${seller}`);
+      if (s('ref')) lines.push(`Referido: ${s('ref')}`); // a periodista's referral: they earn the referral rate too
+      {
+        const made = await staffApi('ad_requests', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ id: rid, status: 'revisar', paid: false,
+          client: { name: s('contact') || s('business'), business: s('business'), email: s('email'), phone: s('phone'), who: 'retail', ...(s('lang') === 'en' ? { lang: 'en' } : {}) },
+          formats: fmtIds, placement: where, start: camp.start, duration, total: pr.total, lines, views: views ?? null, art: { mode: 'upload', files }, link: cleanL || null }) });
+        if (made?.ok) {
+          const paidNow = pr.paidState && pr.total > 0 && s('method') !== 'Cortesía';
+          await staffApi(`ad_requests?id=eq.${rid}`, { method: 'PATCH', body: JSON.stringify({ status: wait ? 'revisar' : 'aprobada', paid: paidNow }) });
+          if (s('email')) kickEmails(2000); // the emails go out only with the client's address
+        }
+        if (wait && !made?.ok) return fail('No se pudo guardar el pedido. Revisa tu sesión (sal y vuelve a entrar) e intenta otra vez.');
+      }
+      // The deal, on record in Ventas → Ganadas
+      const who = seller;
+      const paid = pr.total;
+      const sale = { campaignId: id, paid, due: !pr.paidState, price: pr.price, discount: pr.pct, method: s('method'), paidOn: s('paidOn'), invoice: s('invoice'), terms: s('terms'), soldBy: who, byViews, views, sizes: sz, takeover };
+      const what = takeover ? 'Toma de portada' : sz.map((x) => NAME[x]).join(', ');
+      const record = `Venta directa: ${what}, ${byViews ? `${views!.toLocaleString('es-PR')} vistas desde el ${s('start')}` : `del ${s('start')} al ${s('end')}`}. ${pr.paidState ? 'Pagado' : 'Por cobrar'} $${paid.toLocaleString('en-US')} (${s('method')}${s('paidOn') ? `, ${s('paidOn')}` : ''})${s('invoice') ? ` · factura ${s('invoice')}` : ''}${who ? ` · vendido por ${who}` : ''}.${s('terms') ? ` Acordado: ${s('terms')}` : ''}`;
+      leads.save([{ id: `L-${id.slice(2).toUpperCase()}`, created: Date.now(), business: s('business'), contact: s('contact'), phone: s('phone'), email: s('email'), who: 'retail', channel: 'Venta directa',
+        fmt: takeover ? ['takeover'] : [], start: s('start'), end: camp.end, days: 1, aud: s('regions') === 'all' ? 'all' : s('regions'), reg: [], design: false, prepay: false, founder: false,
+        requests: s('terms'), budget: '', follow: '', stage: 'won', extra: 0, extraAmt: 0, views, custom: [], notes: [{ at: Date.now(), text: record }], total: paid,
+        converted: new Date().toISOString(), sale, owner: myId(), ownerName: who }, ...leads.load()]);
+      dispatchEvent(new Event('nc-campaigns'));
+      dlg.close();
+      dispatchEvent(new Event('nc-sale')); // Mis comisiones and Inicio count it right away
+      if (wait) return void tell(`✓ Enviado: el anuncio de ${s('business')} está en Anuncios → Por revisar. Sale en el sitio cuando el administrador o el Gerente lo apruebe (te avisa tu Inicio). La venta quedó en Ventas → Ganadas.`, 'Perfecto');
+      void tell(`✓ Listo: el anuncio de ${s('business')} ${camp.start <= today ? 'ya sale en el sitio' : `sale el ${camp.start}`}. La venta quedó en Ventas → Ganadas y en tus comisiones.${s('email') ? ` ${s('business')} recibirá por correo la confirmación con lo acordado.` : ' Sin correo del cliente, no se le envían correos.'}`, 'Perfecto');
+    });
+  }
+</script>

@@ -1,6 +1,6 @@
 ---
 // Comments under each story, Reddit style: ▲▼ votes, replies to replies (indented, with lines; − folds a conversation),
-// sorted by Mejores / Recientes / Antiguos. Avatars, level badges, stickers and photos as before.
+// sorted by Más gustados (likes minus dislikes, the default) / Recientes. Avatars, level badges, stickers and photos as before.
 // With reader accounts (Supabase: supabase/comments.sql, connect-all.sql, reddit.sql) everyone sees the same comments.
 // Without them (preview, demo mode) new comments are saved only in this reader's browser ('nc-comments-<story id>'),
 // next to sample comments marked EJEMPLO.
@@ -58,7 +58,7 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       <div class="cm-tools">
         <div class="cm-pick-btns" role="group" aria-label="Agregar">
           <button type="button" data-pick-tab="sticker" aria-pressed="false">Sticker</button>
-          <label class="cm-photo-btn" title="Añadir una foto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>Foto<input type="file" accept="image/*" data-cm-photo class="sr" /></label>
+          {/* Photos in comments were removed (user, 2026-11-03): pictures can't be checked automatically. Stickers and GIFs stay. */}
         </div>
         <span class="cm-err" data-cm-err hidden></span>
         <button type="submit" class="cm-send">Publicar</button>
@@ -68,19 +68,18 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
 
 
   <div class="fo-sort cm-sort" role="group" aria-label="Ordenar comentarios">
-    <button type="button" data-cm-sort="best" aria-pressed="true">Mejores</button>
+    <button type="button" data-cm-sort="best" aria-pressed="true">Más gustados</button>
     <button type="button" data-cm-sort="new" aria-pressed="false">Recientes</button>
-    <button type="button" data-cm-sort="old" aria-pressed="false">Antiguos</button>
   </div>
   <ul class="cm-list" data-cm-list></ul>
 </section>
 
 <script>
   import { addComment, removeComment, getRep, levelOf, specialsOf, syncRep, repsOf, RULES, SPECIALS, type Rep } from '../lib/reputation';
-  import { ago, parseAgo, tree, voteBox, foldable, type Sort } from '../lib/threads';
+  import { ago, parseAgo, tree, foldable, type Sort } from '../lib/threads';
   import { notify } from '../lib/notifications';
   import { accountsOn, loggedIn, askLogin, api, myId, uploadCommentPhoto } from '../lib/account';
-  import { assess, serverSays, judgeReport, getReports, saveReports, upsertReport, isHidden, myReports, saveMyReports, isWeakReporter, REPORT_REASONS, type Report } from '../lib/moderation';
+  import { adIn, serverSays, judgeReport, getReports, saveReports, upsertReport, isHidden, myReports, saveMyReports, isWeakReporter, REPORT_REASONS, type Report } from '../lib/moderation';
   type Mine = { id: string; name: string; text: string; at: number; replyTo?: string; media?: { kind: string; src: string } };
   const store = {
     get: <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || '') ?? d; } catch { return d; } },
@@ -182,6 +181,13 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       if (write) ta.focus();
     });
     backdrop.addEventListener('click', () => close());
+    // The comment icon in the story's toolbar (and any link to #comentarios): on a phone the comments live in this
+    // panel, hidden from the page, so jumping to them did nothing; it opens the panel right away instead
+    document.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href="#comentarios"]');
+      if (!a || !phone.matches) return;
+      e.preventDefault(); open();
+    });
     root.querySelector('[data-cm-close]')!.addEventListener('click', () => close());
     addEventListener('popstate', () => close(true));
     addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
@@ -223,7 +229,7 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
 
 
   // ---------- One comment, the same for real and preview comments ----------
-  const COLORS = ['#2B1185', '#1F90DA', '#B0306A', '#0F8C8C', '#C8202F', '#5C3D99', '#2E7D32', '#E8590C'];
+  const COLORS = ['#000000', '#009DE9', '#B0306A', '#0F8C8C', '#C8202F', '#5C3D99', '#2E7D32', '#E8590C'];
   const colorOf = (name: string) => COLORS[[...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % COLORS.length];
   const avatar = (el: HTMLElement, name: string, photo?: string | null) => {
     el.textContent = photo ? '' : (name[0] || '?').toUpperCase();
@@ -233,9 +239,11 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
   };
   type View = {
     id: string; name: string; photo?: string | null; me?: boolean; badge?: { id: string; name: string } | null; sample?: boolean;
-    text: string; media?: Mine['media'] | null; when: string; score: number; vote: number; mine: boolean; deleted?: boolean;
+    team?: { title: string; slug: string | null } | null; // a team member: their position instead of the level badge
+    text: string; media?: Mine['media'] | null; when: string; score: number; likes?: number; vote: number; mine: boolean; deleted?: boolean;
     report?: 'Reportar' | 'Reportado' | ''; note?: string; depth: number; kids: number;
   };
+  const HEART = '<svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 3.9 4 7.4 4c2 0 3.6 1.1 4.6 2.7C13 5.1 14.6 4 16.6 4c3.5 0 5.8 3.6 4.6 7.1-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg>';
   function commentItem(v: View, badges: Record<string, string>): HTMLLIElement {
     const li = document.createElement('li');
     li.className = `cm-item${v.depth ? ' reply' : ''}${v.mine ? ' mine' : ''}${v.deleted ? ' gone' : ''}`;
@@ -246,15 +254,30 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
     if (v.deleted) av.textContent = '?'; else avatar(av, v.name, v.photo);
     const b = li.querySelector('b')!; b.textContent = v.deleted ? '[eliminado]' : v.name;
     const tail: Node[] = [];
-    if (v.badge && !v.deleted) { const bd = document.createElement('span'); bd.className = `cm-badge cm-b-${v.badge.id}`; bd.title = v.badge.name; bd.innerHTML = `${badges[v.badge.id] ?? ''} `; bd.append(v.badge.name); tail.push(document.createTextNode(' '), bd); }
+    // Team members: their position (Periodista, Editor, Columnista…); a columnist's name opens their profile page
+    if (v.team && !v.deleted) {
+      if (v.team.slug) { const a = document.createElement('a'); a.href = `${import.meta.env.BASE_URL.replace(/\/?$/, "/")}opinion/${v.team.slug}/`; a.className = 'cm-staff-link'; a.textContent = v.name; b.replaceChildren(a); }
+      const bd = document.createElement('span'); bd.className = 'cm-badge cm-staff'; bd.title = `${v.team.title} de NotiCel`;
+      bd.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg> ';
+      bd.append(v.team.title); tail.push(document.createTextNode(' '), bd);
+    } else if (v.badge && !v.deleted) { const bd = document.createElement('span'); bd.className = `cm-badge cm-b-${v.badge.id}`; bd.title = v.badge.name; bd.innerHTML = `${badges[v.badge.id] ?? ''} `; bd.append(v.badge.name); tail.push(document.createTextNode(' '), bd); }
     if (v.sample) { const ej = document.createElement('span'); ej.className = 'sp-demo'; ej.textContent = 'EJEMPLO'; tail.push(document.createTextNode(' '), ej); }
     b.after(...tail);
     const txt = li.querySelector<HTMLElement>('.cm-text')!;
     if (v.deleted) { txt.textContent = 'Este comentario fue eliminado.'; txt.classList.add('gone'); } else fillText(txt, v.text);
     if (v.media && !v.deleted) { const im = document.createElement('img'); im.className = `cm-media${v.media.kind === 'photo' ? ' photo' : ''}`; im.src = v.media.src; im.alt = v.media.kind === 'gif' ? 'GIF' : v.media.kind === 'photo' ? 'Foto del comentario' : 'Sticker'; im.loading = 'lazy'; li.querySelector('.cm-body p')!.after(im); }
     const meta = li.querySelector<HTMLElement>('.cm-meta')!;
-    if (!v.deleted) meta.append(voteBox(v.score, v.vote));
     const when = document.createElement('span'); when.textContent = v.when; meta.append(when);
+    // Likes like Instagram (user, 2026-11-03): a heart on the right (red once liked; double-tap the comment works too),
+    // and «12 Me gusta» under it. No «No me gusta». The most liked comments go first («Más gustados»).
+    if (!v.deleted) {
+      const n = v.likes ?? Math.max(0, v.score);
+      if (n) { const lc = document.createElement('b'); lc.className = 'cm-likecount'; lc.textContent = `${n.toLocaleString('es-PR')} Me gusta`; meta.append(lc); }
+      const h = document.createElement('button'); h.type = 'button'; h.className = 'cm-heart'; h.dataset.vote = '1';
+      h.setAttribute('aria-pressed', String(v.vote > 0)); h.setAttribute('aria-label', v.vote > 0 ? 'Quitar Me gusta' : 'Me gusta');
+      h.innerHTML = HEART; li.append(h);
+      li.querySelector('.cm-body > p')!.addEventListener('dblclick', () => { if (!h.matches('[aria-pressed="true"]')) h.click(); });
+    }
     const btn = (label: string, data: string, disabled = false) => { const x = document.createElement('button'); x.type = 'button'; x.textContent = label; x.setAttribute(data, ''); x.disabled = disabled; meta.append(x); return x; };
     if (!v.deleted) btn('Responder', 'data-reply');
     if (v.mine && !v.deleted) btn('Borrar', 'data-del');
@@ -265,7 +288,8 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
   }
   // Sort buttons above the list; the choice is remembered on this device
   function sortButtons(root: HTMLElement, onChange: () => void): () => Sort {
-    let sort: Sort = 'best'; try { sort = (localStorage.getItem('nc-cm-sort') as Sort) || 'best'; } catch { /* storage blocked */ }
+    // Most liked first by default (user, 2026-11-03: «Antiguos» is gone; a saved «old» goes back to most liked)
+    let sort: Sort = 'best'; try { sort = localStorage.getItem('nc-cm-sort') === 'new' ? 'new' : 'best'; } catch { /* storage blocked */ }
     const btns = [...root.querySelectorAll<HTMLButtonElement>('[data-cm-sort]')];
     const paint = () => btns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cmSort === sort)));
     btns.forEach((b) => b.addEventListener('click', () => { sort = b.dataset.cmSort as Sort; try { localStorage.setItem('nc-cm-sort', sort); } catch { /* storage blocked */ } paint(); onChange(); }));
@@ -304,6 +328,7 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
     // Reputation is counted by the server (badges next to names); the reader's own progress is only in Mi perfil
     const BADGES: Record<string, string> = JSON.parse(root.dataset.badges || '{}');
     let reps: Record<string, Rep> = {};
+    let team: Record<string, { title: string; slug: string | null }> = {}; // supabase/insignias.sql
     const refreshRep = () => { if (loggedIn()) void syncRep(); };
     const note = root.querySelector<HTMLElement>('.cm-note')!;
     const pk = setupPicker(root);
@@ -322,7 +347,7 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       let p: { name?: string; photo?: string } = {}; try { p = JSON.parse(localStorage.getItem('nc-profile') || '{}'); } catch { /* storage blocked */ }
       if (loggedIn() && p.name) avatar(meAv, p.name, p.photo); else { meAv.textContent = '?'; meAv.style.cssText = ''; }
       ta.placeholder = loggedIn() ? 'Añade un comentario…' : 'Entra a tu cuenta para comentar…';
-      note.innerHTML = loggedIn() ? `Comentas como <b></b>. Sé respetuoso: los comentarios con insultos, amenazas o datos personales se ocultan.` : 'Lee los comentarios de todos. Para comentar, votar o reportar, <button type="button" class="cm-login">entra o crea tu cuenta</button>.';
+      note.innerHTML = loggedIn() ? `Comentas como <b></b>. Sé respetuoso. No se permiten enlaces, teléfonos ni correos; los comentarios que los lectores reporten pueden ocultarse.` : 'Lee los comentarios de todos. Para comentar, votar o reportar, <button type="button" class="cm-login">entra o crea tu cuenta</button>.';
       note.querySelector('b') && (note.querySelector('b')!.textContent = `@${p.name ?? ''}`);
       note.querySelector('.cm-login')?.addEventListener('click', () => askLogin('Entra para comentar.'));
     };
@@ -359,16 +384,18 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       } else { liked = new Set(); disliked = new Set(); reported = new Set(); }
       render();
       // Level badges next to each commenter's name (counted by the server)
-      reps = await repsOf([...new Set(rows.map((x) => x.user_id))]);
+      const uids = [...new Set(rows.map((x) => x.user_id))];
+      const [rp, tb] = await Promise.all([repsOf(uids), uids.length ? api('rpc/team_badges', { method: 'POST', body: JSON.stringify({ ids: uids }) }, false) : null]);
+      reps = rp; team = tb?.ok ? Object.fromEntries(((await tb.json()) as Array<{ user_id: string; title: string; slug: string | null }>).map((x) => [x.user_id, { title: x.title, slug: x.slug }])) : {};
       render();
     }
     function render() {
-      const ordered = tree(rows.map((c) => ({ ...c, score: c.likes - (c.dislikes ?? 0), at: Date.parse(c.created_at) })), sortNow());
+      const ordered = tree(rows.map((c) => ({ ...c, score: c.likes, at: Date.parse(c.created_at) })), sortNow()); // most liked first
       list.replaceChildren(...ordered.map(({ item: c, depth, kids }) => {
         const lv = reps[c.user_id] ? levelOf(reps[c.user_id]) : null;
         return commentItem({
-          id: c.id, name: c.author?.username ?? 'lector', photo: c.author?.photo, badge: lv && lv.index > 0 ? { id: lv.id, name: lv.name } : null,
-          text: c.body, media: c.media, when: ago(Date.parse(c.created_at)), score: c.likes - (c.dislikes ?? 0), vote: myVote(c.id),
+          id: c.id, name: c.author?.username ?? 'lector', photo: c.author?.photo, badge: lv && lv.index > 0 ? { id: lv.id, name: lv.name } : null, team: team[c.user_id] ?? null,
+          text: c.body, media: c.media, when: ago(Date.parse(c.created_at)), score: c.likes - (c.dislikes ?? 0), likes: c.likes, vote: myVote(c.id),
           mine: c.user_id === myId(), deleted: c.deleted, report: reported.has(c.id) ? 'Reportado' : 'Reportar', depth, kids,
           note: c.status === 'review' ? 'Solo tú ves este comentario mientras la redacción lo revisa.' : c.status === 'removed' ? 'La redacción quitó este comentario por incumplir las reglas. Solo tú lo ves.' : '',
         }, BADGES);
@@ -437,10 +464,10 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       if (!need('Entra para comentar.')) return;
       const text = ta.value.trim(); const media = pk.media();
       if (!text && !media) { err.textContent = 'Escribe algo o escoge un sticker o GIF.'; err.hidden = false; return; }
-      // Automatic check before posting: clear violations are blocked; doubtful ones get one warning, then go to review
-      const chk = assess(text); const whyTxt = chk.reasons.join(', ').toLowerCase();
-      if (chk.verdict === 'block') { err.textContent = `No se puede publicar: ${whyTxt}. Revisa el texto.`; err.hidden = false; return; }
-      if (chk.verdict === 'review' && warned !== text) { warned = text; err.textContent = `Ojo: ${whyTxt}. Edítalo, o pulsa Publicar otra vez y la redacción lo revisará.`; err.hidden = false; return; }
+      // Before posting: no ads (links, phone numbers, emails); no word filter (user, 2026-11-03). The database checks too.
+      const ad = adIn(text);
+      if (ad) { err.textContent = `No se permiten ${ad} en los comentarios.`; err.hidden = false; return; }
+      const chk = { verdict: 'ok' as const, reasons: [] as string[], score: 0 };
       if (parentId && !text.startsWith('@')) setReply(null); // the reader erased the @name: it's a new comment
       const send = form.querySelector<HTMLButtonElement>('.cm-send')!; send.disabled = true;
       let att = media ?? null;
@@ -511,9 +538,9 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       list.replaceChildren(...tree(nodes, sortNow()).map(({ item: n, depth, kids }) => {
         const li = n.sample
           ? commentItem({ id: n.id, name: n.sample.name, badge: { id: n.sample.level, name: n.sample.levelName }, sample: true, text: n.sample.text, media: n.sample.media ? { kind: 'sticker', src: n.sample.media } : null,
-              when: n.sample.ago, score: n.score, vote: v[n.id] ?? 0, mine: false, report: 'Reportar', depth, kids }, BADGES)
+              when: n.sample.ago, score: n.score, likes: n.sample.likes + ((v[n.id] ?? 0) > 0 ? 1 : 0), vote: v[n.id] ?? 0, mine: false, report: 'Reportar', depth, kids }, BADGES)
           : commentItem({ id: n.id, name: n.mine!.name, me: true, badge: lv.index > 0 ? { id: lv.id, name: lv.name } : null, text: n.mine!.text, media: n.mine!.media,
-              when: ago(n.mine!.at), score: n.score, vote: v[n.id] ?? 0, mine: true, depth, kids }, BADGES);
+              when: ago(n.mine!.at), score: n.score, likes: (v[n.id] ?? 0) > 0 ? 1 : 0, vote: v[n.id] ?? 0, mine: true, depth, kids }, BADGES);
         if (n.mine) myAvatar(li.querySelector<HTMLElement>('.cm-av')!);
         return li;
       }));
@@ -591,11 +618,10 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       e.preventDefault();
       const text = ta.value.trim(); const media = pk.media();
       if (!text && !media) { err.textContent = 'Escribe algo o escoge un sticker o GIF.'; err.hidden = false; return; }
-      // Automatic check before posting: clear violations are blocked; doubtful ones get one warning, then go to the queue
-      const chk = assess(text);
-      const why = chk.reasons.join(', ').toLowerCase();
-      if (chk.verdict === 'block') { err.textContent = `No se puede publicar: ${why}. Revisa el texto.`; err.hidden = false; return; }
-      if (chk.verdict === 'review' && warned !== text) { warned = text; err.textContent = `Ojo: ${why}. Edítalo, o pulsa Publicar otra vez y la redacción lo revisará.`; err.hidden = false; return; }
+      // Before posting: no ads (links, phone numbers, emails); no word filter (user, 2026-11-03)
+      const ad = adIn(text);
+      if (ad) { err.textContent = `No se permiten ${ad} en los comentarios.`; err.hidden = false; return; }
+      const chk = { verdict: 'ok' as 'ok' | 'review', reasons: [] as string[], score: 0 };
       if (replyTo && !text.startsWith('@')) replyTo = undefined; // the reader erased the @name: it's a new comment
       const mine = store.get<Mine[]>(key, []);
       const id = `m${Date.now()}`;

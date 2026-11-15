@@ -5,16 +5,45 @@
 // follow-up dates and notes, a printable proposal, and "convert to ad" once the client says yes.
 // Shared by the sales team through Supabase (sales_leads, supabase/connect-all.sql); preview on this device without it.
 import LiveCampaigns from './LiveCampaigns.astro';
-import { FORMATS, REGIONS, CAMPAIGNS, SPECIALS, SALES_DISCOUNT_LIMIT, VIEW_PACKS, TAKEOVER_VIEW_PACKS } from '../../lib/ads';
+import DirectSale from './DirectSale.astro';
+import Commissions from './Commissions.astro';
+import Invoices from './Invoices.astro';
+import { FORMATS, REGIONS, CAMPAIGNS, SPECIALS, SALES_DISCOUNT_LIMIT, VIEW_PACKS, TAKEOVER_VIEW_PACKS, PAYMENTS } from '../../lib/ads';
+import { SITE, url } from '../../lib/site';
 const fmts = FORMATS.map(({ id, name, price, per }) => ({ id, name, price, per }));
 const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start, end: c.end, client: c.client }));
 ---
-<section class="sd" data-sd data-fmts={JSON.stringify(fmts)} data-booked={JSON.stringify(booked)} data-regions={JSON.stringify(REGIONS.map((r) => ({ id: r.id, name: r.name })))}>
+<section class="sd" data-sd data-pay={PAYMENTS.athMovilToken ? 'Tarjeta (Visa, Mastercard, Amex), Apple Pay, Google Pay o ATH Móvil' : 'Tarjeta (Visa, Mastercard, Amex), Apple Pay o Google Pay'} data-logo={url('email/logo.png')} data-email={SITE.email} data-fmts={JSON.stringify(fmts)} data-booked={JSON.stringify(booked)} data-regions={JSON.stringify(REGIONS.map((r) => ({ id: r.id, name: r.name })))}>
   <header class="sd-head">
-    <div><h1 class="pnl-h">Ventas</h1><p class="pnl-muted">Consultas de clientes, cotizaciones y propuestas. Lo que el cliente pide, a cuánto sale y cuándo darle seguimiento.</p></div>
-    <button type="button" class="adp-btn" data-sd-new>+ Nueva consulta</button>
+    <div><h1 class="pnl-h">Ventas</h1><p class="pnl-muted">Clientes, anuncios en el aire y comisiones, en un solo lugar.</p></div>
+    <div class="sd-head-btns"><DirectSale /><button type="button" class="adp-btn ghost-dark" data-sd-new>+ Nueva consulta</button></div>
   </header>
-  <LiveCampaigns />
+  {/* Three parts, one at a time (the choice is remembered on this device): commissions, ads on the site, clients */}
+  <nav class="sd-tabs" role="tablist" aria-label="Ventas">
+    <button type="button" role="tab" data-sdtab="com" aria-selected="true"><span data-sdtab-l="com">Comisiones</span></button>
+    <button type="button" role="tab" data-sdtab="ads" aria-selected="false"><span data-sdtab-l="ads">Campañas en el aire</span></button>
+    <button type="button" role="tab" data-sdtab="cli" aria-selected="false"><span data-sdtab-l="cli">Clientes</span> <b data-sdtab-n></b></button>
+    <button type="button" role="tab" data-sdtab="fac" aria-selected="false" hidden>Facturas</button>
+    <button type="button" role="tab" data-sdtab="redes" aria-selected="false">Redes</button>
+  </nav>
+  <div data-sdv="com"><Commissions /></div>
+  <div data-sdv="ads" hidden><LiveCampaigns /></div>
+  <div data-sdv="fac" hidden><Invoices /></div>
+  {/* Redes (user, 2026-11-13): where clients come from, and tagged links for social posts (src/lib/source.ts) */}
+  <div data-sdv="redes" hidden>
+    <h2 class="pnl-h3">De dónde vienen los clientes</h2>
+    <p class="pnl-muted pnl-small">Consultas y órdenes de los últimos 90 días, por red o canal. «Ganado» suma las consultas ganadas y las órdenes pagadas en Anúnciate.</p>
+    <div class="sd-src" data-src-table></div>
+    <h2 class="pnl-h3">Enlace para una publicación</h2>
+    <p class="pnl-muted pnl-small">Pon este enlace en el post, la historia o el anuncio. Quien llegue por él y pida un anuncio o escriba en «Prefiero hablar con alguien» queda marcado con esa red y esa campaña (por 30 días en su teléfono).</p>
+    <div class="sd-2 sd-linkb">
+      <label>Red<select data-lk-net><option value="instagram">Instagram</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="x">X (Twitter)</option><option value="whatsapp">WhatsApp</option><option value="youtube">YouTube</option><option value="meta-ads">Anuncio pagado en redes</option><option value="email">Correo</option></select></label>
+      <label>Campaña o publicación<input data-lk-camp maxlength="40" placeholder="Ej. navidad-2026" /></label>
+      <label>Página<select data-lk-page><option value="publicidad/">Anúnciate</option><option value="">Portada</option></select></label>
+    </div>
+    <p class="sd-link"><input readonly data-lk-out aria-label="Enlace" /><button type="button" class="adp-btn ghost-dark" data-lk-copy>Copiar</button></p>
+  </div>
+  <div data-sdv="cli" hidden>
   <h2 class="pnl-h3 sd-leads-h">Consultas de clientes</h2>
   <div class="pnl-kpis" data-sd-kpis></div>
   <nav class="apn-tabs pnl-sub" role="tablist" aria-label="Etapas">
@@ -24,6 +53,7 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
     <button type="button" role="tab" aria-selected="false" data-st="cal">Calendario de tomas</button>
   </nav>
   <div class="sd-list" data-sd-list></div>
+  </div>
 
   <!-- New / edit inquiry -->
   <dialog class="sd-dlg" data-sd-dlg aria-labelledby="sd-dlg-h">
@@ -38,7 +68,8 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
               <label>Teléfono<input name="phone" type="tel" maxlength="20" placeholder="787-555-0100" /></label>
               <label>Correo<input name="email" type="email" maxlength="80" /></label>
               <label>Tipo de cliente<select name="who"><option value="retail">Negocio local</option><option value="agency">Agencia o marca grande</option><option value="nonprofit">Sin fines de lucro</option></select></label>
-              <label>Cómo llegó<select name="channel"><option>Llamada</option><option>WhatsApp</option><option>Correo</option><option>Formulario del sitio</option><option>En persona</option><option>Referido</option><option>Redes sociales</option></select></label>
+              <label>Cómo llegó<select name="channel"><option>Llamada</option><option>WhatsApp</option><option>Instagram</option><option>Facebook</option><option>TikTok</option><option>X (Twitter)</option><option>Anuncio en redes</option><option>Correo</option><option>Formulario del sitio</option><option>En persona</option><option>Referido</option><option>Otro</option></select></label>
+              <label>Publicación o campaña <small>(opcional)</small><input name="campaign" maxlength="60" placeholder="Ej. post de Navidad, anuncio de diciembre" /></label>
             </div>
           </fieldset>
           <fieldset><legend>Qué quiere</legend>
@@ -102,23 +133,40 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
       </footer>
     </form>
   </dialog>
+  <!-- Propuesta: a price quote for a client, shown here; downloaded as PDF or sent by WhatsApp or email -->
+  <dialog class="sd-dlg sd-prop-dlg" data-prop-dlg aria-label="Propuesta de publicidad">
+    <header class="sd-dlg-h"><h2>Propuesta para el cliente</h2><button type="button" class="sd-x" data-prop-x aria-label="Cerrar">✕</button></header>
+    <p class="pnl-muted pnl-small sd-prop-help">Es la cotización que le envías al cliente con lo que pidió y el precio. Cuando diga que sí, cierra la venta con «+ Anuncio vendido» (o «Convertir en anuncio» en su tarjeta).</p>
+    <iframe class="sd-prop-frame" data-prop-frame title="Vista de la propuesta"></iframe>
+    <footer class="sd-dlg-f sd-prop-f">
+      <button type="button" class="adp-btn ghost-dark" data-prop-pdf>Descargar PDF</button>
+      <a class="adp-btn ghost-dark" data-prop-wa target="_blank" rel="noopener">WhatsApp</a>
+      <a class="adp-btn" data-prop-mail>Enviar por correo</a>
+    </footer>
+  </dialog>
   <div class="apn-toast" data-sd-toast role="status" hidden></div>
 </section>
 
 <script>
   import { ask, askText } from '../../lib/dialogs';
   import { quote, lengthLabel, SPECIALS, SALES_DISCOUNT_LIMIT, type QuoteInput, type CustomLine } from '../../lib/ads';
-  import { saveRequest } from '../../lib/adrequests';
+  import { saveRequest, listRequests } from '../../lib/adrequests';
   import { sharedList } from '../../lib/shared';
+  import { isSeller, mineLead, unassignedLead, myId, staffMe } from '../../lib/sellers';
+  import { tokenInfo } from '../../lib/backend';
   const root = document.querySelector<HTMLElement>('[data-sd]');
   if (root) {
     type Fmt = { id: string; name: string; price: number; per: string };
     type Lead = {
       id: string; created: number; business: string; contact: string; phone: string; email: string; who: QuoteInput['who']; channel: string;
+      source?: string; campaign?: string; // where a web lead came from (src/lib/source.ts), and which post or campaign
       fmt: string[]; start: string; end: string; months?: number; days: number; aud: QuoteInput['aud']; reg: string[]; design: boolean; prepay: boolean; founder: boolean;
       requests: string; budget: string; follow: string; stage: 'new' | 'talking' | 'proposal' | 'won' | 'lost'; extra: number; extraAmt: number; views?: number; tkViews?: number; // tkViews: takeover bought by views (empty: by days)
       custom: CustomLine[]; approved?: boolean;
+      owner?: string; ownerName?: string; // the salesperson handling it (account id and name); web-form inquiries start without one
       notes: Array<{ at: number; text: string }>; total: number; demo?: boolean; converted?: string;
+      // A direct sale entered with "+ Anuncio vendido" (DirectSale.astro): the deal on record
+      sale?: { campaignId: string; paid: number; due?: boolean; price?: number; discount?: number; method: string; paidOn: string; invoice: string; terms: string; soldBy: string; byViews: boolean; views?: number; sizes: string[]; takeover: boolean };
     };
     const FMTS: Fmt[] = JSON.parse(root.dataset.fmts!);
     const BOOKED: Array<{ start: string; end: string; client: string }> = JSON.parse(root.dataset.booked!);
@@ -174,7 +222,7 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
       save([...ex, ...load()]);
     }
 
-    const isAdmin = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || '{}').role === 'admin'; } catch { return false; } };
+    const isAdmin = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || '{}').role === 'admin' || JSON.parse(localStorage.getItem('nc-staff') || '{}').role === 'manager'; } catch { return false; } };
     // Special requests: one row per item (what, how many, price each, % off)
     function renderCustom(list: CustomLine[]) {
       $('[data-custom]').innerHTML = list.map(crow).join('');
@@ -198,9 +246,31 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
       (form.elements.namedItem('end') as HTMLInputElement).value = addDays(st.value, Number(b.dataset.len) - 1); updateQuote();
     });
 
+    // ---- Tabs: Comisiones / Campañas en el aire / Clientes (a salesperson's own: Mis comisiones / Mis anuncios / Mis clientes) ----
+    const billing = () => { try { return ['admin', 'manager', 'ads'].includes(JSON.parse(localStorage.getItem('nc-staff') || '{}').role); } catch { return false; } };
+    const showTab = (k: string) => {
+      if (k === 'fac' && !billing()) k = 'com'; // Facturas: the administrator and the Gerente; Ventas sees its own (read only)
+      if (k === 'fac') dispatchEvent(new Event('nc-inv-load'));
+      if (k === 'redes') { paintSources(); linkOut(); }
+      $$('[data-sdtab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.sdtab === k)));
+      $$('[data-sdv]').forEach((v) => (v.hidden = v.dataset.sdv !== k));
+      try { localStorage.setItem('nc-sd-tab', k); } catch { /* storage blocked */ }
+    };
+    const labelTabs = () => {
+      const seller = isSeller();
+      $('[data-sdtab-l="com"]').textContent = seller ? 'Mis comisiones' : 'Comisiones';
+      $('[data-sdtab-l="ads"]').textContent = seller ? 'Mis anuncios' : 'Campañas en el aire';
+      $('[data-sdtab-l="cli"]').textContent = seller ? 'Mis clientes' : 'Clientes';
+      $('[data-sdtab="fac"]').hidden = !billing();
+      $('[data-sdtab="fac"]').textContent = seller ? 'Mis facturas' : 'Facturas';
+    };
+    root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-sdtab]'); if (b) showTab(b.dataset.sdtab!); });
+    let firstTab = 'com'; try { firstTab = localStorage.getItem('nc-sd-tab') || 'com'; } catch { /* storage blocked */ }
+    labelTabs(); showTab(firstTab); addEventListener('nc-staff-change', labelTabs);
     let view = 'open', editing: Lead | null = null;
     function render() {
-      const all = load();
+      // A salesperson sees their own inquiries (and can take unassigned ones); the administrator sees all
+      const every = load(), all = every.filter(mineLead), free = isSeller() ? every.filter((l) => unassignedLead(l) && !['won', 'lost'].includes(l.stage)) : [];
       const open = all.filter((l) => !['won', 'lost'].includes(l.stage)), won = all.filter((l) => l.stage === 'won'), lost = all.filter((l) => l.stage === 'lost');
       const due = open.filter((l) => l.follow && l.follow <= today).length;
       const pipe = open.reduce((a, l) => a + l.total, 0), wonSum = won.reduce((a, l) => a + l.total, 0);
@@ -211,35 +281,87 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
         `<div class="pnl-kpi"><span>Cierre</span><b>${won.length + lost.length ? Math.round((won.length / (won.length + lost.length)) * 100) : 0}%</b><small>de las consultas decididas</small></div>`,
       ].join('');
       const n = (k: string, v: number) => ($(`[data-sn="${k}"]`).textContent = v ? String(v) : '');
+      $('[data-sdtab-n]').textContent = due ? String(due) : '';
       n('open', open.length); n('won', won.length); n('lost', lost.length);
       const box = $('[data-sd-list]');
       if (view === 'cal') { box.innerHTML = calendar(); return; }
       const list = (view === 'open' ? open : view === 'won' ? won : lost).sort((a, b) => (a.follow || '9') .localeCompare(b.follow || '9') || b.created - a.created);
-      box.innerHTML = list.map(card).join('') || `<p class="apr-empty">${view === 'open' ? 'No hay consultas abiertas. Toca “Nueva consulta” cuando llame un cliente.' : 'Nada aquí todavía.'}</p>`;
+      box.innerHTML = (list.map(card).join('') || `<p class="apr-empty">${view === 'open' ? 'No hay consultas abiertas. Toca “Nueva consulta” cuando llame un cliente.' : 'Nada aquí todavía.'}</p>`)
+        + (view === 'open' && free.length ? `<details class="sd-free"><summary>Sin asignar (${free.length}): clientes que escribieron por el sitio y nadie ha tomado</summary>${free.map((l) => `<article class="sd-card sd-card-free" data-id="${l.id}"><header><div><h2>${esc(l.business)}</h2><p class="pnl-muted">${esc(l.contact || 'Sin contacto')} · ${esc(l.channel)} · ${fmtDate(new Date(l.created).toISOString().slice(0, 10))}</p></div></header>${l.requests ? `<p class="sd-req">“${esc(l.requests)}”</p>` : ''}<div class="sd-acts"><button type="button" class="sd-btn strong" data-a="take">Tomar este cliente</button></div></article>`).join('')}</details>` : '');
     }
+    /** The order's record when a won inquiry becomes an ad: who sold it (their commission) and, when a periodista passed
+     *  the client ("código xxxxxxxx" in the referral note), the referral (theirs). */
+    function convertLines(l: Lead): string[] {
+      const seller = l.ownerName || staffMe()?.name || '';
+      const ref = `${l.requests ?? ''} ${(l.notes ?? []).map((n) => n.text).join(' ')}`.match(/código ([a-f0-9]{8})/)?.[1];
+      return [`Venta directa (${l.id})`, 'Pago: Pendiente', `Precio: $${Number(l.total || 0).toFixed(2)}`, ...(seller ? [`Vendido por: ${seller}`] : []), ...(ref ? [`Referido: ${ref}`] : [])];
+    }
+    /** Where a lead came from, as Ventas shows it: the social network (web leads), or how it came in, plus the campaign */
+    const fromWhere = (l: Lead) => [l.source ? `${l.source}${l.channel === 'Formulario web' ? ' (formulario)' : ''}` : l.channel, l.campaign].filter(Boolean).join(' · ');
+    // ---- Redes: leads and paid orders by source (last 90 days) and the link builder ----
+    const NET_OF_CHANNEL = (c: string) => (['Llamada', 'Correo', 'En persona', 'Referido', 'Otro', 'Venta directa'].includes(c) ? c : c === 'Formulario web' || c === 'Formulario del sitio' ? 'Sitio web' : c);
+    function paintSources() {
+      const box = root!.querySelector<HTMLElement>('[data-src-table]'); if (!box) return;
+      const since = Date.now() - 90 * 864e5;
+      const rows = new Map<string, { leads: number; won: number; money: number; orders: number }>();
+      const add = (k: string) => { if (!rows.has(k)) rows.set(k, { leads: 0, won: 0, money: 0, orders: 0 }); return rows.get(k)!; };
+      for (const l of load().filter(mineLead).filter((l) => l.created >= since && !l.demo)) {
+        const r = add(l.source || NET_OF_CHANNEL(l.channel)); r.leads++;
+        if (l.stage === 'won') { r.won++; r.money += Number(l.total) || 0; }
+      }
+      for (const o of listRequests().filter((o) => !o.created || Date.parse(o.created) >= since)) {
+        const src = (o.client as any)?.source; if (!src) continue;
+        const r = add(src); r.orders++; if (o.paid) r.money += Number(o.total) || 0;
+      }
+      const list = [...rows.entries()].sort((a, b) => b[1].money - a[1].money || b[1].leads - a[1].leads);
+      box.innerHTML = list.length ? `<table class="sd-src-t"><thead><tr><th>Red o canal</th><th>Consultas</th><th>Órdenes en línea</th><th>Ganadas</th><th>Ganado</th></tr></thead><tbody>${list.map(([k, r]) =>
+        `<tr><th>${esc(k)}</th><td>${r.leads}</td><td>${r.orders}</td><td>${r.won}</td><td>${money(r.money)}</td></tr>`).join('')}</tbody></table>`
+        : '<p class="apr-empty">Todavía no hay consultas en los últimos 90 días.</p>';
+    }
+    function linkOut() {
+      const net = root!.querySelector<HTMLSelectElement>('[data-lk-net]')!.value, camp = root!.querySelector<HTMLInputElement>('[data-lk-camp]')!.value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const page = root!.querySelector<HTMLSelectElement>('[data-lk-page]')!.value;
+      const q = new URLSearchParams(net === 'meta-ads' ? { utm_source: 'meta', utm_medium: 'paid' } : { utm_source: net, utm_medium: 'social' });
+      if (camp) q.set('utm_campaign', camp);
+      root!.querySelector<HTMLInputElement>('[data-lk-out]')!.value = `https://noticel.com/${page}?${q}`;
+    }
+    root.addEventListener('input', (e) => { if ((e.target as HTMLElement).closest('[data-lk-net],[data-lk-camp],[data-lk-page]')) linkOut(); });
+    root.addEventListener('change', (e) => { if ((e.target as HTMLElement).closest('[data-lk-net],[data-lk-page]')) linkOut(); });
+    root.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-lk-copy]')) { const v = root!.querySelector<HTMLInputElement>('[data-lk-out]')!.value; navigator.clipboard?.writeText(v).catch(() => {}); (e.target as HTMLButtonElement).textContent = 'Copiado ✓'; setTimeout(() => ((e.target as HTMLButtonElement).textContent = 'Copiar'), 1500); }
+    });
     function card(l: Lead) {
-      const fm = l.fmt.map((id) => FMTS.find((f) => f.id === id)?.name).filter(Boolean).join(', ') || 'Sin formato todavía';
+      // A closed sale: what was sold comes from the sale itself, and its paid state and place on the site from its order
+      // (the order is the record Stripe and «Marcar pagado» update; the sale line was written once, when it was saved)
+      const order = l.sale ? listRequests().find((r) => r.id === l.sale!.campaignId.toUpperCase()) : undefined;
+      const due = l.sale ? (order ? !order.paid : !!l.sale.due || /pendiente/i.test(l.sale.method)) : false;
+      const sold = l.sale ? (l.sale.takeover ? 'Toma de portada' : l.sale.sizes.map((id) => FMTS.find((f) => f.id === id)?.name ?? id).join(', ')) : '';
+      const fm = sold || l.fmt.map((id) => FMTS.find((f) => f.id === id)?.name).filter(Boolean).join(', ') || 'Sin formato todavía';
+      const closed = l.stage === 'won' || l.stage === 'lost';
+      const onSite = !l.sale ? '' : order?.status === 'revisar' ? '⏳ Esperando aprobación' : order?.status === 'rechazada' ? 'Rechazado' : l.start > today ? `Sale el ${fmtDate(l.start)}` : !l.sale.byViews && l.end && l.end < today ? 'Terminó' : 'En el sitio ✓';
+      const howPaid = l.sale && !/pendiente/i.test(l.sale.method) ? l.sale.method : '';
       const late = l.follow && l.follow < today && !['won', 'lost'].includes(l.stage), now = l.follow === today;
       const tk = takeoverDays(l); const taken = bookedDays(l.id); const clash = tk.filter((d) => taken.has(d));
       const tel = (l.phone || '').replace(/\D/g, '');
       return `<article class="sd-card" data-id="${l.id}">
         <header><div><h2>${esc(l.business)} ${l.demo ? '<span class="sp-demo">EJEMPLO</span>' : ''}</h2>
-          <p class="pnl-muted">${esc(l.contact || 'Sin contacto')} · ${esc(l.channel)} · ${STAGES[l.stage]}</p></div>
+          <p class="pnl-muted">${[l.contact, l.phone, l.email].filter(Boolean).map((x) => esc(x!)).join(' · ') || 'Sin datos de contacto'} · ${esc(fromWhere(l))} · ${STAGES[l.stage]}${!isSeller() && (l.ownerName || l.sale?.soldBy) ? ` · de ${esc(l.ownerName || l.sale?.soldBy)}` : !isSeller() ? ' · sin asignar' : ''}</p></div>
           <b class="sd-amt">${money(l.total)}</b></header>
         <p class="sd-what"><b>${esc(fm)}</b>${l.fmt.some((id) => ['valla', 'rectangle', 'infeed', 'leaderboard', 'halfpage'].includes(id)) ? ` · ${(l.views ?? 10000).toLocaleString('es-PR')} vistas` : ''} · desde el ${fmtDate(l.start)}${l.fmt.includes('patrocinio') ? ` al ${fmtDate(l.end || addDays(l.start, lenOf(l) - 1))} (${lengthLabel(lenOf(l))})` : ''}${l.fmt.includes('takeover') ? ` · ${tkText(l)}` : ''}${l.aud === 'regions' ? ` · ${l.reg.map((r) => REGIONS.find((x) => x.id === r)?.name).join(', ')}` : ''}${l.design ? ' · lo diseñamos' : ''}</p>
         ${l.custom?.length ? `<p class="sd-what">Pedidos especiales: ${l.custom.map((c) => esc(c.name.split(' (')[0]) + (c.qty > 1 ? ` × ${c.qty}` : '')).join(', ')}</p>` : ''}
+        ${l.sale ? `<p class="sd-sale">Venta directa · <b class="${due ? 'sd-due' : 'sd-paid'}">${due ? 'Por cobrar' : 'Pagado'} ${money(l.sale.paid)}</b>${l.sale.discount ? ` (precio ${money(l.sale.price ?? l.sale.paid)}, −${l.sale.discount}%)` : ''}${howPaid ? ` · ${esc(due ? `pagará con ${howPaid}` : howPaid)}` : ''}${!due && l.sale.paidOn ? ` el ${fmtDate(l.sale.paidOn)}` : ''}${l.sale.invoice ? ` · factura ${esc(l.sale.invoice)}` : ''}${l.sale.soldBy ? ` · vendido por ${esc(l.sale.soldBy)}` : ''}<br>${l.sale.byViews ? `${(l.sale.views ?? 0).toLocaleString('es-PR')} vistas desde el ${fmtDate(l.start)}` : `Del ${fmtDate(l.start)} al ${fmtDate(l.end)}`}</p>` : ''}
         ${l.requests ? `<p class="sd-req">“${esc(l.requests)}”</p>` : ''}
-        ${priceOf(l).q.needsApproval ? (l.approved ? `<p class="sd-ok">✓ Descuento aprobado por el administrador</p>` : `<p class="sd-warn">Necesita aprobación: el descuento negociado pasa de ${SALES_DISCOUNT_LIMIT}%. ${isAdmin() ? '<button type="button" class="pnl-link" data-a="approve">Aprobar descuento</button>' : 'El administrador lo verá aquí.'}</p>`) : ''}
+        ${priceOf(l).q.needsApproval ? (l.approved ? `<p class="sd-ok">✓ Descuento aprobado</p>` : `<p class="sd-warn">Necesita aprobación: el descuento negociado pasa de ${SALES_DISCOUNT_LIMIT}%. ${isAdmin() ? '<button type="button" class="pnl-link" data-a="approve">Aprobar descuento</button>' : 'El administrador o el Gerente lo verán aquí.'}</p>`) : ''}
         ${clash.length ? `<p class="sd-warn">⚠ Ya hay toma de portada el ${clash.map(fmtDate).join(', ')}: ${esc(taken.get(clash[0])!)}.</p>` : ''}
-        <p class="sd-follow ${late ? 'late' : now ? 'now' : ''}">${l.follow ? `Seguimiento: ${late ? 'atrasado, ' : now ? 'hoy, ' : ''}${fmtDate(l.follow)}` : 'Sin fecha de seguimiento'}${l.budget ? ` · presupuesto ${esc(l.budget)}` : ''}</p>
+        ${closed ? '' : `<p class="sd-follow ${late ? 'late' : now ? 'now' : ''}">${l.follow ? `Seguimiento: ${late ? 'atrasado, ' : now ? 'hoy, ' : ''}${fmtDate(l.follow)}` : 'Sin fecha de seguimiento'}${l.budget ? ` · presupuesto ${esc(l.budget)}` : ''}</p>`}
         ${l.notes.length ? `<details class="sd-notes"><summary>Notas (${l.notes.length})</summary><ul>${l.notes.map((x) => `<li><small>${new Date(x.at).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}</small> ${esc(x.text)}</li>`).join('')}</ul></details>` : ''}
         <div class="sd-acts">
           ${tel ? `<a class="sd-btn" href="tel:${tel}">Llamar</a><a class="sd-btn" href="https://wa.me/1${tel.slice(-10)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
           ${l.email ? `<a class="sd-btn" href="mailto:${esc(l.email)}">Correo</a>` : ''}
           <button type="button" class="sd-btn" data-a="note">Añadir nota</button>
           <button type="button" class="sd-btn" data-a="edit">Editar</button>
-          <button type="button" class="sd-btn strong" data-a="proposal" ${priceOf(l).q.needsApproval && !l.approved ? 'disabled title="Primero el administrador aprueba el descuento"' : ''}>Propuesta</button>
-          ${l.stage === 'won' ? (l.converted ? `<span class="sd-done">Convertida en anuncio ✓</span>` : `<button type="button" class="sd-btn strong" data-a="convert">Convertir en anuncio</button>`) : ''}
+          ${l.sale ? '' : `<button type="button" class="sd-btn strong" data-a="proposal" ${priceOf(l).q.needsApproval && !l.approved ? 'disabled title="Primero el administrador aprueba el descuento"' : ''}>Propuesta</button>`}
+          ${l.stage === 'won' ? (l.sale ? `<span class="sd-done${onSite.startsWith('En el sitio') ? '' : ' wait'}">${onSite}</span>` : l.converted ? `<span class="sd-done">Convertida en anuncio ✓</span>` : `<button type="button" class="sd-btn strong" data-a="convert">Convertir en anuncio</button>`) : ''}
         </div></article>`;
     }
     function calendar() {
@@ -259,7 +381,7 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
     const dlg = $<HTMLDialogElement>('[data-sd-dlg]'); const form = $<HTMLFormElement>('[data-sd-form]');
     const readForm = (): Omit<Lead, 'id' | 'created' | 'notes' | 'total'> => {
       const d = new FormData(form); const s = (k: string) => String(d.get(k) ?? '').trim();
-      return { business: s('business'), contact: s('contact'), phone: s('phone'), email: s('email'), who: s('who') as Lead['who'], channel: s('channel'),
+      return { business: s('business'), contact: s('contact'), phone: s('phone'), email: s('email'), who: s('who') as Lead['who'], channel: s('channel'), campaign: s('campaign') || editing?.campaign || undefined, source: editing?.source,
         fmt: d.getAll('fmt').map(String), start: s('start'), end: s('end'), days: Math.max(1, Math.min(14, Number(s('days')) || 1)), views: Math.max(1000, Number(s('views')) || 10000),
         tkViews: s('tkmode') === 'vistas' ? Math.max(5000, Number(s('tkViews')) || 50000) : undefined,
         aud: s('aud') as Lead['aud'], reg: d.getAll('reg').map(String), design: !!d.get('design'), prepay: !!d.get('prepay'), founder: !!d.get('founder'),
@@ -281,7 +403,7 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
       q.custom.forEach(([n, c]) => rows.push(`<li><span>${esc(n)}</span><b>${money(c)}</b></li>`));
       if (extra) rows.push(`<li class="adb-off"><span>Descuento negociado${v.extra ? ` (${v.extra}%)` : ''}${v.extraAmt ? ` ${v.extra ? '+ ' : ''}${money(v.extraAmt)}` : ''}</span><b>−${money(extra)}</b></li>`);
       const ap = $('[data-q-approve]', form); ap.hidden = !q.needsApproval;
-      if (q.needsApproval) ap.textContent = isAdmin() ? `Este descuento pasa de ${SALES_DISCOUNT_LIMIT}%: como administrador, se aprueba al guardar.` : `Este descuento pasa de ${SALES_DISCOUNT_LIMIT}%: necesita aprobación del administrador antes de enviar la propuesta.`;
+      if (q.needsApproval) ap.textContent = isAdmin() ? `Este descuento pasa de ${SALES_DISCOUNT_LIMIT}%: como administrador o Gerente, se aprueba al guardar.` : `Este descuento pasa de ${SALES_DISCOUNT_LIMIT}%: necesita aprobación del administrador o el Gerente antes de enviar la propuesta.`;
       $('[data-q-lines]', form).innerHTML = rows.join('');
       $('[data-q-total]', form).textContent = money(total);
       // Only sponsorship (and a takeover by days) are bought by time; everything else ends when its views are delivered
@@ -300,7 +422,7 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
       $('[data-sd-del]', form).hidden = !l;
       if (l) {
         const set = (k: string, v: string) => { const el = form.elements.namedItem(k) as HTMLInputElement | null; if (el) el.value = v; };
-        (['business', 'contact', 'phone', 'email', 'who', 'channel', 'start', 'aud', 'requests', 'budget', 'follow', 'stage'] as const).forEach((k) => set(k, String(l[k] ?? '')));
+        (['business', 'contact', 'phone', 'email', 'who', 'channel', 'start', 'aud', 'requests', 'budget', 'follow', 'stage', 'campaign'] as const).forEach((k) => set(k, String(l[k] ?? '')));
         set('views', String(l.views ?? 10000)); set('end', l.end || addDays(l.start, lenOf(l) - 1)); set('days', String(l.days)); set('tkmode', l.tkViews ? 'vistas' : 'dias'); set('tkViews', String(l.tkViews ?? 50000)); set('extra', String(l.extra || 0)); set('extraAmt', String(l.extraAmt || 0));
         renderCustom(l.custom ?? []);
         $$<HTMLInputElement>('[name="fmt"]', form).forEach((c) => (c.checked = l.fmt.includes(c.value)));
@@ -323,7 +445,7 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
       const all = load(); const total = priceOf(v).total;
       const approved = priceOf(v).q.needsApproval ? isAdmin() || (editing?.approved && editing.extra === v.extra && editing.extraAmt === v.extraAmt) : undefined;
       if (editing) { const i = all.findIndex((x) => x.id === editing!.id); all[i] = { ...all[i], ...v, total, approved }; }
-      else all.unshift({ ...v, id: `L-${Date.now().toString(36).toUpperCase()}`, created: Date.now(), notes: [], total, approved });
+      else all.unshift({ ...v, id: `L-${Date.now().toString(36).toUpperCase()}`, created: Date.now(), notes: [], total, approved, owner: myId(), ownerName: staffMe()?.name ?? '' });
       save(all); dlg.close(); render(); toast(editing ? 'Consulta actualizada.' : 'Consulta guardada.');
     });
     $$('[data-sd-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
@@ -331,25 +453,47 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
     $('[data-sd-new]').addEventListener('click', () => open(null));
 
     // ---- proposal (printable page in a new window; "Guardar como PDF" from the print dialog) ----
+    /** The proposal: a branded price quote, previewed here; PDF, WhatsApp or email to send it. */
     function proposal(l: Lead) {
       const { q, extra, total } = priceOf(l);
-      const w = window.open('', '_blank'); if (!w) { toast('Permite las ventanas emergentes para ver la propuesta.'); return; }
+      const me = staffMe(), seller = me?.name || 'Ventas', mail = tokenInfo().email || root!.dataset.email || ''; // the salesperson's own email
+      const what = l.fmt.map((id) => FMTS.find((f) => f.id === id)?.name).filter(Boolean).join(', ');
+      const when = l.fmt.length ? `del ${fmtDate(l.start)} al ${fmtDate(l.end || addDays(l.start, lenOf(l) - 1))} (${lengthLabel(lenOf(l))})` : '';
       const rows = [...q.lines.map(([n, c]) => `<tr><td>${esc(n)}</td><td>${money(c)}</td></tr>`),
         ...(q.off ? [`<tr class="off"><td>Descuentos</td><td>−${money(q.off)}</td></tr>`] : []),
         ...(q.design !== null ? [`<tr><td>Diseño del anuncio</td><td>${q.design ? money(q.design) : 'Gratis'}</td></tr>`] : []),
         ...q.custom.map(([n, c]) => `<tr><td>${esc(n)}</td><td>${money(c)}</td></tr>`),
         ...(extra ? [`<tr class="off"><td>Descuento especial</td><td>−${money(extra)}</td></tr>`] : [])].join('');
-      w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Propuesta para ${esc(l.business)} · NotiCel</title>
-        <style>body{font-family:system-ui,sans-serif;color:#16161D;max-width:720px;margin:40px auto;padding:0 24px;line-height:1.5}h1{color:#007BB6;margin:0}.k{color:#007BB6;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
-        table{width:100%;border-collapse:collapse;margin:16px 0}td{padding:8px 4px;border-bottom:1px solid #E2E3EA}td:last-child{text-align:right;font-weight:700}.off td{color:#14663F}.tot td{font-size:20px;border-bottom:0;color:#000}
-        .box{background:#F3F3F8;border-radius:12px;padding:12px 16px}small{color:#5C5F6E}@media print{button{display:none}}</style></head><body>
-        <p class="k">NotiCel · Propuesta de publicidad</p><h1>${esc(l.business)}</h1>
-        <p>${esc(l.contact)}${l.contact ? ' · ' : ''}${new Date().toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-        <div class="box"><b>Lo que pediste:</b> ${esc(l.fmt.map((id) => FMTS.find((f) => f.id === id)?.name).filter(Boolean).join(', '))}${l.fmt.length ? `, del ${fmtDate(l.start)} al ${fmtDate(l.end || addDays(l.start, lenOf(l) - 1))} (${lengthLabel(lenOf(l))})` : ''}${l.fmt.includes('takeover') ? `, ${l.tkViews ? `toma de portada hasta ${l.tkViews.toLocaleString('es-PR')} vistas` : `toma de portada ${l.days} día(s)`}` : ''}.${l.requests ? `<br>${esc(l.requests)}` : ''}</div>
+      const until = new Date(Date.now() + 15 * 864e5).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric' });
+      const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Propuesta para ${esc(l.business)} · NotiCel</title>
+        <style>body{font-family:system-ui,-apple-system,sans-serif;color:#16161D;max-width:720px;margin:28px auto;padding:0 24px;line-height:1.5;background:#fff}
+        .top{display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid #000000;padding-bottom:12px;margin-bottom:18px}.top img{height:44px}
+        .k{color:#009DE9;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:12px;margin:0}h1{color:#000000;margin:2px 0 4px;font-size:28px}
+        table{width:100%;border-collapse:collapse;margin:16px 0}td{padding:9px 4px;border-bottom:1px solid #E2E3EA}td:last-child{text-align:right;font-weight:700;white-space:nowrap}
+        .off td{color:#14663F}.tot td{font-size:22px;border-bottom:0;color:#000000}.box{background:#F3F3F8;border-radius:12px;padding:12px 16px}
+        .who{margin-top:22px;padding-top:12px;border-top:1px solid #E2E3EA;font-size:14px}small{color:#5C5F6E}</style></head><body>
+        <div class="top"><img src="${root!.dataset.logo}" alt="NotiCel"><p class="k">Propuesta de publicidad</p></div>
+        <h1>${esc(l.business)}</h1>
+        <p>${l.contact ? `${esc(l.contact)} · ` : ''}${new Date().toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        <div class="box"><b>Lo que te proponemos:</b> ${what ? `${esc(what)}, ${when}` : 'tu anuncio en NotiCel'}${l.fmt.includes('takeover') ? `, ${l.tkViews ? `toma de portada hasta ${l.tkViews.toLocaleString('es-PR')} vistas` : `toma de portada ${l.days} día(s)`}` : ''}.${l.requests ? `<br>${esc(l.requests)}` : ''}</div>
         <table>${rows}<tr class="tot"><td>Total</td><td>${money(total)}</td></tr></table>
-        <p>Pago con tarjeta o ATH Móvil. Los anuncios directos siempre salen antes que los de Google. Respondemos en menos de 24 horas.</p>
-        <p><small>Precios válidos por 15 días. Propuesta ${esc(l.id)}.</small></p><button onclick="print()">Imprimir o guardar como PDF</button></body></html>`);
-      w.document.close();
+        <p><b>Cómo pagar:</b> ${esc(root!.dataset.pay || '')}. Te enviamos el enlace de pago al confirmar. Tu anuncio sale en menos de 24 horas después de aprobarlo, y en tu panel de anunciante ves cuántas personas lo vieron y lo tocaron.</p>
+        <p><small>Precios válidos hasta el ${until}. Propuesta ${esc(l.id)}.</small></p>
+        <p class="who"><b>${esc(seller)}</b> · Ventas, NotiCel${mail ? ` · ${esc(mail)}` : ''}<br><small>noticel.com</small></p></body></html>`;
+      const dlg = root!.querySelector<HTMLDialogElement>('[data-prop-dlg]')!, frame = dlg.querySelector<HTMLIFrameElement>('[data-prop-frame]')!;
+      frame.srcdoc = html;
+      // Short text for WhatsApp and email (the PDF has the details)
+      const text = `Hola${l.contact ? ` ${l.contact.split(' ')[0]}` : ''}, te comparto la propuesta de publicidad de NotiCel para ${l.business}: ${what || 'tu anuncio'}${when ? `, ${when}` : ''}. Total: ${money(total)} (válido hasta el ${until}). ¿Te parece si lo dejamos listo? — ${seller}, NotiCel`;
+      const tel = (l.phone || '').replace(/\D/g, '');
+      dlg.querySelector<HTMLAnchorElement>('[data-prop-wa]')!.href = `https://wa.me/${tel ? `1${tel.slice(-10)}` : ''}?text=${encodeURIComponent(text)}`;
+      const m = dlg.querySelector<HTMLAnchorElement>('[data-prop-mail]')!;
+      m.href = `mailto:${l.email ?? ''}?subject=${encodeURIComponent(`Propuesta de publicidad para ${l.business} · NotiCel`)}&body=${encodeURIComponent(`${text}\n\n(Te adjunto la propuesta en PDF.)`)}`;
+      dlg.showModal();
+    }
+    {
+      const dlg = root.querySelector<HTMLDialogElement>('[data-prop-dlg]')!;
+      dlg.querySelector('[data-prop-x]')!.addEventListener('click', () => dlg.close());
+      dlg.querySelector('[data-prop-pdf]')!.addEventListener('click', () => dlg.querySelector<HTMLIFrameElement>('[data-prop-frame]')!.contentWindow?.print());
     }
 
     // ---- actions ----
@@ -359,24 +503,26 @@ const booked = CAMPAIGNS.filter((c) => c.takeover).map((c) => ({ start: c.start,
       if (st) { view = st.dataset.st!; $$('[data-st]').forEach((b) => b.setAttribute('aria-selected', String(b === st))); render(); return; }
       const a = t.closest<HTMLElement>('[data-a]'); if (!a) return;
       const id = t.closest<HTMLElement>('[data-id]')!.dataset.id!; const all = load(); const l = all.find((x) => x.id === id)!;
+      if (a.dataset.a === 'take') { l.owner = myId(); l.ownerName = staffMe()?.name ?? ''; l.notes.unshift({ at: Date.now(), text: `${l.ownerName} tomó este cliente.` }); save(all); render(); toast(`${l.business} ahora es tu cliente.`); return; }
       if (a.dataset.a === 'edit') open(l);
-      if (a.dataset.a === 'approve') { l.approved = true; l.notes.unshift({ at: Date.now(), text: 'Descuento aprobado por el administrador.' }); save(all); render(); toast('Descuento aprobado.'); }
+      if (a.dataset.a === 'approve') { l.approved = true; l.notes.unshift({ at: Date.now(), text: 'Descuento aprobado.' }); save(all); render(); toast('Descuento aprobado.'); }
       if (a.dataset.a === 'note') { const text = await askText(`Nota sobre ${l.business}:`, { placeholder: 'ej. Llamar el lunes para confirmar fechas.', ok: 'Guardar nota', multiline: true }); if (text?.trim()) { l.notes.unshift({ at: Date.now(), text: text.trim() }); save(all); render(); } }
       if (a.dataset.a === 'proposal') { proposal(l); if (l.stage === 'new' || l.stage === 'talking') { l.stage = 'proposal'; save(all); render(); } }
       if (a.dataset.a === 'convert') {
+        if (!l.email) { toast('Añade el correo del cliente (Editar) antes de convertirlo: ahí le llegan la confirmación y el enlace de pago.'); return; }
         // A won deal becomes a request in the ad approval queue (Anuncios), waiting for the client's art and payment
         const fm = FMTS.filter((f) => l.fmt.includes(f.id));
         await saveRequest({ id: `NC-${l.id.slice(2)}`, created: new Date().toISOString(), status: l.design ? 'disenar' : 'revisar', paid: false,
           client: { name: l.contact || l.business, business: l.business, email: l.email, phone: l.phone, who: l.who },
           formats: l.fmt, where: l.aud === 'regions' ? l.reg.map((r) => REGIONS.find((x) => x.id === r)?.name).join(', ') : l.aud === 'island' ? 'Solo Puerto Rico' : l.aud === 'diaspora' ? 'Solo la diáspora' : 'Puerto Rico y la diáspora',
           start: l.start || today, duration: l.fmt.includes('takeover') && fm.length === 1 ? (l.tkViews ? `${l.tkViews.toLocaleString('en-US')} vistas` : `${l.days} día(s)`) : lengthLabel(lenOf(l)),
-          total: l.total, lines: [`Venta directa (${l.id})`], note: l.requests, views: FMTS.some((f) => l.fmt.includes(f.id) && f.per === 'mes' && f.id !== 'patrocinio') ? l.views ?? 10000 : undefined, takeoverViews: l.fmt.includes('takeover') ? l.tkViews : undefined,
+          total: l.total, lines: convertLines(l), note: l.requests, views: FMTS.some((f) => l.fmt.includes(f.id) && f.per === 'mes' && f.id !== 'patrocinio') ? l.views ?? 10000 : undefined, takeoverViews: l.fmt.includes('takeover') ? l.tkViews : undefined,
           art: l.design ? { mode: 'design', files: [], title: l.business, msg: '', cta: '', theme: 'morado', notes: l.requests } : { mode: 'upload', files: [] }, link: '' });
         l.converted = new Date().toISOString(); save(all); render();
         toast('Listo: el anuncio está en la cola de Anuncios esperando el arte y el pago.');
       }
     });
-    addEventListener('nc-leads', () => {}); // other tabs listen for this
+    addEventListener('nc-leads', () => render()); // also a sale saved with "+ Anuncio vendido"
     render();
     // The team's latest clients (and again when this person logs in)
     void leads.refresh().then((ok) => ok && render());

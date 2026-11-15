@@ -5,56 +5,78 @@
 // can also belong to one or more business accounts (owner / can edit / can only view), like Facebook + Meta Business.
 // The real version needs accounts and ad statistics from outside services (see src/lib/ads.ts) and should replace
 // this page's data, not its look. Settings and demo actions are saved only on this device.
+// English: ?lang=en, or the saved choice ('nc-ad-lang'), or automatically when the client ordered from /en/advertise/.
+// Static text carries its English in data-en (inner HTML), data-en-href and data-en-label; the script uses t(es, en).
 import Base from '../../layouts/Base.astro';
 import { SITE, url } from '../../lib/site';
-import { REWARDS } from '../../lib/ads';
+import { REWARDS, FORMATS, FORMATS_EN, REWARDS_EN } from '../../lib/ads';
 const GLOSSARY = [
-  ['Veces que se vio', 'Cada vez que tu anuncio apareció en la pantalla de alguien (en inglés, “impresiones”).'],
-  ['Personas alcanzadas', 'Cuántas personas distintas vieron tu anuncio. Una misma persona puede verlo varias veces.'],
-  ['Toques', 'Las veces que alguien tocó o hizo clic en tu anuncio para ir a tu página, WhatsApp o tienda.'],
-  ['% de toques', 'De cada 100 veces que se vio tu anuncio, cuántas veces lo tocaron. En sitios de noticias, más de 0.5% es bueno.'],
-  ['Costo por toque', 'Lo que pagaste dividido entre los toques que recibiste.'],
-  ['Valla digital', 'Tu anuncio rota con otros cada 8 segundos en el mismo espacio, como una valla en la carretera.'],
+  ['Veces que se vio', 'Cada vez que tu anuncio apareció en la pantalla de alguien (en inglés, “impresiones”).', 'Views', 'Each time your ad appeared on someone’s screen (also called “impressions”).'],
+  ['Personas alcanzadas', 'Cuántas personas distintas vieron tu anuncio. Una misma persona puede verlo varias veces.', 'People reached', 'How many different people saw your ad. The same person may see it several times.'],
+  ['Toques', 'Las veces que alguien tocó o hizo clic en tu anuncio para ir a tu página, WhatsApp o tienda.', 'Taps', 'The times someone tapped or clicked your ad to go to your page, WhatsApp or store.'],
+  ['% de toques', 'De cada 100 veces que se vio tu anuncio, cuántas veces lo tocaron. En sitios de noticias, más de 0.5% es bueno.', '% of taps', 'Out of every 100 times your ad was seen, how many times it was tapped. On news sites, more than 0.5% is good.'],
+  ['Costo por toque', 'Lo que pagaste dividido entre los toques que recibiste.', 'Cost per tap', 'What you paid divided by the taps you got.'],
+  ['Valla digital', 'Tu anuncio rota con otros cada 8 segundos en el mismo espacio, como una valla en la carretera.', 'Digital billboard', 'Your ad rotates with others every 8 seconds in the same space, like a billboard on the highway.'],
 ];
+const order = url('publicidad'), orderEn = url('en/advertise');
+const help = (subject: string) => (SITE.email ? `mailto:${SITE.email}?subject=${encodeURIComponent(subject)}` : '');
 ---
 <Base title="Panel de anunciante" noindex description="Ejemplo del panel de anunciante de NotiCel: cómo le va a tu anuncio, tus campañas, facturas, premios e informes por correo.">
-  <main class="wrap apn" id="main" data-apn data-rewards={JSON.stringify(REWARDS)}>
-    <p class="pf-demo"><span class="sp-demo">DEMO</span> Panel de ejemplo con datos ficticios. Así verán sus estadísticas nuestros anunciantes.</p>
+  <main class="wrap apn" id="main" data-apn data-rewards={JSON.stringify(REWARDS)} data-rewards-en={JSON.stringify(REWARDS_EN)}
+    data-fmts={JSON.stringify(Object.fromEntries(FORMATS.map((f) => [f.id, f.name])))} data-fmts-en={JSON.stringify(Object.fromEntries(Object.entries(FORMATS_EN).map(([k, f]) => [k, f.name])))}>
+    <p class="apn-lang" data-langsw><button type="button" data-setlang="en" lang="en" aria-pressed="false">English</button><span aria-hidden="true">/</span><button type="button" data-setlang="es" lang="es" aria-pressed="true">Español</button></p>
+    {/* Real panel: the signed-in client's own requests and campaigns (supabase/anunciante-panel.sql). The sample
+        panel below shows in demo mode, or with ?ejemplo=1 ("Ver un ejemplo"). */}
+    <section class="apr" data-real hidden>
+      <header class="apr-h">
+        <div><h1 data-en="Your advertiser panel">Tu panel de anunciante</h1><p class="apr-sub" data-real-sub data-en="How your ads are doing on NotiCel.">Cómo le va a tus anuncios en NotiCel.</p></div>
+        <a class="adp-btn red" href={`${order}#campana`} data-en-href={`${orderEn}#campana`} data-en="+ New campaign">+ Nueva campaña</a>
+      </header>
+      <div class="apr-out" data-real-out hidden>
+        <p data-en="Sign in with the <b>same email</b> you used to order your ad and you’ll see your campaigns here, how many times your ad was seen and how many people tapped it.">Entra con el <b>mismo correo</b> que usaste al pedir tu anuncio y aquí verás tus campañas, cuántas veces se vio tu anuncio y cuántas personas lo tocaron.</p>
+        <div class="apr-acts"><button type="button" class="adp-btn red" data-real-login data-en="Sign in">Entrar</button><a class="adp-btn ghost-dark" href="?ejemplo=1" data-en="See an example">Ver un ejemplo</a></div>
+      </div>
+      <p class="apr-empty" data-real-empty hidden></p>
+      <div class="pnl-kpis apr-kpis" data-real-kpis hidden></div>
+      <div class="apr-list" data-real-list></div>
+      <p class="apr-help" data-en={`Questions, or want to change something? Write to us from <a href="${orderEn}#contacto">I’d rather talk to someone</a>.`}>¿Preguntas o quieres cambiar algo? Escríbenos desde <a href={`${order}#contacto`}>Prefiero hablar con alguien</a>.</p>
+    </section>
+    <p class="pf-demo"><span class="sp-demo">DEMO</span> <span data-en="EXAMPLE panel with made-up data. This is how our advertisers will see their numbers.">Panel de ejemplo con datos ficticios. Así verán sus estadísticas nuestros anunciantes.</span></p>
 
     <header class="apn-hero">
       <span class="apn-av" data-av aria-hidden="true">PE</span>
       <div class="apn-hello">
         <p class="apn-greet" data-greet>¡Hola!</p>
         <label class="apn-switch">
-          <span class="sr">Cuenta de negocio</span>
+          <span class="sr" data-en="Business account">Cuenta de negocio</span>
           <select data-biz>
             <option value="panaderia">Panadería La Esquina</option>
-            <option value="ferreteria">Ferretería Díaz (cliente de agencia)</option>
+            <option value="ferreteria" data-en="Ferretería Díaz (agency client)">Ferretería Díaz (cliente de agencia)</option>
           </select>
         </label>
         <p class="apn-sub" data-role>Eres dueño de esta cuenta · Negocio local</p>
       </div>
       <div class="apn-actions">
-        <a class="adp-btn red" href={`${url('publicidad')}#campana`}>+ Nueva campaña</a>
-        <a class="adp-btn ghost-dark" href={url('perfil')}>Mi perfil de lector</a>
+        <a class="adp-btn red" href={`${order}#campana`} data-en-href={`${orderEn}#campana`} data-en="+ New campaign">+ Nueva campaña</a>
+        <a class="adp-btn ghost-dark" href={url('perfil')} data-en="My reader profile">Mi perfil de lector</a>
       </div>
     </header>
 
-    <nav class="apn-tabs" role="tablist" aria-label="Secciones del panel">
-      <button type="button" role="tab" aria-selected="true" data-tab="inicio">Inicio</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="campanas">Mis anuncios</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="pagos">Pagos y premios</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="ayuda">Ayuda y ajustes</button>
+    <nav class="apn-tabs" role="tablist" aria-label="Secciones del panel" data-en-label="Panel sections">
+      <button type="button" role="tab" aria-selected="true" data-tab="inicio" data-en="Home">Inicio</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="campanas" data-en="My ads">Mis anuncios</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="pagos" data-en="Payments and rewards">Pagos y premios</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="ayuda" data-en="Help and settings">Ayuda y ajustes</button>
     </nav>
 
     <!-- ===== Inicio ===== -->
     <section data-panel="inicio">
       <div class="apn-range-row">
-        <h2 class="apn-h">¿Cómo le va a tu publicidad?</h2>
-        <div class="cx-tabs apn-range" role="tablist" aria-label="Período">
-          <button type="button" role="tab" aria-selected="true" data-range="7">Esta semana</button>
-          <button type="button" role="tab" aria-selected="false" data-range="30">30 días</button>
-          <button type="button" role="tab" aria-selected="false" data-range="90">3 meses</button>
+        <h2 class="apn-h" data-en="How is your advertising doing?">¿Cómo le va a tu publicidad?</h2>
+        <div class="cx-tabs apn-range" role="tablist" aria-label="Período" data-en-label="Period">
+          <button type="button" role="tab" aria-selected="true" data-range="7" data-en="This week">Esta semana</button>
+          <button type="button" role="tab" aria-selected="false" data-range="30" data-en="30 days">30 días</button>
+          <button type="button" role="tab" aria-selected="false" data-range="90" data-en="3 months">3 meses</button>
         </div>
       </div>
       <div class="apn-story" data-story aria-live="polite"></div>
@@ -62,114 +84,261 @@ const GLOSSARY = [
 
       <div class="apn-grid">
         <section class="apn-card apn-wide">
-          <h3>Veces que se vio, por día</h3>
+          <h3 data-en="Views per day">Veces que se vio, por día</h3>
           <div class="apn-chart" data-chart></div>
           <p class="apn-read" data-read></p>
         </section>
         <section class="apn-card">
-          <h3>Pendientes</h3>
+          <h3 data-en="To do">Pendientes</h3>
           <ul class="apn-todo" data-todo></ul>
         </section>
         <section class="apn-card">
-          <h3>💡 Consejos para ti</h3>
+          <h3 data-en="💡 Tips for you">💡 Consejos para ti</h3>
           <ul class="apn-tips" data-tips></ul>
         </section>
-        <section class="apn-card"><h3>¿Dónde te vieron?</h3><ul class="apn-bars" data-regions></ul></section>
-        <section class="apn-card"><h3>¿En qué parte del sitio?</h3><ul class="apn-bars" data-sections></ul></section>
+        <section class="apn-card"><h3 data-en="Where did they see you?">¿Dónde te vieron?</h3><ul class="apn-bars" data-regions></ul></section>
+        <section class="apn-card"><h3 data-en="Where on the site?">¿En qué parte del sitio?</h3><ul class="apn-bars" data-sections></ul></section>
       </div>
     </section>
 
     <!-- ===== Mis anuncios ===== -->
     <section data-panel="campanas" hidden>
-      <h2 class="apn-h">Mis anuncios</h2>
+      <h2 class="apn-h" data-en="My ads">Mis anuncios</h2>
       <div class="apn-camps" data-camps></div>
     </section>
 
     <!-- ===== Pagos y premios ===== -->
     <section data-panel="pagos" hidden>
-      <h2 class="apn-h">Pagos y premios</h2>
+      <h2 class="apn-h" data-en="Payments and rewards">Pagos y premios</h2>
       <div class="apn-grid">
         <section class="apn-card">
-          <h3>🎁 Premios</h3>
-          <p class="apn-spent">Has invertido <b data-spent></b></p>
+          <h3 data-en="🎁 Rewards">🎁 Premios</h3>
+          <p class="apn-spent"><span data-en="You’ve invested">Has invertido</span> <b data-spent></b></p>
           <div class="cx-bar apn-prog"><span data-prog></span></div>
           <p class="apn-small" data-next></p>
           <ul class="apn-gifts" data-gifts></ul>
         </section>
         <section class="apn-card">
-          <h3>Facturas</h3>
+          <h3 data-en="Invoices">Facturas</h3>
           <ul class="apn-inv" data-invoices></ul>
-          <p class="apn-small">Forma de pago: tarjeta terminada en •••• (se configura con tu representante).</p>
+          <p class="apn-small" data-en="Payment method: card ending in •••• (set up with your representative).">Forma de pago: tarjeta terminada en •••• (se configura con tu representante).</p>
         </section>
       </div>
     </section>
 
     <!-- ===== Ayuda y ajustes ===== -->
     <section data-panel="ayuda" hidden>
-      <h2 class="apn-h">Ayuda y ajustes</h2>
+      <h2 class="apn-h" data-en="Help and settings">Ayuda y ajustes</h2>
       <div class="apn-grid">
         <section class="apn-card">
-          <h3>📧 Informe por correo</h3>
-          <p class="apn-small">Te enviamos tus números automáticamente, en palabras sencillas.</p>
+          <h3 data-en="📧 Email report">📧 Informe por correo</h3>
+          <p class="apn-small" data-en="We send you your numbers automatically, in plain words.">Te enviamos tus números automáticamente, en palabras sencillas.</p>
           <form class="apn-mail" data-mail>
-            <label>¿Cada cuánto?
-              <select name="freq"><option value="weekly">Cada lunes</option><option value="monthly">El día 1 de cada mes</option><option value="off">No enviar</option></select>
+            <label><span data-en="How often?">¿Cada cuánto?</span>
+              <select name="freq"><option value="weekly" data-en="Every Monday">Cada lunes</option><option value="monthly" data-en="On the 1st of every month">El día 1 de cada mes</option><option value="off" data-en="Don’t send">No enviar</option></select>
             </label>
-            <label>¿A qué correo?<input name="to" type="email" value="ventas@panaderialaesquina.com" /></label>
-            <label class="adb-check"><input type="checkbox" name="alerts" checked /> Avísame cuando una campaña esté por terminar</label>
-            <button type="submit" class="adp-btn">Guardar</button>
+            <label><span data-en="To which email?">¿A qué correo?</span><input name="to" type="email" value="ventas@panaderialaesquina.com" /></label>
+            <label class="adb-check"><input type="checkbox" name="alerts" checked /> <span data-en="Let me know when a campaign is about to end">Avísame cuando una campaña esté por terminar</span></label>
+            <button type="submit" class="adp-btn" data-en="Save">Guardar</button>
             <p class="adp-note" data-mail-note hidden></p>
           </form>
         </section>
         <section class="apn-card">
-          <h3>👥 Tu equipo</h3>
-          <p class="apn-small">Quién puede entrar a esta cuenta de negocio con su propio usuario.</p>
+          <h3 data-en="👥 Your team">👥 Tu equipo</h3>
+          <p class="apn-small" data-en="Who can sign in to this business account with their own login.">Quién puede entrar a esta cuenta de negocio con su propio usuario.</p>
           <ul class="apn-team" data-team></ul>
-          <button type="button" class="adp-btn ghost-dark" data-demo-act="Invitar a alguien">+ Invitar a alguien</button>
+          <button type="button" class="adp-btn ghost-dark" data-demo-act="Invitar a alguien" data-demo-act-en="Invite someone" data-en="+ Invite someone">+ Invitar a alguien</button>
         </section>
         <section class="apn-card apn-wide">
-          <h3>¿Qué significa cada número?</h3>
+          <h3 data-en="What does each number mean?">¿Qué significa cada número?</h3>
           <div class="apn-gloss">
-            {GLOSSARY.map(([t, d]) => <details><summary>{t}</summary><p>{d}</p></details>)}
+            {GLOSSARY.map(([t, d, te, de]) => <details><summary data-en={te}>{t}</summary><p data-en={de}>{d}</p></details>)}
           </div>
         </section>
         <section class="apn-card apn-wide apn-help">
-          <div><h3>¿Necesitas ayuda?</h3><p class="apn-small">Tu representante te ayuda con el arte, las fechas o cualquier duda.</p></div>
-          <a class="adp-btn red" href={SITE.email ? `mailto:${SITE.email}?subject=${encodeURIComponent('Ayuda con mi panel de anunciante')}` : `${url('publicidad')}#contacto`}>Escríbenos</a>
+          <div><h3 data-en="Need help?">¿Necesitas ayuda?</h3><p class="apn-small" data-en="Your representative can help with the artwork, the dates or any question.">Tu representante te ayuda con el arte, las fechas o cualquier duda.</p></div>
+          <a class="adp-btn red" href={help('Ayuda con mi panel de anunciante') || `${order}#contacto`} data-en-href={help('Help with my advertiser panel') || `${orderEn}#contacto`} data-en="Write to us">Escríbenos</a>
         </section>
       </div>
     </section>
 
     <div class="apn-toast" data-toast role="status" hidden></div>
   </main>
+  <style>
+    .apn-lang{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin:0 0 8px;font-size:13px;color:var(--muted)}
+    .apn-lang button{background:none;border:0;padding:4px 2px;font:inherit;color:inherit;cursor:pointer}
+    .apn-lang button[aria-pressed="true"]{font-weight:700;color:var(--text,inherit);text-decoration:underline;text-underline-offset:3px}
+  </style>
   <script>
+    import { hasBackend, BACKEND, freshToken } from '../../lib/backend';
+    import { loggedIn, askLogin, token } from '../../lib/account';
+    import { isDemo } from '../../lib/demo';
+    // ---- Language: ?lang=en, else the saved choice, else English if the client ordered in English (see paintReal) ----
+    const LS = 'nc-ad-lang';
+    const pick = (v: string | null) => (v === 'en' || v === 'es' ? v : null);
+    const asked = pick(new URLSearchParams(location.search).get('lang')) ?? pick((() => { try { return localStorage.getItem(LS); } catch { return null; } })());
+    let lang: 'es' | 'en' = asked ?? 'es';
+    const t = (es: string, en: string) => (lang === 'en' ? en : es);
+    const loc = () => t('es-PR', 'en-US');
+    // A few fixed words from the sample data (statuses, roles, regions, sections, formats)
+    const WORDS: Record<string, string> = {
+      Activa: 'Active', 'En revisión': 'In review', Pausada: 'Paused', Terminó: 'Ended', Pagada: 'Paid', Pendiente: 'Pending',
+      Tú: 'You', 'Carmen (gerente)': 'Carmen (manager)', Contable: 'Accountant', 'Sr. Díaz': 'Mr. Díaz',
+      Dueño: 'Owner', 'Puede editar': 'Can edit', 'Solo puede ver': 'Can only view', Administra: 'Manages',
+      'Eres dueño de esta cuenta · Negocio local': 'You own this account · Local business', 'Puedes editar · Cuenta manejada por tu agencia': 'You can edit · Account managed by your agency',
+      Norte: 'North', Este: 'East', Centro: 'Central', Sur: 'South', Oeste: 'West', Diáspora: 'Diaspora',
+      Portada: 'Home page', Deportes: 'Sports', Clima: 'Weather', Entretenimiento: 'Entertainment',
+      'Rectángulo · Toda la isla': 'Rectangle · Whole island', 'Valla digital · Metro': 'Digital billboard · Metro', 'Entre noticias': 'Between stories',
+      'Rectángulo · Centro': 'Rectangle · Central', 'Media página · Oeste y Sur': 'Half page · West and South', 'Toma de portada · 1 día': 'Home page takeover · 1 day',
+    };
+    const w = (s: string) => (lang === 'en' ? WORDS[s] ?? s : s);
+    // Static text: swap each [data-en] element's inner HTML (the Spanish is kept in data-es), links and labels
+    function applyLang() {
+      document.documentElement.lang = lang;
+      document.title = document.title.replace(lang === 'en' ? 'Panel de anunciante' : 'Advertiser panel', t('Panel de anunciante', 'Advertiser panel'));
+      document.querySelectorAll<HTMLElement>('[data-en]').forEach((el) => { el.dataset.es ??= el.innerHTML; el.innerHTML = lang === 'en' ? el.dataset.en! : el.dataset.es; });
+      document.querySelectorAll<HTMLElement>('[data-en-href]').forEach((el) => { el.dataset.esHref ??= el.getAttribute('href')!; el.setAttribute('href', lang === 'en' ? el.dataset.enHref! : el.dataset.esHref); });
+      document.querySelectorAll<HTMLElement>('[data-en-label]').forEach((el) => { el.dataset.esLabel ??= el.getAttribute('aria-label')!; el.setAttribute('aria-label', lang === 'en' ? el.dataset.enLabel! : el.dataset.esLabel); });
+      document.querySelectorAll<HTMLElement>('[data-setlang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setlang === lang)));
+    }
+    let repaintReal = () => {};
+    if (lang === 'en') applyLang();
+    document.querySelectorAll<HTMLElement>('[data-setlang]').forEach((b) => b.addEventListener('click', () => {
+      lang = b.dataset.setlang as 'es' | 'en';
+      try { localStorage.setItem(LS, lang); } catch { /* storage blocked */ }
+      const u = new URL(location.href); if (u.searchParams.has('lang')) { u.searchParams.delete('lang'); history.replaceState(null, '', u); } // a reload keeps the choice
+      applyLang(); renderAll(); repaintReal();
+    }));
+    // ---- Real advertiser panel ----
+    {
+      const main = document.querySelector<HTMLElement>('[data-apn]')!;
+      const real = main.querySelector<HTMLElement>('[data-real]')!;
+      const sample = new URLSearchParams(location.search).has('ejemplo');
+      if (hasBackend() && !isDemo() && !sample) {
+        // Hide the sample panel; show the client's own
+        [...main.children].forEach((el) => { if (el !== real && !(el as HTMLElement).matches('[data-toast], [data-langsw], script, style')) (el as HTMLElement).style.display = 'none'; }); // their own styles would override `hidden`
+        real.hidden = false;
+        const q = (s: string) => real.querySelector<HTMLElement>(s)!;
+        const FMTS: Record<string, string> = JSON.parse(main.dataset.fmts || '{}'), FMTS_EN: Record<string, string> = JSON.parse(main.dataset.fmtsEn || '{}');
+        const num = (v: number) => Math.round(v).toLocaleString(loc());
+        const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc(), { day: 'numeric', month: 'short', year: 'numeric' });
+        const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+        // Through noticel.com/sb/… first (Cloudflare relay, cloudflare/password-gate.js): ad blockers like Brave Shields
+        // block the database's own address; straight to the database when the relay isn't there
+        const rest = async (path: string, tk: string) => {
+          const init = { headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${tk}` } };
+          if (location.hostname.endsWith('noticel.com')) {
+            const r = await fetch(`${location.origin}/sb/rest/v1/${path}`, init).catch(() => null);
+            if (r && r.status !== 404 && r.status !== 405 && (r.headers.get('content-type') || '').includes('json')) return r;
+          }
+          return fetch(`${BACKEND.url.replace(/\/$/, '')}/rest/v1/${path}`, init);
+        };
+        q('[data-real-login]').addEventListener('click', () => askLogin(t('Entra con el correo que usaste al pedir tu anuncio.', 'Sign in with the email you used to order your ad.')));
+        async function paintReal() {
+          // The reader account and the staff panel's login are separate (and may use different emails): look up each
+          // one's own requests with its own login, then put them together
+          const email = (k: string) => { try { return (JSON.parse(localStorage.getItem(k) || 'null')?.user?.email as string) || ''; } catch { return ''; } };
+          const logins = [
+            { t: loggedIn() ? await token() : undefined, who: email('nc-session') },
+            { t: await freshToken(), who: email('nc-staff-session') },
+          ].filter((l) => l.t && l.who).filter((l, i, all) => all.findIndex((x) => x.who.toLowerCase() === l.who.toLowerCase()) === i);
+          const tk = logins[0]?.t;
+          const who = logins.map((l) => l.who).join(t(' y ', ' and '));
+          q('[data-real-out]').hidden = !!tk;
+          if (!tk) { q('[data-real-kpis]').hidden = true; q('[data-real-list]').innerHTML = ''; q('[data-real-empty]').hidden = true; return; }
+          const lists = await Promise.all(logins.map(async (l) => {
+            const r = await rest(`ad_requests?select=id,created_at,status,client,formats,start,duration,views,total&order=created_at.desc&client->>email=ilike.${encodeURIComponent(l.who)}`, l.t!).catch(() => null);
+            return r?.ok ? ((await r.json()) as any[]) : [];
+          }));
+          const reqs: any[] = lists.flat().filter((x, i, all) => all.findIndex((y) => y.id === x.id) === i).sort((a, b) => b.created_at.localeCompare(a.created_at));
+          // Ordered from /en/advertise/ and no choice made: English
+          if (!asked && lang === 'es' && reqs.some((x) => x.client?.lang === 'en')) { lang = 'en'; applyLang(); renderAll(); }
+          const email0 = reqs[0]?.client?.email ?? '';
+          if (!reqs.length) {
+            q('[data-real-kpis]').hidden = true; q('[data-real-list]').innerHTML = '';
+            const e = q('[data-real-empty]'); e.hidden = false;
+            e.innerHTML = t(`Entraste como <b>${esc(who)}</b> y no hay anuncios pedidos con ${logins.length > 1 ? 'esos correos' : 'ese correo'}. Si pediste tu anuncio con otro correo, sal y entra con ese. <a href="?ejemplo=1">Ver un ejemplo</a>`,
+              `You’re signed in as <b>${esc(who)}</b> and there are no ads ordered with ${logins.length > 1 ? 'those emails' : 'that email'}. If you ordered your ad with a different email, sign out and sign in with that one. <a href="?ejemplo=1">See an example</a>`);
+            return;
+          }
+          q('[data-real-empty]').hidden = true;
+          q('[data-real-sub]').textContent = `${reqs[0].client?.business ?? ''} · ${email0}`;
+          const ids = reqs.map((x) => x.id.toLowerCase());
+          const inList = `in.(${ids.map((i) => `"${i}"`).join(',')})`;
+          const [cr, sr] = await Promise.all([rest(`ad_campaigns?select=id,start_date,end_date,status,views,sizes,takeover,creatives&id=${inList}`, tk), rest(`ad_stats?select=campaign_id,views,clicks&campaign_id=${inList}`, tk)]).catch(() => [null, null]);
+          const camps: Record<string, any> = Object.fromEntries((cr?.ok ? await cr.json() : []).map((c: any) => [c.id, c]));
+          const stats: Record<string, any> = Object.fromEntries((sr?.ok ? await sr.json() : []).map((s: any) => [s.campaign_id, s]));
+          const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+          let live = 0, views = 0, clicks = 0;
+          const cards = reqs.map((x) => {
+            const c = camps[x.id.toLowerCase()], s = stats[x.id.toLowerCase()] ?? { views: 0, clicks: 0 };
+            let st = t('En revisión', 'In review'), cls = 'wait', when = t(`Pedido el ${day(x.created_at.slice(0, 10))}`, `Ordered ${day(x.created_at.slice(0, 10))}`);
+            if (x.status === 'cambios') { st = t('Te pedimos cambios', 'We asked for changes'); cls = 'warn'; }
+            else if (x.status === 'rechazada') { st = t('No aprobado', 'Not approved'); cls = 'off'; }
+            else if (x.status === 'disenar') { st = t('Lo estamos diseñando', 'We’re designing it'); }
+            else if (c) {
+              views += s.views; clicks += s.clicks;
+              const done = c.status === 'ended' || c.end_date < today || (c.views != null && s.views >= c.views);
+              if (done) { st = t('Terminado', 'Ended'); cls = 'off'; when = `${day(c.start_date)} – ${day(c.end_date)}`; }
+              else if (c.status === 'paused') { st = t('En pausa', 'Paused'); cls = 'warn'; }
+              else if (c.start_date > today) { st = t(`Empieza el ${day(c.start_date)}`, `Starts ${day(c.start_date)}`); when = t(`Hasta el ${day(c.end_date)}`, `Until ${day(c.end_date)}`); }
+              else { st = t('En el aire', 'Live'); cls = 'on'; live++; when = c.views ? t(`Hasta cumplir ${num(c.views)} vistas`, `Until it reaches ${num(c.views)} views`) : t(`Hasta el ${day(c.end_date)}`, `Until ${day(c.end_date)}`); }
+            }
+            const pct = s.views ? ((s.clicks / s.views) * 100).toFixed(1) : '0.0';
+            // Which spaces it fills, and the ad itself in each size
+            const SPACE: Record<string, string> = lang === 'en'
+              ? { leaderboard: 'Top and bottom banner', rectangle: 'Rectangle', infeed: 'Between stories', halfpage: 'Half page (computers)' }
+              : { leaderboard: 'Banner de arriba y de abajo', rectangle: 'Rectángulo', infeed: 'Entre noticias', halfpage: 'Media página (computadora)' };
+            const where = c ? (c.takeover ? t('Todos los espacios del sitio, solo tu marca', 'Every ad space on the site, only your brand') : (c.sizes || []).map((z: string) => SPACE[z] ?? z).join(' · ')) : '';
+            const arts = (c?.creatives || []).filter((a: any) => a.img).map((a: any) => `<figure><img src="${esc(a.img)}" alt="" loading="lazy" /><figcaption>${a.w && a.h ? `${a.w} × ${a.h}` : ''}</figcaption></figure>`).join('');
+            const prog = c?.views ? `<div class="lc-prog"><p><span>${num(s.views)} ${t('de', 'of')} ${num(c.views)} ${t('vistas', 'views')}</span><b>${Math.min(100, Math.round((s.views / c.views) * 100))}%</b></p><i><em style="width:${Math.min(100, (s.views / c.views) * 100)}%"></em></i></div>` : '';
+            const fmts = lang === 'en' ? FMTS_EN : FMTS;
+            return `<article class="apr-card"><header><b>${esc((x.formats || []).map((f: string) => fmts[f] ?? FMTS[f] ?? f).join(', ') || t('Anuncio', 'Ad'))}</b><span class="apn-st ${cls}">${st}</span></header>
+              <p class="apr-meta">${esc(when)} · ${t('Solicitud', 'Request')} ${esc(x.id)}</p>
+              ${where ? `<p class="apr-where"><b>${t('Dónde sale:', 'Where it runs:')}</b> ${esc(where)}</p>` : ''}
+              ${arts ? `<div class="apr-arts">${arts}</div>` : ''}
+              ${c ? `<p class="apr-nums"><span><b>${num(s.views)}</b> ${t('veces que se vio', 'views')}</span><span><b>${num(s.clicks)}</b> ${t('toques', 'taps')}</span><span><b>${pct}%</b> ${t('de toques', 'of taps')}</span></p>${prog}` : ''}
+            </article>`;
+          });
+          const k = q('[data-real-kpis]'); k.hidden = false;
+          k.innerHTML = [[t('En el aire', 'Live'), num(live)], [t('Veces que se vio', 'Views'), num(views)], [t('Toques', 'Taps'), num(clicks)], [t('% de toques', '% of taps'), views ? `${((clicks / views) * 100).toFixed(1)}%` : '—']]
+            .map(([l, v]) => `<div class="pnl-kpi"><span>${l}</span><b>${v}</b></div>`).join('');
+          q('[data-real-list]').innerHTML = cards.join('');
+        }
+        repaintReal = () => void paintReal();
+        void paintReal();
+        addEventListener('nc-profile-change', () => void paintReal());
+        addEventListener('storage', () => void paintReal());
+      }
+    }
     const page = document.querySelector<HTMLElement>('[data-apn]')!;
     const $ = (s: string) => page.querySelector<HTMLElement>(s)!;
-    const n = (v: number) => Math.round(v).toLocaleString('es-PR');
+    const n = (v: number) => Math.round(v).toLocaleString(loc());
     const money = (v: number) => `$${v.toLocaleString('en-US', { maximumFractionDigits: v < 10 ? 2 : 0, minimumFractionDigits: v < 10 ? 2 : 0 })}`;
     const SITE_CTR = 0.9; // site-wide average % of taps (demo)
 
     // ---- Two demo business accounts: a local business (owner) and an agency client (editor) ----
+    // Campaign and invoice dates are ISO so they show in either language
     type Camp = { name: string; fmt: string; from: string; to: string; daysLeft: number; imp: number; clk: number; budget: number; used: number; st: 'Activa' | 'En revisión' | 'Pausada' | 'Terminó'; bg: string; line: string };
     type Biz = { name: string; initials: string; role: string; base: number; spentAll: number; inv: Array<[string, number, string]>; team: Array<[string, string]>; camps: Camp[]; top: string; color: string; regions: Array<[string, number]> };
     const BIZ: Record<string, Biz> = {
       panaderia: { name: 'Panadería La Esquina', initials: 'PE', role: 'Eres dueño de esta cuenta · Negocio local', base: 420, spentAll: 171, color: '#B45309', top: 'Metro',
         regions: [['Metro', 0.34], ['Norte', 0.16], ['Este', 0.13], ['Centro', 0.12], ['Sur', 0.11], ['Oeste', 0.09], ['Diáspora', 0.05]],
-        inv: [['Octubre 2026', 58, 'Pagada'], ['Septiembre 2026', 64, 'Pagada'], ['Agosto 2026', 49, 'Pagada']],
+        inv: [['2026-10', 58, 'Pagada'], ['2026-09', 64, 'Pagada'], ['2026-08', 49, 'Pagada']],
         team: [['Tú', 'Dueño'], ['Carmen (gerente)', 'Puede editar'], ['Contable', 'Solo puede ver']],
         camps: [
-          { name: 'Pan sobao de otoño', fmt: 'Rectángulo · Toda la isla', from: '15 sep', to: '15 oct', daysLeft: 13, imp: 9210, clk: 116, budget: 49, used: 28, st: 'Activa', bg: 'linear-gradient(135deg,#B45309,#F59E0B)', line: 'Pan sobao calientito' },
-          { name: 'Quesitos 2×1', fmt: 'Valla digital · Metro', from: '20 sep', to: '20 oct', daysLeft: 18, imp: 12480, clk: 141, budget: 29, used: 12, st: 'Activa', bg: 'linear-gradient(135deg,#D7263D,#F28C28)', line: 'Quesitos 2×1 hoy' },
-          { name: 'Café y desayuno', fmt: 'Entre noticias', from: '1 nov', to: '30 nov', daysLeft: 0, imp: 0, clk: 0, budget: 49, used: 0, st: 'En revisión', bg: 'linear-gradient(135deg,#5B3A1E,#A16207)', line: 'Desayuno criollo $5.99' },
-          { name: 'Gran apertura Caguas', fmt: 'Rectángulo · Centro', from: '10 ago', to: '31 ago', daysLeft: 0, imp: 9840, clk: 157, budget: 25, used: 25, st: 'Terminó', bg: 'linear-gradient(135deg,#2B1185,#1F90DA)', line: '¡Abrimos en Caguas!' },
+          { name: 'Pan sobao de otoño', fmt: 'Rectángulo · Toda la isla', from: '2026-09-15', to: '2026-10-15', daysLeft: 13, imp: 9210, clk: 116, budget: 49, used: 28, st: 'Activa', bg: 'linear-gradient(135deg,#B45309,#F59E0B)', line: 'Pan sobao calientito' },
+          { name: 'Quesitos 2×1', fmt: 'Valla digital · Metro', from: '2026-09-20', to: '2026-10-20', daysLeft: 18, imp: 12480, clk: 141, budget: 29, used: 12, st: 'Activa', bg: 'linear-gradient(135deg,#D7263D,#F28C28)', line: 'Quesitos 2×1 hoy' },
+          { name: 'Café y desayuno', fmt: 'Entre noticias', from: '2026-11-01', to: '2026-11-30', daysLeft: 0, imp: 0, clk: 0, budget: 49, used: 0, st: 'En revisión', bg: 'linear-gradient(135deg,#5B3A1E,#A16207)', line: 'Desayuno criollo $5.99' },
+          { name: 'Gran apertura Caguas', fmt: 'Rectángulo · Centro', from: '2026-08-10', to: '2026-08-31', daysLeft: 0, imp: 9840, clk: 157, budget: 25, used: 25, st: 'Terminó', bg: 'linear-gradient(135deg,#000000,#009DE9)', line: '¡Abrimos en Caguas!' },
         ] },
       ferreteria: { name: 'Ferretería Díaz', initials: 'FD', role: 'Puedes editar · Cuenta manejada por tu agencia', base: 900, spentAll: 1430, color: '#0E7490', top: 'Oeste',
         regions: [['Oeste', 0.52], ['Sur', 0.48]],
-        inv: [['Octubre 2026', 320, 'Pendiente'], ['Septiembre 2026', 345, 'Pagada'], ['Agosto 2026', 305, 'Pagada']],
+        inv: [['2026-10', 320, 'Pendiente'], ['2026-09', 345, 'Pagada'], ['2026-08', 305, 'Pagada']],
         team: [['Agencia Creativa PR', 'Administra'], ['Sr. Díaz', 'Dueño'], ['Tú', 'Puede editar']],
         camps: [
-          { name: 'Temporada de huracanes', fmt: 'Media página · Oeste y Sur', from: '1 sep', to: '30 nov', daysLeft: 59, imp: 41200, clk: 455, budget: 297, used: 105, st: 'Activa', bg: 'linear-gradient(135deg,#0E7490,#22D3EE)', line: 'Generadores y plantas' },
-          { name: 'Toma de portada: Black Friday', fmt: 'Toma de portada · 1 día', from: '28 nov', to: '28 nov', daysLeft: 0, imp: 0, clk: 0, budget: 99, used: 0, st: 'Pausada', bg: 'linear-gradient(135deg,#111827,#4B5563)', line: 'Black Friday −40%' },
+          { name: 'Temporada de huracanes', fmt: 'Media página · Oeste y Sur', from: '2026-09-01', to: '2026-11-30', daysLeft: 59, imp: 41200, clk: 455, budget: 297, used: 105, st: 'Activa', bg: 'linear-gradient(135deg,#0E7490,#22D3EE)', line: 'Generadores y plantas' },
+          { name: 'Toma de portada: Black Friday', fmt: 'Toma de portada · 1 día', from: '2026-11-28', to: '2026-11-28', daysLeft: 0, imp: 0, clk: 0, budget: 99, used: 0, st: 'Pausada', bg: 'linear-gradient(135deg,#111827,#4B5563)', line: 'Black Friday −40%' },
         ] },
     };
     let biz = BIZ.panaderia;
@@ -186,32 +355,37 @@ const GLOSSARY = [
     let daily = series(biz);
     const SEC: Array<[string, number]> = [['Portada', 0.31], ['Deportes', 0.22], ['Puerto Rico', 0.17], ['Juegos NotiCel', 0.14], ['Clima', 0.09], ['Entretenimiento', 0.07]];
 
-    const toast = (msg: string) => { const t = $('[data-toast]'); t.textContent = msg; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3500); };
+    const toast = (msg: string) => { const el = $('[data-toast]'); el.textContent = msg; el.hidden = false; clearTimeout((el as any).tm); (el as any).tm = setTimeout(() => (el.hidden = true), 3500); };
     const bars = (sel: string, rows: Array<[string, number]>, total: number) => {
       const max = Math.max(...rows.map((r) => r[1]));
-      $(sel).innerHTML = rows.map(([name, s]) => `<li><span class="apn-b-name">${name}</span><span class="apn-b-track"><i style="width:${(s / max) * 100}%"></i></span><b>${n(total * s)}</b></li>`).join('');
+      $(sel).innerHTML = rows.map(([name, s]) => `<li><span class="apn-b-name">${w(name)}</span><span class="apn-b-track"><i style="width:${(s / max) * 100}%"></i></span><b>${n(total * s)}</b></li>`).join('');
     };
-    const fmtD = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString('es-PR', o);
+    const fmtD = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString(loc(), o);
+    const short = (iso: string) => fmtD(new Date(`${iso}T12:00:00`), { day: 'numeric', month: 'short' });
+    const month = (ym: string) => { const d = new Date(`${ym}-15T12:00:00`), m = fmtD(d, { month: 'long' }); return `${m[0].toUpperCase()}${m.slice(1)} ${d.getFullYear()}`; };
+    const act = (es: string, en: string) => `data-demo-act="${es}" data-demo-act-en="${en}"`;
 
     let range = 7;
     function renderHome() {
       const cur = daily.slice(-range), prev = daily.slice(-range * 2, -range);
-      const sum = (a: typeof daily, k: 'imp' | 'clk') => a.reduce((t, x) => t + x[k], 0);
+      const sum = (a: typeof daily, k: 'imp' | 'clk') => a.reduce((s, x) => s + x[k], 0);
       const imp = sum(cur, 'imp'), clk = sum(cur, 'clk'), pClk = sum(prev, 'clk');
       const reach = Math.round(imp / (1.6 + range / 60)); // people see an ad a few times
       const ctr = (clk / imp) * 100;
       const spend = (biz.spentAll / 90) * range;
       const best = cur.reduce((a, b) => (b.imp > a.imp ? b : a));
-      const when = range === 7 ? 'Esta semana' : range === 30 ? 'En los últimos 30 días' : 'En los últimos 3 meses';
+      const when = range === 7 ? t('Esta semana', 'This week') : range === 30 ? t('En los últimos 30 días', 'In the last 30 days') : t('En los últimos 3 meses', 'In the last 3 months');
       const trend = pClk ? Math.round(((clk - pClk) / pClk) * 100) : 0;
       const good = ctr >= SITE_CTR;
-      $('[data-story]').innerHTML = `<span class="apn-mood" aria-hidden="true">${good ? '😄' : '🙂'}</span><p><b>${when}, ${n(reach)} personas vieron tu anuncio y ${n(clk)} lo tocaron</b> para ir a tu negocio. ${good ? `Eso es <b>mejor que el promedio</b> del sitio (${SITE_CTR}%).` : `Eso está cerca del promedio del sitio (${SITE_CTR}%).`} ${trend >= 0 ? `Tuviste ${trend}% más toques que en el período anterior.` : `Tuviste ${Math.abs(trend)}% menos toques que en el período anterior.`}</p>`;
-      const tile = (icon: string, k: string, v: string, help: string) => `<div><span class="apn-k-h"><i aria-hidden="true">${icon}</i>${k}</span><b>${v}</b><small>${help}</small></div>`;
+      $('[data-story]').innerHTML = `<span class="apn-mood" aria-hidden="true">${good ? '😄' : '🙂'}</span><p>` + t(
+        `<b>${when}, ${n(reach)} personas vieron tu anuncio y ${n(clk)} lo tocaron</b> para ir a tu negocio. ${good ? `Eso es <b>mejor que el promedio</b> del sitio (${SITE_CTR}%).` : `Eso está cerca del promedio del sitio (${SITE_CTR}%).`} ${trend >= 0 ? `Tuviste ${trend}% más toques que en el período anterior.` : `Tuviste ${Math.abs(trend)}% menos toques que en el período anterior.`}`,
+        `<b>${when}, ${n(reach)} people saw your ad and ${n(clk)} tapped it</b> to visit your business. ${good ? `That’s <b>better than the site average</b> (${SITE_CTR}%).` : `That’s close to the site average (${SITE_CTR}%).`} ${trend >= 0 ? `You got ${trend}% more taps than in the previous period.` : `You got ${Math.abs(trend)}% fewer taps than in the previous period.`}`) + '</p>';
+      const tile = (icon: string, k: string, v: string, hint: string) => `<div><span class="apn-k-h"><i aria-hidden="true">${icon}</i>${k}</span><b>${v}</b><small>${hint}</small></div>`;
       $('[data-kpis]').innerHTML = [
-        tile('👀', 'Personas alcanzadas', n(reach), `vieron tu anuncio ${n(imp)} veces`),
-        tile('👆', 'Toques', n(clk), `${ctr.toFixed(2)}% de las veces`),
-        tile('💵', 'Invertido', money(Math.round(spend)), 'en este período'),
-        tile('🎯', 'Costo por toque', money(spend / clk), 'por cada cliente que llegó'),
+        tile('👀', t('Personas alcanzadas', 'People reached'), n(reach), t(`vieron tu anuncio ${n(imp)} veces`, `saw your ad ${n(imp)} times`)),
+        tile('👆', t('Toques', 'Taps'), n(clk), t(`${ctr.toFixed(2)}% de las veces`, `${ctr.toFixed(2)}% of the time`)),
+        tile('💵', t('Invertido', 'Invested'), money(Math.round(spend)), t('en este período', 'in this period')),
+        tile('🎯', t('Costo por toque', 'Cost per tap'), money(spend / clk), t('por cada cliente que llegó', 'for each customer who came')),
       ].join('');
       // Line chart with hover/touch readout
       const box = $('[data-chart]');
@@ -223,11 +397,11 @@ const GLOSSARY = [
       const step = Math.ceil(cur.length / 6);
       const xl = cur.map((p, i) => (i % step === 0 ? `<text x="${x(i)}" y="${H - 8}" class="apn-ax" text-anchor="middle">${range === 7 ? fmtD(p.d, { weekday: 'short' }) : fmtD(p.d, { day: 'numeric', month: 'short' })}</text>` : '')).join('');
       const pts = cur.map((p, i) => `${x(i)},${y(p.imp)}`).join(' ');
-      box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Veces que se vio tu anuncio por día">${grid}${xl}<polygon points="${L},${y(0)} ${pts} ${x(cur.length - 1)},${y(0)}" class="apn-area"/><polyline points="${pts}" class="apn-line"/><line class="apn-cur" data-cur y1="${T}" y2="${y(0)}" hidden/><circle r="5" class="apn-dot" data-dot hidden/><rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" data-hit/></svg>`;
+      box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('Veces que se vio tu anuncio por día', 'Times your ad was seen, per day')}">${grid}${xl}<polygon points="${L},${y(0)} ${pts} ${x(cur.length - 1)},${y(0)}" class="apn-area"/><polyline points="${pts}" class="apn-line"/><line class="apn-cur" data-cur y1="${T}" y2="${y(0)}" hidden/><circle r="5" class="apn-dot" data-dot hidden/><rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" data-hit/></svg>`;
       const svg = box.querySelector('svg')!;
       const read = (i: number) => {
         const p = cur[i];
-        $('[data-read]').innerHTML = `<b>${fmtD(p.d, { weekday: 'long', day: 'numeric', month: 'long' })}:</b> se vio ${n(p.imp)} veces · ${n(p.clk)} toques`;
+        $('[data-read]').innerHTML = `<b>${fmtD(p.d, { weekday: 'long', day: 'numeric', month: 'long' })}:</b> ` + t(`se vio ${n(p.imp)} veces · ${n(p.clk)} toques`, `seen ${n(p.imp)} times · ${n(p.clk)} taps`);
         const c = svg.querySelector('[data-cur]')!, dot = svg.querySelector('[data-dot]')!;
         c.removeAttribute('hidden'); dot.removeAttribute('hidden');
         c.setAttribute('x1', String(x(i))); c.setAttribute('x2', String(x(i))); dot.setAttribute('cx', String(x(i))); dot.setAttribute('cy', String(y(p.imp)));
@@ -241,26 +415,27 @@ const GLOSSARY = [
       bars('[data-sections]', SEC, imp);
       // Tips in plain words, from the numbers
       $('[data-tips]').innerHTML = [
-        `Tu mejor día fue el <b>${fmtD(best.d, { weekday: 'long' })}</b>. Ese día es buen momento para una oferta.`,
-        `La región que más te vio fue <b>${biz.top}</b>. Si casi todos tus clientes son de ahí, anunciarte solo en esa región te sale más barato.`,
-        'Los anuncios con <b>precio o descuento</b> en el arte reciben más toques. Sube una segunda versión para que roten.',
-      ].map((t) => `<li>${t}</li>`).join('');
+        t(`Tu mejor día fue el <b>${fmtD(best.d, { weekday: 'long' })}</b>. Ese día es buen momento para una oferta.`, `Your best day was <b>${fmtD(best.d, { weekday: 'long' })}</b>. That’s a good day for an offer.`),
+        t(`La región que más te vio fue <b>${biz.top}</b>. Si casi todos tus clientes son de ahí, anunciarte solo en esa región te sale más barato.`, `The region that saw you most was <b>${w(biz.top)}</b>. If most of your customers are from there, advertising only in that region costs less.`),
+        t('Los anuncios con <b>precio o descuento</b> en el arte reciben más toques. Sube una segunda versión para que roten.', 'Ads with a <b>price or discount</b> in the artwork get more taps. Upload a second version so they rotate.'),
+      ].map((s) => `<li>${s}</li>`).join('');
     }
 
     function renderTodo() {
       const items: string[] = [];
       biz.camps.forEach((c) => {
-        if (c.st === 'Activa' && c.daysLeft <= 14) items.push(`<li class="warn"><span>⏳ <b>${c.name}</b> termina en ${c.daysLeft} días.</span><button type="button" data-demo-act="Extender ${c.name}">Extender</button></li>`);
-        if (c.st === 'En revisión') items.push(`<li><span>🕑 El arte de <b>${c.name}</b> está en revisión. Te avisamos al aprobarlo (casi siempre en 1 día).</span></li>`);
-        if (c.st === 'Pausada') items.push(`<li><span>⏸️ <b>${c.name}</b> está en pausa.</span><button type="button" data-demo-act="Reanudar ${c.name}">Reanudar</button></li>`);
+        if (c.st === 'Activa' && c.daysLeft <= 14) items.push(`<li class="warn"><span>⏳ ${t(`<b>${c.name}</b> termina en ${c.daysLeft} días.`, `<b>${c.name}</b> ends in ${c.daysLeft} days.`)}</span><button type="button" ${act(`Extender ${c.name}`, `Extend ${c.name}`)}>${t('Extender', 'Extend')}</button></li>`);
+        if (c.st === 'En revisión') items.push(`<li><span>🕑 ${t(`El arte de <b>${c.name}</b> está en revisión. Te avisamos al aprobarlo (casi siempre en 1 día).`, `The artwork for <b>${c.name}</b> is in review. We’ll let you know when it’s approved (almost always within 1 day).`)}</span></li>`);
+        if (c.st === 'Pausada') items.push(`<li><span>⏸️ ${t(`<b>${c.name}</b> está en pausa.`, `<b>${c.name}</b> is paused.`)}</span><button type="button" ${act(`Reanudar ${c.name}`, `Resume ${c.name}`)}>${t('Reanudar', 'Resume')}</button></li>`);
       });
-      biz.inv.filter((i) => i[2] === 'Pendiente').forEach((i) => items.push(`<li class="warn"><span>💳 Factura de ${i[0]} pendiente: <b>${money(i[1])}</b>.</span><button type="button" data-demo-act="Pagar factura">Pagar</button></li>`));
-      if (!items.length) items.push('<li><span>✅ Todo al día. ¡Nada pendiente!</span></li>');
+      biz.inv.filter((i) => i[2] === 'Pendiente').forEach((i) => items.push(`<li class="warn"><span>💳 ${t(`Factura de ${month(i[0])} pendiente`, `Invoice for ${month(i[0])} pending`)}: <b>${money(i[1])}</b>.</span><button type="button" ${act('Pagar factura', 'Pay invoice')}>${t('Pagar', 'Pay')}</button></li>`));
+      if (!items.length) items.push(`<li><span>✅ ${t('Todo al día. ¡Nada pendiente!', 'All caught up. Nothing to do!')}</span></li>`);
       $('[data-todo]').innerHTML = items.join('');
     }
 
     function renderCamps() {
-      const groups: Array<[string, Camp[]]> = [['Activas', biz.camps.filter((c) => c.st === 'Activa')], ['Próximas y en pausa', biz.camps.filter((c) => c.st === 'En revisión' || c.st === 'Pausada')], ['Anteriores', biz.camps.filter((c) => c.st === 'Terminó')]];
+      const groups: Array<[string, Camp[]]> = [[t('Activas', 'Active'), biz.camps.filter((c) => c.st === 'Activa')], [t('Próximas y en pausa', 'Upcoming and paused'), biz.camps.filter((c) => c.st === 'En revisión' || c.st === 'Pausada')], [t('Anteriores', 'Past'), biz.camps.filter((c) => c.st === 'Terminó')]];
+      const ACTS: Record<string, string> = { Pausar: 'Pause', Extender: 'Extend', 'Cambiar arte': 'Change artwork', Reanudar: 'Resume', 'Cambiar fechas': 'Change dates', 'Repetir esta campaña': 'Repeat this campaign' };
       $('[data-camps]').innerHTML = groups.filter(([, l]) => l.length).map(([g, l]) => `<h3 class="apn-group">${g}</h3>` + l.map((c) => {
         const ctr = c.imp ? ((c.clk / c.imp) * 100).toFixed(2) + '%' : '—';
         const pct = Math.round((c.used / c.budget) * 100);
@@ -268,32 +443,34 @@ const GLOSSARY = [
         return `<article class="apn-camp">
           <div class="apn-prev" style="background:${c.bg}"><b>${c.line}</b><span>${biz.name}</span></div>
           <div class="apn-camp-body">
-            <div class="apn-camp-top"><h4>${c.name}</h4><span class="apn-st ${c.st === 'Activa' ? 'on' : c.st === 'Terminó' ? '' : 'wait'}">${c.st}</span></div>
-            <p class="apn-small">${c.fmt} · ${c.from} – ${c.to}${c.st === 'Activa' ? ` · quedan ${c.daysLeft} días` : ''}</p>
-            <dl class="apn-camp-k"><div><dt>Se vio</dt><dd>${c.imp ? n(c.imp) : '—'}</dd></div><div><dt>Toques</dt><dd>${c.clk ? n(c.clk) : '—'}</dd></div><div><dt>% toques</dt><dd>${ctr}</dd></div></dl>
-            <div class="apn-budget"><span>Presupuesto usado: ${money(c.used)} de ${money(c.budget)}</span><span class="cx-bar"><span style="width:${pct}%"></span></span></div>
-            <div class="apn-camp-acts">${acts.map((a) => `<button type="button" data-demo-act="${a}: ${c.name}">${a}</button>`).join('')}</div>
+            <div class="apn-camp-top"><h4>${c.name}</h4><span class="apn-st ${c.st === 'Activa' ? 'on' : c.st === 'Terminó' ? '' : 'wait'}">${w(c.st)}</span></div>
+            <p class="apn-small">${w(c.fmt)} · ${short(c.from)} – ${short(c.to)}${c.st === 'Activa' ? t(` · quedan ${c.daysLeft} días`, ` · ${c.daysLeft} days left`) : ''}</p>
+            <dl class="apn-camp-k"><div><dt>${t('Se vio', 'Views')}</dt><dd>${c.imp ? n(c.imp) : '—'}</dd></div><div><dt>${t('Toques', 'Taps')}</dt><dd>${c.clk ? n(c.clk) : '—'}</dd></div><div><dt>${t('% toques', '% taps')}</dt><dd>${ctr}</dd></div></dl>
+            <div class="apn-budget"><span>${t(`Presupuesto usado: ${money(c.used)} de ${money(c.budget)}`, `Budget used: ${money(c.used)} of ${money(c.budget)}`)}</span><span class="cx-bar"><span style="width:${pct}%"></span></span></div>
+            <div class="apn-camp-acts">${acts.map((a) => `<button type="button" ${act(`${a}: ${c.name}`, `${ACTS[a]}: ${c.name}`)}>${t(a, ACTS[a])}</button>`).join('')}</div>
           </div></article>`;
       }).join('')).join('');
     }
 
     function renderPay() {
-      const rewards: Array<{ at: number; gift: string }> = JSON.parse(page.dataset.rewards!);
+      const rewardsEn: Record<number, string> = JSON.parse(page.dataset.rewardsEn || '{}');
+      const rewards: Array<{ at: number; gift: string }> = (JSON.parse(page.dataset.rewards!) as Array<{ at: number; gift: string }>).map((r) => ({ at: r.at, gift: lang === 'en' ? rewardsEn[r.at] ?? r.gift : r.gift }));
       const next = rewards.find((r) => biz.spentAll < r.at);
       $('[data-spent]').textContent = money(biz.spentAll);
       $('[data-prog]').style.width = `${next ? (biz.spentAll / next.at) * 100 : 100}%`;
-      $('[data-next]').textContent = next ? `Te faltan ${money(next.at - biz.spentAll)} para ganarte ${next.gift.toLowerCase()}.` : '¡Ganaste todos los premios!';
-      $('[data-gifts]').innerHTML = rewards.map((r) => `<li class="${biz.spentAll >= r.at ? 'won' : ''}"><b>${money(r.at)}</b> ${r.gift}${biz.spentAll >= r.at ? ' ✓ ganado' : ''}</li>`).join('');
-      $('[data-invoices]').innerHTML = biz.inv.map(([m, a, s]) => `<li><span>${m}</span><b>${money(a)}</b><span class="apn-st ${s === 'Pagada' ? 'on' : 'wait'}">${s}</span><button type="button" class="apn-dl" data-demo-act="Descargar factura de ${m}" aria-label="Descargar factura de ${m}">PDF</button></li>`).join('');
-      $('[data-team]').innerHTML = biz.team.map(([who, role]) => `<li><span class="apn-av sm" aria-hidden="true">${who.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ ]/g, '').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</span><span>${who}</span><span class="apn-st">${role}</span></li>`).join('');
+      $('[data-next]').textContent = next ? t(`Te faltan ${money(next.at - biz.spentAll)} para ganarte ${next.gift.toLowerCase()}.`, `You’re ${money(next.at - biz.spentAll)} away from earning ${next.gift}.`) : t('¡Ganaste todos los premios!', 'You’ve earned every reward!');
+      $('[data-gifts]').innerHTML = rewards.map((r) => `<li class="${biz.spentAll >= r.at ? 'won' : ''}"><b>${money(r.at)}</b> ${r.gift}${biz.spentAll >= r.at ? t(' ✓ ganado', ' ✓ earned') : ''}</li>`).join('');
+      $('[data-invoices]').innerHTML = biz.inv.map(([ym, a, s]) => { const m = month(ym), dl = t(`Descargar factura de ${m}`, `Download invoice for ${m}`); return `<li><span>${m}</span><b>${money(a)}</b><span class="apn-st ${s === 'Pagada' ? 'on' : 'wait'}">${w(s)}</span><button type="button" class="apn-dl" ${act(`Descargar factura de ${m}`, `Download invoice for ${m}`)} aria-label="${dl}">PDF</button></li>`; }).join('');
+      $('[data-team]').innerHTML = biz.team.map(([who, role]) => `<li><span class="apn-av sm" aria-hidden="true">${w(who).replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ ]/g, '').split(' ').map((s) => s[0]).join('').slice(0, 2).toUpperCase()}</span><span>${w(who)}</span><span class="apn-st">${w(role)}</span></li>`).join('');
     }
 
     function renderAll() {
       const h = new Date().getHours();
-      $('[data-greet]').textContent = `${h < 12 ? '¡Buenos días' : h < 19 ? '¡Buenas tardes' : '¡Buenas noches'}! 👋`;
+      $('[data-greet]').textContent = `${h < 12 ? t('¡Buenos días', 'Good morning') : h < 19 ? t('¡Buenas tardes', 'Good afternoon') : t('¡Buenas noches', 'Good evening')}! 👋`;
       $('[data-av]').textContent = biz.initials; $('[data-av]').style.background = biz.color;
-      $('[data-role]').textContent = biz.role;
+      $('[data-role]').textContent = w(biz.role);
       renderHome(); renderTodo(); renderCamps(); renderPay();
+      const note = $('[data-mail-note]'); if (!note.hidden) note.hidden = true; // its text was in the other language
     }
 
     // Business switcher (agencies, and people with more than one business)
@@ -312,7 +489,7 @@ const GLOSSARY = [
     // Demo actions explain what the real button will do
     page.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-demo-act]');
-      if (b) toast(`Ejemplo: “${b.dataset.demoAct}” funcionará cuando abramos las cuentas de anunciante.`);
+      if (b) toast(t(`Ejemplo: “${b.dataset.demoAct}” funcionará cuando abramos las cuentas de anunciante.`, `EXAMPLE: “${b.dataset.demoActEn ?? b.dataset.demoAct}” will work once we open advertiser accounts.`));
     });
 
     // Email report settings (demo: saved on this device only)
@@ -323,7 +500,8 @@ const GLOSSARY = [
       const d = new FormData(mf);
       try { localStorage.setItem('nc-adpanel', JSON.stringify({ freq: d.get('freq'), to: d.get('to') })); } catch { /* storage blocked */ }
       const note = $('[data-mail-note]');
-      note.textContent = d.get('freq') === 'off' ? 'Listo: no te enviaremos informes.' : `Listo: recibirás tu informe ${d.get('freq') === 'weekly' ? 'cada lunes' : 'el día 1 de cada mes'}. (Ejemplo: no se envía nada todavía.)`;
+      note.textContent = d.get('freq') === 'off' ? t('Listo: no te enviaremos informes.', 'Done: we won’t send you reports.')
+        : t(`Listo: recibirás tu informe ${d.get('freq') === 'weekly' ? 'cada lunes' : 'el día 1 de cada mes'}. (Ejemplo: no se envía nada todavía.)`, `Done: you’ll get your report ${d.get('freq') === 'weekly' ? 'every Monday' : 'on the 1st of every month'}. (EXAMPLE: nothing is sent yet.)`);
       note.hidden = false;
     });
 

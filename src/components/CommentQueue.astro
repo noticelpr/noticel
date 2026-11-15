@@ -1,8 +1,8 @@
 ---
 // Reported-comments review queue (moved from src/pages/comentarios/revisar.astro, which still shows it on its own).
 // Review queue for reported comments, for the same one employee who approves ads (/publicidad/aprobar/).
-// The automatic check (src/lib/moderation.ts) already hid the clear violations and kept the clearly fine ones;
-// only doubtful cases land in "Por revisar". "Ocultos automáticamente" lets the employee undo a mistake.
+// No word filter (user, 2026-11-03): links, phones and emails are blocked before posting (nx_has_ad in the database)
+// and photos aren't allowed, so what lands here is what readers report. 3 reports hide a comment until someone decides.
 // PREVIEW: shows reports made on this device plus four examples. The real version needs Supabase (shared reports
 // from every reader), an AI moderation key, and a staff login so only the employee can open it.
 import { getStories, url } from '../lib/site';
@@ -15,15 +15,16 @@ const Tag = embedded ? 'section' : 'main';
   <p class="pf-demo"><span class="sp-demo">VISTA PREVIA</span> Página interna para quien modera. Muestra los reportes hechos en este dispositivo y cuatro de ejemplo. Con las cuentas, llegarán los reportes de todos los lectores.</p>
   <header class="apr-head">
     <h1>Revisar comentarios</h1>
-    <p class="apn-sub">El sistema oculta solo lo que claramente incumple las reglas y deja publicado lo que está bien. Aquí llega únicamente lo dudoso.</p>
+    <p class="apn-sub">Aquí llegan los comentarios que reportan los lectores. Con 3 reportes, un comentario se oculta solo hasta que decidas.</p>
   </header>
   <section class="mod-rules" aria-label="Cómo decidir">
-    <div class="no"><h2>Ocultar si tiene…</h2><ul><li>Insultos o ataques a una persona</li><li>Odio por raza, origen, religión, sexo u orientación</li><li>Amenazas o llamados a la violencia</li><li>Datos personales (teléfono, dirección, correo)</li><li>Spam, ventas o enlaces sospechosos</li></ul></div>
-    <div class="yes"><h2>Mantener si es…</h2><ul><li>Una crítica fuerte pero sin insultos</li><li>Una opinión distinta a la de otros</li><li>Una queja contra el gobierno o una figura pública</li><li>Una duda o corrección sobre la noticia</li></ul></div>
+    <div class="no"><h2>Ocultar solo si es…</h2><ul><li>Un anuncio o una venta</li><li>Spam (lo mismo repetido, mensajes sin sentido)</li><li>Una estafa: cripto, inversiones, «dinero fácil», premios falsos</li></ul><p class="mod-legal">También se quita lo que puede ser un delito: amenazas reales de violencia, datos privados de alguien para acosarlo (dirección, teléfono) y contenido sexual con menores.</p></div>
+    <div class="yes"><h2>Mantener todo lo demás</h2><ul><li>Opiniones de cualquier tipo, también las fuertes</li><li>Insultos y malas palabras</li><li>Críticas y quejas contra el gobierno, figuras públicas o la noticia</li><li>Desacuerdos entre lectores</li></ul></div>
+    <p class="mod-auto">Se bloquean solos, antes de publicarse: enlaces y páginas web, teléfonos y correos. Las fotos ya no se permiten (los stickers y GIFs sí). No hay filtro de palabras.</p>
   </section>
   <nav class="apn-tabs" role="tablist" aria-label="Filtrar">
     <button type="button" role="tab" aria-selected="true" data-f="review">Por revisar <b data-n="review"></b></button>
-    <button type="button" role="tab" aria-selected="false" data-f="auto">Ocultos automáticamente <b data-n="auto"></b></button>
+    <button type="button" role="tab" aria-selected="false" data-f="auto">Reportados <b data-n="auto"></b></button>
     <button type="button" role="tab" aria-selected="false" data-f="done">Resueltos <b data-n="done"></b></button>
   </nav>
   <div class="apr-list" data-list></div>
@@ -43,7 +44,8 @@ const Tag = embedded ? 'section' : 'main';
   // Four example reports, added once so the queue isn't empty in the preview
   function demo() {
   function seed() {
-    try { if (localStorage.getItem('nc-mod-seeded')) return; localStorage.setItem('nc-mod-seeded', '1'); } catch { return; }
+    // v2 (2026-11-04): samples that match the current rules; older samples on this device are replaced
+    try { if (localStorage.getItem('nc-mod-seeded-2')) return; localStorage.setItem('nc-mod-seeded-2', '1'); } catch { return; }
     const now = Date.now();
     const ex = (i: number, author: string, text: string, reasons: string[], count: number, status: Report['status'], mins: number): Report => {
       const s = STORIES[i % STORIES.length]; const a = assess(text);
@@ -52,11 +54,11 @@ const Tag = embedded ? 'section' : 'main';
     };
     const list = [
       ex(0, 'boricua_en_orlando', 'Eso no es verdad. El municipio ya dijo hace un mes que la obra se canceló, busquen bien antes de publicar.', ['falso'], 2, 'review', 25),
-      ex(1, 'vecino_molesto', 'Llamen al 787-555-0199, ese es el número del que hizo eso. Que todo el mundo sepa quién es.', ['personal'], HIDE_AFTER_REPORTS, 'review', 50),
-      ex(2, 'anonimo_77', 'Este alcalde es un pendejo y un cabrón, que se vaya ya.', ['insulto'], 1, 'auto', 90),
-      ex(0, 'maestra_retirada', 'Me parece que el gobierno debió avisar con más tiempo. Siempre es lo mismo.', ['insulto'], 1, 'kept', 140),
+      ex(1, 'vecino_molesto', 'El que hizo eso vive en la calle Luna, la casa azul al lado del colmado. Que todo el mundo sepa dónde está.', ['personal'], HIDE_AFTER_REPORTS, 'review', 50),
+      ex(2, 'anonimo_77', 'Este alcalde es un pendejo y un cabrón, que se vaya ya.', ['insulto'], 1, 'review', 90),
+      ex(0, 'maestra_retirada', 'Me parece que el gobierno debió avisar con más tiempo. Siempre es lo mismo.', ['insulto'], 1, 'restored', 140),
     ];
-    saveReports([...getReports(), ...list]);
+    saveReports([...getReports().filter((r) => !r.commentId.startsWith('ejemplo')), ...list]);
   }
 
   const DONE: Record<string, string> = { kept: 'Reporte rechazado por el sistema: sigue publicado', restored: 'Mantenido por la redacción', removed: 'Ocultado por la redacción', warned: 'Publicado con advertencia al autor', auto: '', review: '' };
@@ -84,8 +86,6 @@ const Tag = embedded ? 'section' : 'main';
         <blockquote class="mod-quote">${esc(r.text) || '<i>(solo sticker o GIF)</i>'}${r.media ? `<img src="${esc(r.media)}" alt="Sticker" />` : ''}</blockquote>
         <div class="mod-flags">
           ${r.reasons.length ? `Motivo del reporte: ${r.reasons.map((x) => `<span class="mod-chip r">${esc(reasonName(x))}</span>`).join('')}` : ''}
-          <span class="mod-score">Revisión automática: <i><b style="width:${r.score}%"></b></i> ${r.score}/100</span>
-          ${r.flags.length ? r.flags.map((f) => `<span class="mod-chip">${esc(f)}</span>`).join('') : '<span>No encontró nada que incumpla las reglas.</span>'}
         </div>
         <div class="apr-acts">${acts}</div>
       </article>`;
@@ -115,6 +115,7 @@ const Tag = embedded ? 'section' : 'main';
       toast(`Ocultado. ${r.author} pierde ${Math.abs(RULES.report)} puntos de reputación y, si lo tenía, su nivel Top comentarista o Diamante.`);
     }
     render();
+    dispatchEvent(new Event('nc-comments-changed')); // the Comentarios badge and Inicio's count
   });
 
   seed(); render();
@@ -128,7 +129,7 @@ const Tag = embedded ? 'section' : 'main';
     const tabs = page.querySelectorAll<HTMLElement>('[data-f]');
     const LABEL: Record<string, string> = { review: 'Por revisar', auto: 'Reportados', done: 'Quitados' };
     tabs.forEach((b) => (b.firstChild!.textContent = `${LABEL[b.dataset.f!]} `));
-    page.querySelector('.apn-sub')!.textContent = 'Aquí llega lo que el filtro automático marcó al publicarse y lo que reportan los lectores. Con 3 reportes, un comentario se oculta solo hasta que decidas.';
+    page.querySelector('.apn-sub')!.textContent = 'Aquí llegan los comentarios que reportan los lectores. Con 3 reportes, un comentario se oculta solo hasta que decidas.';
     let tab = 'review';
     type C = { id: string; story: string; url: string; body: string; media: { src: string } | null; status: string; flags: string[]; likes: number; reports: number; created_at: string;
       author: { username: string } | null; why: Array<{ reason: string }> };
@@ -164,6 +165,7 @@ const Tag = embedded ? 'section' : 'main';
       const r = await staffApi(`comments?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
       toast(!r?.ok ? 'No se pudo guardar. Intenta otra vez.' : btn.dataset.act === 'remove' ? 'Quitado. Su autor recibe un aviso.' : 'Listo: el comentario queda publicado.');
       void load();
+      dispatchEvent(new Event('nc-comments-changed')); // the Comentarios badge and Inicio's count
     });
     void load();
   }

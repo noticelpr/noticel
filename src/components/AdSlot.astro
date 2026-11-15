@@ -23,7 +23,7 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
   </div>
 )}
 <script>
-  import { CAMPAIGNS, DEMO_CAMPAIGNS, GOOGLE, ROTATE_SECONDS, FORMATS, type AdSize, type Campaign, type Creative } from '../lib/ads';
+  import { CAMPAIGNS, DEMO_CAMPAIGNS, GOOGLE, ROTATE_SECONDS, FORMATS, MAX_PER_SPACE, type AdSize, type Campaign, type Creative } from '../lib/ads';
   import { isDemo } from '../lib/demo';
   import { hasBackend, liveCampaigns, countView, countClick } from '../lib/backend';
   const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
@@ -56,7 +56,7 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
   const demoAds = isDemo() || testSite ? DEMO_CAMPAIGNS.map((c) => ({ ...c, demo: true })) : [];
   const live = [...CAMPAIGNS, ...demoAds, ...remote, ...approvedHere()].filter((c) => c.start <= today && today <= c.end && c.creatives.length && notDone(c) && (!c.regions || c.regions === 'all' || c.regions === where));
   // Each space only shows images of its shape (wide banners, 300×250, 300×600); if a campaign has none, it skips the space
-  const RATIO: Record<AdSize, number[]> = { leaderboard: [728 / 90, 320 / 100], infeed: [728 / 90, 320 / 100], rectangle: [300 / 250], halfpage: [300 / 600] };
+  const RATIO: Record<AdSize, number[]> = { leaderboard: [728 / 90, 320 / 100], infeed: [728 / 90, 320 / 100], rectangle: [300 / 250, 1] /* a square post (Cuadrado) also goes in the rectangle spaces */, halfpage: [300 / 600] };
   const sizeOf = (cr: Creative) => (cr.w && cr.h ? [cr.w, cr.h] : (cr.img.match(/(\d+)x(\d+)\.\w+$/) ?? []).slice(1).map(Number));
   const fits = (cr: Creative, size: AdSize) => { const [w, h] = sizeOf(cr); return !w || !h || RATIO[size].some((r) => Math.abs(w / h - r) / r < 0.15); };
   const takeover = live.find((c) => c.takeover);
@@ -92,52 +92,131 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
     ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
   }
 
+  const esc = (t: string) => t.replace(/"/g, '&quot;');
+  const file = (p: string) => (/^data:/.test(p) ? p : src(p));
+  // A still or animated image, or a video (muted, plays only while on screen; `img` is its first picture)
+  const media = (cr: Creative) => cr.video
+    ? `<video src="${file(cr.video)}" poster="${file(cr.img)}" muted playsinline preload="none" aria-label="${esc(cr.alt)}"></video>`
+    : `<img src="${file(cr.img)}" alt="${esc(cr.alt)}" loading="lazy" />`;
+
   function direct(slot: HTMLElement, size: AdSize, pool: Array<{ c: Campaign; cr: Creative }>) {
     const box = document.createElement('div');
     box.className = 'ad-rot';
-    box.innerHTML = pool.map(({ c, cr }, i) => `<a href="${cr.url}" target="_blank" rel="sponsored noopener" data-k="${i}"${i ? ' hidden' : ''}>${(c as any).demo ? '' /* the image itself says "ANUNCIO DE EJEMPLO" */ : (c as any).preview ? '<span class="ad-prev">Vista previa · solo en este dispositivo</span>' : ''}<img src="${/^data:/.test(cr.img) ? cr.img : src(cr.img)}" alt="${cr.alt.replace(/"/g, '&quot;')}" loading="lazy" /></a>`).join('')
+    box.innerHTML = pool.map(({ c, cr }, i) => `<a href="${cr.url}" target="_blank" rel="sponsored noopener" data-k="${i}"${i ? ' hidden' : ''}>${(c as any).demo ? '' /* the image itself says "ANUNCIO DE EJEMPLO" */ : (c as any).preview ? '<span class="ad-prev">Vista previa · solo en este dispositivo</span>' : ''}${media(cr)}</a>`).join('')
+      + (pool.some(({ cr }) => cr.video) ? '<button type="button" class="ad-snd" aria-label="Activar sonido" aria-pressed="false" hidden>🔇</button>' : '')
       + (pool.length > 1 ? `<span class="ad-dots" aria-hidden="true">${pool.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</span>` : '');
     slot.querySelector('.ad-box')?.replaceWith(box);
     const links = [...box.querySelectorAll<HTMLAnchorElement>('a')];
     const dots = [...box.querySelectorAll('.ad-dots i')];
     const seen = new Set<number>();
     let k = 0, visible = false, hover = false;
+    const vids = links.map((a) => a.querySelector('video'));
+    const snd = box.querySelector<HTMLButtonElement>('.ad-snd');
+    let sound = false;
+    // Only the video on screen plays; the sound button shows while a video is the ad being shown
+    const playback = () => {
+      vids.forEach((v, i) => { if (!v) return; v.muted = !sound; if (i === k && visible && !document.hidden) void v.play().catch(() => {}); else v.pause(); });
+      if (snd) { snd.hidden = !vids[k]; snd.textContent = sound ? '🔊' : '🔇'; snd.setAttribute('aria-pressed', String(sound)); snd.setAttribute('aria-label', sound ? 'Quitar sonido' : 'Activar sonido'); }
+    };
+    snd?.addEventListener('click', () => { sound = !sound; playback(); });
+    document.addEventListener('visibilitychange', playback);
     const show = (n: number) => {
       links[k].hidden = true; dots[k]?.classList.remove('on');
       k = n; links[k].hidden = false; dots[k]?.classList.add('on');
-      if (visible && !seen.has(k)) { seen.add(k); track('ad_impression', pool[k].c, size); }
+      countSoon();
+      playback();
     };
+    // A view counts only after the ad has been at least half on screen for 1 continuous second (the MRC/IAB standard
+    // big advertisers trust; user, 2026-11-06): scrolling straight past it doesn't count
+    let viewTimer = 0;
+    function countSoon() {
+      clearTimeout(viewTimer);
+      if (!visible || document.hidden || seen.has(k)) return;
+      const shown = k;
+      viewTimer = window.setTimeout(() => { if (visible && !document.hidden && k === shown && !seen.has(k)) { seen.add(k); track('ad_impression', pool[k].c, size); } }, 1000);
+    }
+    document.addEventListener('visibilitychange', countSoon);
+    // A video plays to the end before the next ad rotates in
+    vids.forEach((v, i) => v?.addEventListener('ended', () => { if (pool.length > 1 && i === k) show((k + 1) % pool.length); else void v.play().catch(() => {}); }));
     links.forEach((a, i) => a.addEventListener('click', () => track('ad_click', pool[i].c, size)));
-    new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) show(k); }, { threshold: 0.5 }).observe(box);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) show(k); else { clearTimeout(viewTimer); playback(); } }, { threshold: 0.5 }).observe(box);
     if (pool.length > 1) {
       box.addEventListener('pointerenter', () => (hover = true));
       box.addEventListener('pointerleave', () => (hover = false));
-      setInterval(() => { if (visible && !hover && !document.hidden) show((k + 1) % pool.length); }, ROTATE_SECONDS * 1000);
+      setInterval(() => { if (visible && !hover && !document.hidden && !vids[k]) show((k + 1) % pool.length); }, ROTATE_SECONDS * 1000);
     }
   }
 
-  // Wide spaces: computers get the 728×90 picture and phones the 320×100 one (both used to rotate everywhere, so a
-  // phone picture showed stretched on computers). A campaign with only one of the two still shows it.
+  // Equal turns through the day (user, 2026-11-06): the ad with the fewest views today (for its weight) is the likeliest to
+  // show first, so no ad gets everything in the morning and nothing at night. Still random, so readers who load at the
+  // same moment don't all see the same one.
+  function fairStart(pool: Array<{ c: Campaign }>) {
+    const share = (c: Campaign) => ((c as any).today_views ?? 0) / Math.max(1, c.weight ?? 1);
+    const avg = pool.reduce((a, { c }) => a + share(c), 0) / pool.length;
+    const w = pool.map(({ c }) => Math.min(2, Math.max(0.2, 1 + (avg - share(c)) / (avg + 20))));
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; }
+    return 0;
+  }
+
+  // Wide spaces accept both banner shapes; pick the one for this screen (728×90 on computers, 320×100 on phones)
   const narrow = matchMedia('(max-width:760px)').matches;
   const artFor = (c: Campaign, size: AdSize) => {
     const ok = c.creatives.filter((cr) => fits(cr, size));
     if (size !== 'leaderboard' && size !== 'infeed') return ok;
     const want = narrow ? 320 / 100 : 728 / 90;
     const best = ok.filter((cr) => { const [w, h] = sizeOf(cr); return !w || !h || Math.abs(w / h - want) / want < 0.15; });
-    return best.length ? best : ok;
+    return best.length ? best : ok; // a campaign with only one shape still shows
+  };
+
+  // Spaces the layout hides on this screen (phone-only, computer-only, too narrow) get no ad at all
+  const shown = (s: HTMLElement) => s.hidden || getComputedStyle(s).display !== 'none';
+  // The banner at the very bottom only when no other ad is within one screen above it (no two ads in one screenful)
+  const crowded = (s: HTMLElement) => {
+    const top = s.getBoundingClientRect().top;
+    return [...document.querySelectorAll<HTMLElement>('[data-ad-size]')].some((o) => o !== s && !o.hidden && shown(o) && o.getBoundingClientRect().bottom > top - innerHeight && o.getBoundingClientRect().bottom <= top);
+  };
+  // Phones (user, 2026-11-04): ads at least 1.5 screens apart, top to bottom (never two in one screenful), so the
+  // news always leads; a space that would land too close to the one above it is dropped
+  // Squares first (user, 2026-11-06): on phones every space shows a 300 × 250 square (the size readers see best and
+  // that counts the most views), 1.25 screens apart, and ads never take more than a quarter of the page
+  let lastBottom = -Infinity, adPx = 0;
+  const pageH = document.documentElement.scrollHeight;
+  const tooClose = (s: HTMLElement) => {
+    if (!narrow) return false;
+    const r = s.getBoundingClientRect(), top = r.top + scrollY;
+    if (top - lastBottom < innerHeight * 1.25 || adPx + 270 > pageH * 0.25) return true;
+    lastBottom = top + 270; adPx += 270;
+    return false;
   };
   document.querySelectorAll<HTMLElement>('[data-ad-size]').forEach((slot) => {
-    const size = slot.dataset.adSize as AdSize;
-    const camps = takeover ? [takeover] : live.filter((c) => c.sizes.includes(size));
+    if (!shown(slot)) return;
+    if (slot.classList.contains('ad-bottom') && crowded(slot)) { slot.remove(); return; }
+    if (!slot.hidden && tooClose(slot)) { slot.remove(); return; }
+    const booked = slot.dataset.adSize as AdSize;
+    // Phones: banners and tall ads become squares (campaigns sold only as banners still show their banner)
+    const size: AdSize = narrow && booked !== 'rectangle' && !slot.classList.contains('ad-top') ? 'rectangle' : booked;
+    if (size !== booked) { slot.classList.add('ad-as-square'); slot.classList.remove('ad-sticky'); }
+    // A phone square takes square campaigns and the campaigns sold for this space (banners show their square image)
+    // At most MAX_PER_SPACE ads share a space (first booked first), so each gets a fair share (src/lib/ads.ts)
+    const capped = (list: typeof live) => [...list].sort((a, b) => a.start.localeCompare(b.start)).slice(0, MAX_PER_SPACE);
+    const camps = takeover ? [takeover] : [...new Set([...capped(live.filter((c) => c.sizes.includes(size))), ...(size !== booked ? capped(live.filter((c) => c.sizes.includes(booked))) : [])])];
     // Each campaign appears `weight` times per round, interleaved; start at a random spot so every client gets first view
     const rounds = Math.max(1, ...camps.map((c) => c.weight ?? 1));
-    const pool = Array.from({ length: rounds }, (_, r) => camps.filter((c) => r < (c.weight ?? 1)).flatMap((c) => artFor(c, size).map((cr) => ({ c, cr })))).flat();
+    const pool = Array.from({ length: rounds }, (_, r) => camps.filter((c) => r < (c.weight ?? 1)).flatMap((c) => (c.sizes.includes(size) ? artFor(c, size) : size !== booked && c.creatives.some((cr) => fits(cr, size)) ? c.creatives.filter((cr) => fits(cr, size)) : artFor(c, booked)).map((cr) => ({ c, cr })))).flat(); // a banner campaign shows its square image on phones
     const quiet = slot.hasAttribute('data-quiet');
     if (pool.length) {
-      const start = Math.floor(Math.random() * pool.length);
+      const start = fairStart(pool);
       direct(slot, size, [...pool.slice(start), ...pool.slice(0, start)]);
       slot.hidden = false;
-    } else if (GOOGLE.client && GOOGLE.slots[size]) { google(slot, size); slot.hidden = false; }
-    else if (quiet) slot.remove();
+    } else if (GOOGLE.client && (GOOGLE.slots[size] || GOOGLE.slots[booked])) {
+      // Google ads load only when the reader is about one screen away (user, 2026-11-06): more of them are actually
+      // seen (what advertisers pay for) and the page opens faster. The space keeps its size meanwhile, so nothing jumps.
+      const which = GOOGLE.slots[size] ? size : booked;
+      slot.hidden = false;
+      const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); google(slot, which); } }, { rootMargin: '100% 0px' });
+      io.observe(slot);
+    }
+    else if (quiet || narrow) slot.remove(); // phones: no empty "Anúnciate aquí" boxes between the news
   });
 </script>

@@ -1,0 +1,430 @@
+---
+// Panel → Ventas: "Mis comisiones" for each salesperson and "Comisiones del equipo" for the administrator.
+// Rules (user, 2026-11-02; supabase/comisiones.sql): 20% on a new client, 10% on renewals and repeat orders, +5% on
+// what is sold above the monthly goal; earned only once the client pays (a rejected or refunded order earns nothing).
+// Who sold what: direct sales say "Vendido por: <name>" (DirectSale.astro); online orders made through a salesperson's
+// own Anúnciate link say "Referido: <code>" (the first 8 characters of their account id). Orders that come in on their
+// own belong to the house. Counted by the month the order was made. Demo mode: sample numbers labeled DEMO.
+---
+<section class="cm" data-cm hidden>
+  <header class="cm-head">
+    <h2 class="pnl-h3" data-cm-title>Mis comisiones <span class="sp-demo" data-cm-demo hidden>DEMO</span></h2>
+    <div class="pnl-range" role="group" aria-label="Mes" data-cm-months></div>
+  </header>
+
+  <!-- A salesperson's own numbers -->
+  <div data-cm-mine hidden>
+    <div class="pnl-kpis" data-cm-kpis></div>
+    <div class="cm-goal" data-cm-goal></div>
+    <div class="cm-grid">
+      <div class="pnl-card">
+        <h3 class="pnl-h4">Calculadora</h3>
+        <label class="cm-calc">Si vendo <span>$<input type="number" min="0" step="50" value="500" data-cm-calc /></span> más este mes</label>
+        <div class="cm-calc-out" data-cm-calc-out></div>
+      </div>
+      <div class="pnl-card">
+        <h3 class="pnl-h4">Mi enlace de Anúnciate</h3>
+        <p class="pnl-muted pnl-small">Compártelo con tus clientes: lo que pidan por este enlace en los próximos 30 días cuenta como venta tuya.</p>
+        <div class="cm-link"><input readonly data-cm-link aria-label="Mi enlace" /><button type="button" class="adp-btn ghost-dark" data-cm-copy="es">Copiar</button></div>
+        <div class="cm-link"><input readonly data-cm-link-en aria-label="Mi enlace en inglés" /><button type="button" class="adp-btn ghost-dark" data-cm-copy="en">Copiar (inglés)</button></div>
+      </div>
+    </div>
+    <div class="cm-grid">
+      <div class="pnl-card"><h3 class="pnl-h4">Por cobrar</h3><p class="pnl-muted pnl-small">Pedidos tuyos aprobados que el cliente no ha pagado. «Enlace de pago» abre la página segura de Stripe con la cantidad exacta: envíasela por WhatsApp o correo.</p><ul class="earn-list" data-cm-owed></ul></div>
+      <div class="pnl-card">
+        <h3 class="pnl-h4">Kit para vender</h3>
+        <p class="pnl-muted pnl-small">Nuestra audiencia en los últimos 28 días <span class="sp-demo" data-cm-aud-demo hidden>DEMO</span>:</p>
+        <div class="cm-aud" data-cm-aud><p class="pnl-muted pnl-small">Cargando…</p></div>
+        <p class="pnl-muted pnl-small">Enlaces para enviar:</p>
+        <ul class="cm-kit" data-cm-kit></ul>
+      </div>
+    </div>
+    <div class="cm-grid">
+      <div class="pnl-card"><h3 class="pnl-h4">Mis ventas del mes</h3><ul class="earn-list" data-cm-sales></ul></div>
+      <div class="pnl-card"><h3 class="pnl-h4">Por renovar <small class="pnl-muted">(terminan en 30 días)</small></h3><ul class="earn-list" data-cm-renew></ul></div>
+    </div>
+    <div class="pnl-card"><h3 class="pnl-h4">Mis clientes</h3><ul class="earn-list cm-clients" data-cm-clients></ul></div>
+    <div class="pnl-card"><h3 class="pnl-h4">Mis pagos de comisión</h3><ul class="earn-list" data-cm-history></ul></div>
+    <p class="pnl-muted pnl-small" data-cm-rules></p>
+  </div>
+
+  <!-- The administrator: everyone -->
+  <div data-cm-team hidden>
+    <div class="pnl-kpis" data-cm-team-kpis></div>
+    {/* One row of filters (user, 2026-11-03): who sold it. The people with commissions (everyone, salespeople, periodistas
+        and editors) show as a table; Ventas directas, Google and Otros earn no commission and show their own sales */}
+    <div class="cm-filters">
+      <div class="cm-frow"><span class="cm-flabel">Quién:</span><div class="pnl-range cm-src" role="group" aria-label="Quién lo vendió"><button type="button" data-cm-role="all" aria-pressed="true">Todos</button><button type="button" data-cm-role="ads" aria-pressed="false">Vendedores</button><button type="button" data-cm-role="reporter" aria-pressed="false">Periodistas y editores</button><button type="button" data-cm-role="directa" aria-pressed="false">Ventas directas</button><button type="button" data-cm-role="google" aria-pressed="false">Google</button><button type="button" data-cm-role="otros" aria-pressed="false">Anunciantes vía web</button></div><button type="button" class="adp-btn ghost-dark cm-csv" data-cm-csv>Descargar (CSV)</button></div>
+      {/* A second, separate choice (user, 2026-11-04: in one row it looked like two buttons were selected at once) */}
+      <div class="cm-frow" data-cm-st-row><span class="cm-flabel">Pago de la comisión:</span><div class="pnl-range cm-pay" role="group" aria-label="Pago de la comisión"><button type="button" data-cm-st="all" aria-pressed="true">Todos</button><button type="button" data-cm-st="due" aria-pressed="false">Por pagar</button><button type="button" data-cm-st="paid" aria-pressed="false">Pagados</button></div></div>
+    </div>
+    <div class="cm-table-wrap" data-cm-team-list></div>
+    <p class="pnl-muted pnl-small" data-cm-house></p>
+    <p class="pnl-muted pnl-small">El dueño de la cuenta y el Gerente cambian los porcentajes y las metas, y marcan los pagos; los otros administradores los ven. Toca «Comisión y meta» para cambiar los porcentajes o la meta de cada persona. «Marcar pagado» guarda el pago de comisión del mes (lo cobrado hasta hoy). Comisión = lo cobrado × su porcentaje (cliente nuevo o renovación) + el extra sobre la meta.</p>
+  </div>
+
+  <dialog class="sd-dlg pnl-acct" data-cm-plan aria-labelledby="cm-plan-h">
+    <form method="dialog" class="sd-form" data-cm-plan-form>
+      <h2 id="cm-plan-h" class="pnl-h3">Comisión y meta: <span data-cm-plan-name></span></h2>
+      <div class="cm-plan-fields">
+        <label>Cliente nuevo (%)<input type="number" name="new_pct" min="0" max="100" step="1" /></label>
+        <label>Renovación (%)<input type="number" name="renew_pct" min="0" max="100" step="1" /></label>
+        <label>Extra sobre la meta (%)<input type="number" name="bonus_pct" min="0" max="100" step="1" /></label>
+        <label>Meta del mes ($)<input type="number" name="goal" min="0" step="100" /></label>
+      </div>
+      <p class="cm-err" data-cm-plan-err hidden></p>
+      <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-cm-plan-close>Cerrar</button><button type="submit" class="adp-btn">Guardar</button></footer>
+    </form>
+  </dialog>
+</section>
+
+<script>
+  import { listRequests, loadRequests, cardPayment, type AdRequest } from '../../lib/adrequests';
+  import { allCampaigns, getAnalytics, hasBackend, staffApi, tokenInfo, logActivity, type CampaignRow } from '../../lib/backend';
+  import { demoAnalytics } from '../../lib/demo';
+  import { formatName } from '../../lib/ads';
+  import { isDemo } from '../../lib/demo';
+  import { ask, tell } from '../../lib/dialogs';
+  import { commissionMonth, clientKey, defaultPlanFor, isReferrer, creditedTo, sellerOf as libSellerOf, referrerOf as libReferrerOf } from '../../lib/sellers';
+
+  type Plan = { user_id: string; new_pct: number; renew_pct: number; bonus_pct: number; goal: number };
+  type Payout = { user_id: string; month: string; amount: number; paid_at: string; paid_by: string };
+  type Member = { id?: string; name: string; role: string };
+  const DEFAULT = { new_pct: 20, renew_pct: 10, bonus_pct: 5, goal: 0 };
+
+  const root = document.querySelector<HTMLElement>('[data-cm]')!;
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+  const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const money = (n: number) => { const c = Math.round(n * 100) / 100; return `$${c.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(c) ? 0 : 2, maximumFractionDigits: 2 })}`; };
+  const get = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+  const me = () => get<{ name: string; role: string } | null>('nc-staff', null);
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const monthName = (k: string) => new Date(`${k}-15T12:00:00`).toLocaleDateString('es-PR', { month: 'long', year: 'numeric' });
+  const $$ = <T extends HTMLElement = HTMLElement>(sel: string) => [...root.querySelectorAll<T>(sel)];
+  const kpi = (label: string, value: string, sub = '', tone = '') => `<div class="pnl-kpi ${tone}"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+
+  let month = monthKey(new Date());
+  let owner = false; // the owner or the Gerente change commissions and goals, and mark them paid (supabase/gerente-todo.sql)
+  let requests: AdRequest[] = [], plans: Plan[] = [], payouts: Payout[] = [], camps: CampaignRow[] = [];
+  let demoTeam: Member[] = []; // demo mode: the sample salespeople, kept here (the panel resets its own sample team)
+  const team = (): Member[] => [...get<Member[]>('nc-staff-team', []), ...demoTeam];
+  const codeOf = (id: string) => id.replace(/-/g, '').slice(0, 8);
+  // No row of their own: salespeople get the sales rates, periodistas the referral rates (src/lib/sellers.ts)
+  const planOf = (id: string) => ({ ...defaultPlanFor(team().find((m) => m.id === id)?.role), ...plans.find((p) => p.user_id === id) });
+  const line = (r: AdRequest, k: string) => (r.lines ?? []).find((x) => x.startsWith(`${k}: `))?.slice(k.length + 2).trim() ?? '';
+
+  /** Who gets credit for an order: the salesperson who recorded it, or whose link the client used. */
+  const sellerOf = (r: AdRequest) => libSellerOf(r, team()); // with the demo's sample salespeople
+
+  /** One person's month (the rules: commissionMonth in src/lib/sellers.ts) and whether it was paid out. */
+  function monthFor(m: Member, key: string) {
+    const p = planOf(m.id ?? '');
+    // Periodistas: referrals only; everyone else: what they sold or referred
+    const counts = (r: AdRequest) => (isReferrer(m.role) ? libReferrerOf(r, team())?.id === m.id : creditedTo(r, m.id ?? '', team()));
+    return { p, ...commissionMonth(requests, counts, p, key), payout: payouts.find((x) => x.user_id === m.id && x.month === key) };
+  }
+
+  /** This week (Monday to Sunday) and its goal: the month's goal spread over the year's weeks (user, 2026-11-03). */
+  function weekFor(m: Member) {
+    const p = planOf(m.id ?? ''), d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const counts = (r: AdRequest) => (isReferrer(m.role) ? libReferrerOf(r, team())?.id === m.id : creditedTo(r, m.id ?? '', team()));
+    const sold = requests.filter((r) => r.status === 'aprobada' && Date.parse(r.created) >= d.valueOf() && counts(r)).reduce((a, r) => a + Number(r.total || 0), 0);
+    const goal = p.goal ? Math.round((p.goal * 12) / 52) : 0;
+    return { sold, goal, pct: goal ? Math.min(100, Math.round((sold / goal) * 100)) : 0 };
+  }
+
+  function paintMonths() {
+    const now = new Date(), keys = [0, 1, 2].map((i) => monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+    $('[data-cm-months]').innerHTML = keys.map((k, i) => `<button type="button" data-cm-month="${k}" aria-pressed="${k === month}">${i === 0 ? 'Este mes' : i === 1 ? 'Mes pasado' : monthName(k).split(' ')[0]}</button>`).join('');
+  }
+
+  function paintMine(m: Member) {
+    const x = monthFor(m, month), p = x.p, demo = isDemo() ? 'DEMO · ' : '';
+    $('[data-cm-kpis]').innerHTML = [
+      kpi('Vendido', money(x.sold), `${demo}${x.rows.length} ${x.rows.length === 1 ? 'venta' : 'ventas'} en ${monthName(month).split(' ')[0]}`),
+      kpi('Comisión ganada', money(x.earned), `${demo}de ${money(x.collected)} cobrado${x.payout ? ` · pagada el ${new Date(x.payout.paid_at).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}` : ''}`, x.earned ? 'good' : ''),
+      kpi('Comisión pendiente', money(x.pending), `${demo}cuando paguen ${money(x.sold - x.collected)}`, x.pending ? 'warn' : ''),
+    ].join('');
+    const pctGoal = p.goal ? Math.min(100, Math.round((x.sold / p.goal) * 100)) : 0;
+    $('[data-cm-goal]').innerHTML = p.goal
+      ? `<div class="cm-goal-top"><span>Meta del mes: <b>${money(p.goal)}</b></span><span>${x.sold >= p.goal ? `🎉 ¡Meta cumplida! Ganas ${p.bonus_pct}% extra en lo que pase de la meta` : `Te faltan <b>${money(p.goal - x.sold)}</b> (${pctGoal}%)`}</span></div><div class="cm-bar" role="progressbar" aria-valuenow="${pctGoal}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pctGoal}%"></i></div>`
+      : '<p class="pnl-muted pnl-small">Todavía no tienes meta del mes. El administrador la pone en «Comisión y meta».</p>';
+    // The week's goal too, so a slow start shows early
+    const w = weekFor(m);
+    if (w.goal) $('[data-cm-goal]').insertAdjacentHTML('beforeend', `<div class="cm-goal-top cm-week"><span>Meta de esta semana: <b>${money(w.goal)}</b></span><span>${w.sold >= w.goal ? '🎉 ¡Cumplida esta semana!' : `Llevas <b>${money(w.sold)}</b> (${w.pct}%)`}</span></div><div class="cm-bar sm" role="progressbar" aria-valuenow="${w.pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${w.pct}%"></i></div>`);
+    calc(m);
+    $('[data-cm-sales]').innerHTML = x.rows.slice().reverse().map((y) => `<li><span><b>${esc(y.r.client.business || y.r.client.name || y.r.id)}</b><small>${new Date(y.r.created).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })} · ${esc(y.r.formats.map((f) => formatName(f)).join(', '))} · ${y.fresh ? 'cliente nuevo' : 'renovación'} ${y.pct}% · venta ${money(y.total)}</small></span>`
+      + `<span class="pnl-chip ${y.r.paid ? 'ok' : 'warn'}">${y.r.paid ? 'Cobrado' : 'Por cobrar'}</span><b>${money(y.commission)}</b></li>`).join('') || '<li class="pnl-muted">Todavía no tienes ventas este mes.</li>';
+    // Their clients whose campaign ends in the next 30 days: a renewal to offer
+    const ending = endingFor(m).sort((a, b) => a.end.localeCompare(b.end));
+    $('[data-cm-renew]').innerHTML = ending.map((c) => { const r = requests.find((q) => q.id.toLowerCase() === c.id.toLowerCase());
+      return `<li><span><b>${esc(c.client)}</b><small>${esc(r?.client.phone || r?.client.email || '')}</small></span><span class="pnl-chip warn">Termina el ${new Date(`${c.end}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}</span><b>${money(Number(r?.total || 0))}</b></li>`; }).join('')
+      || '<li class="pnl-muted">Ninguna campaña tuya termina en los próximos 30 días.</li>';
+    // Their clients (every order credited to them, any month): contact, what they spent, and whether an ad is running now
+    const today = new Date().toISOString().slice(0, 10);
+    const byClient = new Map<string, AdRequest[]>();
+    requests.filter((r) => r.status !== 'rechazada' && creditedTo(r, m.id ?? '', team())).forEach((r) => byClient.set(clientKey(r), [...(byClient.get(clientKey(r)) ?? []), r]));
+    const clients = [...byClient.values()].map((l) => {
+      const last = l.slice().sort((a, b) => Date.parse(b.created) - Date.parse(a.created))[0];
+      const ids = new Set(l.map((r) => r.id.toLowerCase()));
+      const live = camps.some((c) => ids.has(c.id.toLowerCase()) && c.status === 'active' && c.start <= today && c.end >= today);
+      return { last, spent: l.filter((r) => r.status === 'aprobada').reduce((a, r) => a + Number(r.total || 0), 0), orders: l.length, live };
+    }).sort((a, b) => Number(b.live) - Number(a.live) || Date.parse(b.last.created) - Date.parse(a.last.created));
+    $('[data-cm-clients]').innerHTML = clients.map(({ last: r, spent, orders, live }) => {
+      const tel = (r.client.phone || '').replace(/\D/g, '');
+      return `<li><span><b>${esc(r.client.business || r.client.name || r.id)}</b><small>${esc(r.client.name || '')}${r.client.name ? ' · ' : ''}${orders} ${orders === 1 ? 'pedido' : 'pedidos'} · último el ${new Date(r.created).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}</small>`
+        + `<small class="cm-contact">${tel ? `<a href="tel:${tel}">${esc(r.client.phone)}</a> · <a href="https://wa.me/1${tel.slice(-10)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${tel && r.client.email ? ' · ' : ''}${r.client.email ? `<a href="mailto:${esc(r.client.email)}">${esc(r.client.email)}</a>` : ''}</small></span>`
+        + `<span class="pnl-chip ${live ? 'ok' : ''}">${live ? 'Anuncio en el aire' : 'Sin anuncio ahora'}</span><b>${money(spent)}</b></li>`;
+    }).join('') || '<li class="pnl-muted">Todavía no tienes clientes. Comparte tu enlace o registra una venta con «+ Anuncio vendido».</li>';
+    // The last 6 months: what was earned and whether it was paid
+    const now = new Date();
+    $('[data-cm-history]').innerHTML = Array.from({ length: 6 }, (_, i) => monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1))).map((k) => {
+      const y = monthFor(m, k); if (!y.rows.length && !y.payout) return '';
+      return `<li><span><b>${monthName(k)}</b><small>Vendido ${money(y.sold)} · ganada ${money(y.earned)}${y.pending ? ` · pendiente ${money(y.pending)}` : ''}</small></span><span class="pnl-chip ${y.payout ? 'ok' : ''}">${y.payout ? `Pagado ${money(y.payout.amount)}` : 'Sin pagar todavía'}</span><b></b></li>`;
+    }).join('') || '<li class="pnl-muted">Todavía no hay meses con ventas.</li>';
+    // Approved orders of theirs not paid yet (any month): a card-payment link to send
+    const owed = requests.filter((r) => r.status === 'aprobada' && !r.paid && creditedTo(r, m.id ?? '', team())).sort((a, b) => Date.parse(b.created) - Date.parse(a.created));
+    $('[data-cm-owed]').innerHTML = owed.map((r) => `<li data-cm-req="${esc(r.id)}"><span><b>${esc(r.client.business || r.client.name || r.id)}</b><small>${new Date(r.created).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })} · ${esc(r.id)}${r.client.phone ? ` · ${esc(r.client.phone)}` : ''}</small></span>`
+      + `${isDemo() ? '' : '<button type="button" class="pnl-link" data-cm-paylink>Enlace de pago</button>'}<b>${money(Number(r.total || 0))}</b></li>`).join('') || '<li class="pnl-muted">🎉 Nada por cobrar.</li>';
+    paintKit(m);
+    $('[data-cm-rules]').textContent = `Tu plan: ${p.new_pct}% de cada venta a un cliente nuevo, ${p.renew_pct}% en renovaciones y pedidos repetidos${p.goal ? `, y ${p.bonus_pct}% extra en lo que vendas sobre la meta` : ''}. La comisión se gana cuando el cliente paga; si un pedido se rechaza o se devuelve el dinero, no cuenta. Cuenta por el mes en que se hizo el pedido.`;
+    const base = `${location.origin}${(document.querySelector<HTMLElement>('[data-pnl]')?.dataset.base ?? '/').replace(/\/$/, '')}`;
+    $<HTMLInputElement>('[data-cm-link]').value = `${base}/publicidad/?v=${codeOf(m.id ?? '00000000')}`;
+    $<HTMLInputElement>('[data-cm-link-en]').value = `${base}/en/advertise/?v=${codeOf(m.id ?? '00000000')}`;
+  }
+
+  /** The sales kit: audience numbers to pitch with (Google Analytics, 28 days) and links to send clients. */
+  let audience = '';
+  async function paintKit(m: Member) {
+    const base = `${location.origin}${(document.querySelector<HTMLElement>('[data-pnl]')?.dataset.base ?? '/').replace(/\/$/, '')}`, code = codeOf(m.id ?? '00000000');
+    const links: Array<[string, string]> = [
+      ['Precios y descuentos', `${base}/publicidad/?v=${code}#precios`], ['Prices (English)', `${base}/en/advertise/?v=${code}#precios`],
+      ['Términos para anunciantes', `${base}/terminos-anunciantes/`], ['Advertiser terms (English)', `${base}/en/advertiser-terms/`],
+      ['Ejemplo del panel del anunciante', `${base}/publicidad/panel/?ejemplo=1`],
+    ];
+    $('[data-cm-kit]').innerHTML = links.map(([l, u]) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a><button type="button" class="pnl-link" data-cm-copylink="${esc(u)}">Copiar</button></li>`).join('');
+    $('[data-cm-aud-demo]').hidden = !isDemo();
+    if (!audience) {
+      const d = isDemo() ? demoAnalytics(28, []) : hasBackend() ? await getAnalytics(28, 5) : { error: '' };
+      if ('error' in d) audience = '<p class="pnl-muted pnl-small">Las visitas no están disponibles ahora.</p>';
+      else {
+        const share = (list: { name: string; users: number }[], test: (n: string) => boolean) => { const t = list.reduce((a, x) => a + x.users, 0) || 1; return Math.round((list.filter((x) => test(x.name)).reduce((a, x) => a + x.users, 0) / t) * 100); };
+        const n = (v: number) => Math.round(v).toLocaleString('es-PR');
+        audience = `<div class="cm-aud-row"><span><b>${n(d.totals.users)}</b> personas</span><span><b>${n(d.totals.views)}</b> páginas vistas</span><span><b>${share(d.devices, (x) => x === 'mobile')}%</b> en celular</span><span><b>${share(d.countries, (x) => x === 'Puerto Rico')}%</b> desde Puerto Rico</span></div>`;
+      }
+    }
+    $('[data-cm-aud]').innerHTML = audience;
+  }
+
+  /** "If I sell $X more": at the renewal and the new-client rate, with the extra once the goal is passed. */
+  function calc(m: Member) {
+    const x = monthFor(m, month), p = x.p, more = Math.max(0, Number($<HTMLInputElement>('[data-cm-calc]').value) || 0);
+    const above = p.goal > 0 ? Math.max(0, Math.min(more, x.sold + more - p.goal)) : 0, extra = above * p.bonus_pct / 100;
+    $('[data-cm-calc-out]').innerHTML = `<p>A un <b>cliente nuevo</b>: ganas <b>${money(more * p.new_pct / 100 + extra)}</b></p><p>En una <b>renovación</b>: ganas <b>${money(more * p.renew_pct / 100 + extra)}</b></p>`
+      + (above ? `<p class="pnl-muted pnl-small">Incluye ${money(extra)} extra por pasar la meta.</p>` : p.goal && x.sold < p.goal ? `<p class="pnl-muted pnl-small">Si pasas la meta (${money(p.goal)}), lo que venda de más gana ${p.bonus_pct}% extra.</p>` : '');
+  }
+
+  /** Their clients whose campaign ends in the next 30 days (a renewal to offer). */
+  function endingFor(m: Member) {
+    const today = new Date().toISOString().slice(0, 10), soon = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    const ids = new Set(requests.filter((r) => r.status === 'aprobada' && creditedTo(r, m.id ?? '', team())).map((r) => r.id.toLowerCase()));
+    return camps.filter((c) => ids.has(c.id.toLowerCase()) && c.status !== 'ended' && c.end >= today && c.end <= soon);
+  }
+
+  /** The administrator: one row per salesperson with their progress this month, plus a team total. */
+  let roleFilter: 'all' | 'ads' | 'reporter' | 'directa' | 'google' | 'otros' = 'all', stFilter: 'all' | 'due' | 'paid' = 'all'; // stFilter: tap again to show all
+  /** What a commission still owes: earned minus what was already marked paid this month. */
+  const owedOf = (x: { earned: number; payout?: { amount: number } | null }) => Math.max(0, Math.round((x.earned - Number(x.payout?.amount ?? 0)) * 100) / 100);
+  /** Everyone who sells or refers: Ventas, periodistas with referrals, and anyone with a plan or a credited order. */
+  // The administrator's and a Gerente's own sales are the company's (Ventas directas): no commission
+  const earners = () => team().filter((m) => m.id && m.role !== 'admin' && m.role !== 'manager' && (m.role === 'ads' || plans.some((p) => p.user_id === m.id) || requests.some((r) => creditedTo(r, m.id!, team()))));
+  /** The administrator: team totals, then one row per person (sorted by sales) with their breakdown folded below. */
+  function paintTeam() {
+    const ROLE: Record<string, string> = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente' };
+    const all = earners().map((m) => ({ m, x: monthFor(m, month) }));
+    const sum = (l: typeof all, f: (y: (typeof all)[number]) => number) => l.reduce((a, y) => a + f(y), 0);
+    const house = requests.filter((r) => r.status === 'aprobada' && r.created.slice(0, 7) === month && !sellerOf(r));
+    const houseSum = house.reduce((a, r) => a + Number(r.total || 0), 0);
+    $('[data-cm-team-kpis]').innerHTML = [
+      kpi('Vendido', money(sum(all, (y) => y.x.sold) + houseSum), `${money(sum(all, (y) => y.x.sold))} por el equipo · ${money(houseSum)} de la casa`),
+      kpi('Comisiones ganadas', money(sum(all, (y) => y.x.earned)), 'de lo ya cobrado', 'good'),
+      kpi('Comisiones pendientes', money(sum(all, (y) => y.x.pending)), 'cuando los clientes paguen', sum(all, (y) => y.x.pending) ? 'warn' : ''),
+      kpi('Por pagar al equipo', money(sum(all, (y) => owedOf(y.x))), sum(all, (y) => owedOf(y.x)) ? 'marca cada pago abajo' : 'todo pagado'),
+    ].join('');
+    $$('[data-cm-role]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cmRole === roleFilter)));
+    $$('[data-cm-st]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cmSt === stFilter)));
+    // No-commission sources: their own list of sales instead of the people table
+    const people = roleFilter === 'all' || roleFilter === 'ads' || roleFilter === 'reporter';
+    $('[data-cm-st-row]').hidden = !people;
+    if (!people) { paintSource(roleFilter as 'directa' | 'google' | 'otros'); return; }
+    const rows = all.filter(({ m, x }) => (roleFilter === 'all' || (roleFilter === 'ads' ? !isReferrer(m.role) : isReferrer(m.role)))
+      && (stFilter === 'all' || (stFilter === 'paid' ? !!x.payout && !owedOf(x) : owedOf(x) > 0))).sort((a, b) => b.x.sold - a.x.sold);
+    const fmtD = (iso: string) => new Date(iso).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' });
+    // One aligned grid row per person (role="table" for screen readers), each with its sales folded below at full width
+    const cell = (v: string, cls = '') => `<span role="cell" class="${cls}">${v}</span>`;
+    $('[data-cm-team-list]').innerHTML = rows.length ? `<div class="cm-t" role="table" aria-label="Comisiones del equipo"><div class="cm-tr cm-th" role="row">${['Persona', 'Ventas', 'Vendido', 'Cobrado', 'Comisión ganada', 'Pendiente', 'Pago'].map((h) => `<span role="columnheader">${h}</span>`).join('')}</div>`
+      + rows.map(({ m, x }) => {
+        const p = x.p, pct = p.goal ? Math.min(100, Math.round((x.sold / p.goal) * 100)) : 0;
+        // Paid in full, partly paid (it earned more after the payment was marked), or not paid yet
+        const owed = owedOf(x), payBtn = (t: string) => (owner ? `<button type="button" class="adp-btn sm" data-cm-pay>${t}</button>` : '<span class="pnl-chip warn">Por pagar</span>');
+        const pay = x.payout && !owed ? `<span class="pnl-chip ok">Pagado ${money(x.payout.amount)}</span>`
+          : x.payout ? `<span class="cm-pay-part"><span class="pnl-chip ok">Pagado ${money(x.payout.amount)}</span><small>faltan ${money(owed)}</small>${payBtn('Marcar el resto')}</span>`
+          : x.earned > 0 ? payBtn('Marcar pagado') : '<span class="pnl-muted">—</span>';
+        const detail = x.rows.map((y) => `<tr><td>${fmtD(y.r.created)}</td><td>${esc(y.r.client.business || y.r.client.name || y.r.id)}</td><td>${esc(y.r.formats.map((f) => formatName(f)).join(', '))}</td><td>${sellerOf(y.r)?.id === m.id ? 'Vendió' : 'Refirió'} · ${y.fresh ? 'nuevo' : 'renovación'}</td><td>${money(y.total)}</td><td>${y.pct}%</td><td><b>${money(y.commission)}</b></td><td>${y.r.paid ? '<span class="pnl-chip ok">Cobrado</span>' : '<span class="pnl-chip warn">Por cobrar</span>'}</td></tr>`).join('');
+        return `<div class="cm-person" data-cm-who="${esc(m.id)}"><div class="cm-tr" role="row">
+          <span role="rowheader" class="cm-who"><b>${esc(m.name)}</b> <span class="role-badge role-${m.role}">${ROLE[m.role] ?? m.role}</span>
+            <small>${p.new_pct}% nuevo · ${p.renew_pct}% renovación${p.goal ? ` · meta ${money(p.goal)} (${pct}%) · esta semana ${money(weekFor(m).sold)} de ${money(weekFor(m).goal)}` : ''}</small>
+            ${p.goal ? `<span class="cm-bar sm" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></span>` : ''}
+            ${owner || isDemo() ? '<button type="button" class="pnl-link" data-cm-edit>Comisión y meta</button>' : ''}</span>
+          ${cell(String(x.rows.length))}${cell(money(x.sold))}${cell(money(x.collected))}${cell(`<b>${money(x.earned)}</b>`, 'cm-earn')}${cell(x.pending ? money(x.pending) : '—')}${cell(pay)}</div>
+          ${x.rows.length ? `<details class="cm-more"><summary>Ver sus ${x.rows.length} ${x.rows.length === 1 ? 'venta' : 'ventas'}</summary><div class="cm-sub-wrap"><table class="cm-sub"><thead><tr><th>Fecha</th><th>Cliente</th><th>Anuncio</th><th>Tipo</th><th>Monto</th><th>%</th><th>Comisión</th><th>Cliente pagó</th></tr></thead><tbody>${detail}</tbody></table></div></details>` : ''}
+        </div>`;
+      }).join('') + '</div>'
+      : `<p class="pnl-muted">${earners().length ? 'Nadie con estos filtros este mes.' : 'Todavía no hay vendedores. Invita a alguien con el rol Ventas en Equipo; los periodistas con referidos aparecen aquí solos.'}</p>`;
+    $('[data-cm-house]').hidden = false;
+    $('[data-cm-house]').innerHTML = `<b>De la casa:</b> ${money(houseSum)} en ${house.length} ${house.length === 1 ? 'pedido' : 'pedidos'} que llegaron solos (sin vendedor ni referido), sin comisión.`;
+  }
+  /** Who an order's money came from (same groups as Analítica → Ingresos): a salesperson, a periodista or editor who
+   *  referred it, the administrator or a Gerente (Ventas directas), or nobody (it came in alone online: Otros). */
+  function sourceOf(r: AdRequest): 'ads' | 'reporter' | 'directa' | 'otros' {
+    const s = sellerOf(r)?.role;
+    if (s === 'ads') return 'ads';
+    if (isReferrer(s)) return 'reporter';
+    if (s === 'admin' || s === 'manager') return 'directa';
+    return (r.lines ?? []).some((l) => l.startsWith('Venta directa')) ? 'directa' : 'otros';
+  }
+  /** Ventas directas, Google or Otros: the month's sales (no commission). */
+  function paintSource(src: 'directa' | 'google' | 'otros') {
+    $('[data-cm-house]').hidden = true;
+    if (src === 'google') {
+      // Demo: a sample monthly AdSense figure, labeled; for real, not connected yet
+      const g = isDemo() ? 380 + (Number(month.slice(5)) * 37) % 140 : 0;
+      $('[data-cm-team-list]').innerHTML = isDemo()
+        ? `<div class="pnl-card"><p><span class="sp-demo">DEMO</span> <b>Google AdSense</b>: ${money(g)} este mes (número de ejemplo), sin comisión. Cuando conectemos Google, aquí verás lo que paga de verdad.</p></div>`
+        : '<div class="pnl-card"><p><b>Google AdSense</b> todavía no está conectado. Cuando lo conectemos, aquí verás lo que paga Google cada mes (sin comisión).</p></div>';
+      return;
+    }
+    const list = requests.filter((r) => r.status === 'aprobada' && r.created.slice(0, 7) === month && sourceOf(r) === src).sort((a, b) => Date.parse(b.created) - Date.parse(a.created));
+    const total = list.reduce((a, r) => a + Number(r.total || 0), 0), paid = list.filter((r) => r.paid).reduce((a, r) => a + Number(r.total || 0), 0);
+    const what = src === 'directa' ? 'Ventas directas: lo que vendieron el administrador y el Gerente (sin comisión)' : 'Anunciantes vía web: pedidos que llegaron solos por Anúnciate, sin vendedor ni referido (sin comisión)';
+    const fmtD = (iso: string) => new Date(iso).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' });
+    $('[data-cm-team-list]').innerHTML = `<p class="pnl-muted pnl-small">${what}. <b>${money(total)}</b> en ${list.length} ${list.length === 1 ? 'pedido' : 'pedidos'} · ${money(paid)} cobrado.</p>`
+      + (list.length ? `<div class="cm-sub-wrap"><table class="cm-sub"><thead><tr><th>Fecha</th><th>Cliente</th><th>Anuncio</th>${src === 'directa' ? '<th>Vendió</th>' : ''}<th>Monto</th><th>Cliente pagó</th></tr></thead><tbody>${list.map((r) => `<tr><td>${fmtD(r.created)}</td><td>${esc(r.client.business || r.client.name || r.id)}</td><td>${esc(r.formats.map((f) => formatName(f)).join(', '))}</td>${src === 'directa' ? `<td>${esc(sellerOf(r)?.name ?? '—')}</td>` : ''}<td><b>${money(Number(r.total || 0))}</b></td><td>${r.paid ? '<span class="pnl-chip ok">Cobrado</span>' : '<span class="pnl-chip warn">Por cobrar</span>'}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="pnl-muted">Nada este mes.</p>');
+  }
+  /** The month's commissions as a spreadsheet (one row per sale), for accounting. */
+  function downloadCsv() {
+    const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [['Mes', 'Persona', 'Rol', 'Fecha', 'Cliente', 'Tipo', 'Cliente nuevo', 'Monto', '%', 'Comisión', 'Cliente pagó', 'Comisión pagada'].map(q).join(',')];
+    earners().forEach((m) => { const x = monthFor(m, month); x.rows.forEach((y) => lines.push([month, m.name, m.role, y.r.created.slice(0, 10), y.r.client.business || y.r.client.name, sellerOf(y.r)?.id === m.id ? 'Vendió' : 'Refirió', y.fresh ? 'sí' : 'no', y.total.toFixed(2), y.pct, y.commission.toFixed(2), y.r.paid ? 'sí' : 'no', x.payout ? (owedOf(x) ? 'parcial' : 'sí') : 'no'].map(q).join(','))); });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([`\ufeff${lines.join('\n')}`], { type: 'text/csv' })); a.download = `comisiones-${month}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  /** Demo mode: two sample salespeople and their sales. */
+  function demoData() {
+    const sellers = [{ id: 'aaaa1111-demo', name: 'Vendedora (ejemplo)', role: 'ads' }, { id: 'bbbb2222-demo', name: 'Vendedor (ejemplo)', role: 'ads' }];
+    const writer = { id: 'cccc3333-demo', name: 'Periodista (ejemplo)', role: 'reporter' };
+    demoTeam = [...sellers, writer];
+    const biz = ['Panadería La Esquina', 'Ferretería El Martillo', 'Clínica Dental Sonrisa', 'Gimnasio Fuerza', 'Café del Barrio', 'Farmacia Central', 'Mueblería Don Pepe', 'Taller Hermanos Ortiz', 'Restaurante El Fogón', 'Óptica Visión Clara'];
+    const now = Date.now(), monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).valueOf();
+    // 14 sales spread over this month so far (even on the 1st there's a month to show), then about one every 3 days before
+    const when = (i: number) => (i < 14 ? now - (Math.max(now - monthStart, 6 * 36e5) * i) / 14 : monthStart - (i - 13) * 2.6 * 864e5);
+    requests = Array.from({ length: 50 }, (_, i) => ({ id: `NX-EJC${i}`, created: new Date(when(i)).toISOString(), status: 'aprobada', paid: i % 4 !== 1,
+      client: { name: '', business: `${biz[i % biz.length]} (ejemplo)`, email: `${i % biz.length}@ejemplo.com`, phone: '787-555-01' + String(i).padStart(2, '0'), who: 'retail' },
+      formats: [['rectangle'], ['valla'], ['leaderboard'], ['patrocinio']][i % 4], where: '', start: '', duration: '', total: [149, 420, 89, 350, 175, 640, 210, 1200][i % 8],
+      lines: i % 5 === 3 ? [] : i % 7 === 4 ? [`Referido: ${codeOf(writer.id)}`] : i % 2 ? ['Venta directa', `Vendido por: ${sellers[0].name}`] : [`Referido: ${codeOf(sellers[1].id)}`], art: { mode: 'upload', files: [] }, link: '' } as AdRequest));
+    plans = [{ user_id: sellers[0].id, new_pct: 20, renew_pct: 10, bonus_pct: 5, goal: 1500 }, { user_id: sellers[1].id, new_pct: 20, renew_pct: 10, bonus_pct: 5, goal: 1000 }, { user_id: writer.id, new_pct: 10, renew_pct: 5, bonus_pct: 0, goal: 0 }];
+    payouts = [{ user_id: sellers[0].id, month: monthKey(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)), amount: 182, paid_at: new Date().toISOString(), paid_by: 'Admin' }];
+    const end = (d: number) => new Date(now + d * 864e5).toISOString().slice(0, 10);
+    camps = requests.slice(0, 6).map((r, i) => ({ id: r.id.toLowerCase(), client: r.client.business, sizes: [], start: r.created.slice(0, 10), end: end(4 + i * 5), regions: 'all', takeover: false, views: null, status: 'active', delivered: 0, clicks: 0, created: r.created }));
+    return sellers;
+  }
+
+  async function load() {
+    const s = me(); if (!s || !['admin', 'ads', 'manager'].includes(s.role)) { root.hidden = true; return; }
+    root.hidden = false;
+    const admin = s.role === 'admin' || s.role === 'manager'; // the whole team (the owner and the Gerente edit it)
+    $('[data-cm-demo]').hidden = !isDemo();
+    let self: Member | undefined;
+    if (isDemo()) { const sellers = demoData(); self = admin ? undefined : sellers[0]; }
+    else if (hasBackend()) {
+      const [rq, pl, po, cp, ow] = await Promise.all([loadRequests(), staffApi('sales_plans?select=*'), staffApi('commission_payouts?select=*'), allCampaigns(),
+        admin ? staffApi('rpc/soy_dueno', { method: 'POST', body: '{}' }) : Promise.resolve(null)]);
+      owner = s.role === 'manager' || (!!ow?.ok && (await ow.json()) === true);
+      requests = rq; camps = cp ?? [];
+      plans = pl?.ok ? await pl.json() : []; payouts = po?.ok ? await po.json() : [];
+      if (pl && pl.status === 404) $('[data-cm-rules]').textContent = 'Falta un paso en la base de datos (supabase/comisiones.sql): por ahora se usan los porcentajes de siempre.';
+      const id = tokenInfo().id; self = team().find((m) => m.id === id) ?? { id, name: s.name, role: s.role };
+    } else { requests = listRequests(); self = { id: '00000000', name: s.name, role: s.role }; }
+    $('[data-cm-title]').firstChild!.textContent = admin ? 'Comisiones del equipo ' : 'Mis comisiones ';
+    $('[data-cm-mine]').hidden = admin; $('[data-cm-team]').hidden = !admin;
+    paintMonths();
+    if (admin) paintTeam(); else if (self) paintMine(self);
+    root.dataset.self = self?.id ?? '';
+  }
+  const repaint = () => { const s = me(); if (s?.role === 'admin' || s?.role === 'manager') paintTeam(); else { const m = team().find((x) => x.id === root.dataset.self) ?? { id: root.dataset.self, name: s?.name ?? '', role: 'ads' }; paintMine(m); } paintMonths(); };
+
+  root.addEventListener('click', async (e) => {
+    const t = e.target as HTMLElement;
+    const mb = t.closest<HTMLElement>('[data-cm-month]'); if (mb) { month = mb.dataset.cmMonth!; repaint(); return; }
+    const rf = t.closest<HTMLElement>('[data-cm-role]'); if (rf) { roleFilter = rf.dataset.cmRole as typeof roleFilter; paintTeam(); return; }
+    const sf = t.closest<HTMLElement>('[data-cm-st]'); if (sf) { stFilter = stFilter === sf.dataset.cmSt ? 'all' : sf.dataset.cmSt as typeof stFilter; paintTeam(); return; } // tap again: all
+    if (t.closest('[data-cm-csv]')) { downloadCsv(); return; }
+    const cp = t.closest<HTMLElement>('[data-cm-copy]');
+    if (cp) { const v = $<HTMLInputElement>(cp.dataset.cmCopy === 'en' ? '[data-cm-link-en]' : '[data-cm-link]').value; await navigator.clipboard?.writeText(v).catch(() => {}); cp.textContent = '¡Copiado!'; setTimeout(() => (cp.textContent = cp.dataset.cmCopy === 'en' ? 'Copiar (inglés)' : 'Copiar'), 1500); return; }
+    const kl = t.closest<HTMLElement>('[data-cm-copylink]');
+    if (kl) { await navigator.clipboard?.writeText(kl.dataset.cmCopylink!).catch(() => {}); kl.textContent = '¡Copiado!'; setTimeout(() => (kl.textContent = 'Copiar'), 1500); return; }
+    const pl = t.closest<HTMLElement>('[data-cm-paylink]');
+    if (pl) {
+      const id = pl.closest<HTMLElement>('[data-cm-req]')!.dataset.cmReq!, r = requests.find((q) => q.id === id)!;
+      (pl as HTMLButtonElement).disabled = true; pl.textContent = 'Preparando…';
+      const res = await cardPayment(id);
+      (pl as HTMLButtonElement).disabled = false; pl.textContent = 'Enlace de pago';
+      if (!res.url) { void tell(res.error || 'No se pudo preparar el enlace de pago. Intenta otra vez.'); return; }
+      await navigator.clipboard?.writeText(res.url).catch(() => {});
+      const msg = `Hola${r.client.name ? ` ${r.client.name.split(' ')[0]}` : ''}, aquí puedes pagar tu anuncio en NotiCel (${money(Number(r.total || 0))}) con tarjeta, Apple Pay o Google Pay: ${res.url}`;
+      const tel = (r.client.phone || '').replace(/\D/g, '');
+      const li = pl.closest('li')!; li.querySelector('.cm-pay-share')?.remove();
+      li.insertAdjacentHTML('beforeend', `<p class="cm-pay-share">✓ Enlace copiado (vale por 1 hora). Envíalo: ${tel ? `<a href="https://wa.me/1${tel.slice(-10)}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}${tel && r.client.email ? ' · ' : ''}${r.client.email ? `<a href="mailto:${esc(r.client.email)}?subject=${encodeURIComponent('Pago de tu anuncio en NotiCel')}&body=${encodeURIComponent(msg)}">Correo</a>` : ''}</p>`);
+      return;
+    }
+    const who = t.closest<HTMLElement>('[data-cm-who]')?.dataset.cmWho; if (!who) return;
+    const m = team().find((x) => x.id === who); if (!m) return;
+    if (t.closest('[data-cm-edit]')) {
+      const p = planOf(who), f = $<HTMLFormElement>('[data-cm-plan-form]');
+      $('[data-cm-plan-name]').textContent = m.name; $('[data-cm-plan-err]').hidden = true; f.dataset.who = who;
+      (['new_pct', 'renew_pct', 'bonus_pct', 'goal'] as const).forEach((k) => ((f.elements.namedItem(k) as HTMLInputElement).value = String(p[k])));
+      $<HTMLDialogElement>('[data-cm-plan]').showModal(); return;
+    }
+    if (t.closest('[data-cm-pay]')) {
+      const x = monthFor(m, month);
+      const owed = owedOf(x);
+      if (!(await ask(x.payout ? `¿Marcar pagado el resto de la comisión de ${m.name} de ${monthName(month)}: ${money(owed)} (total ${money(x.earned)})?` : `¿Marcar pagada la comisión de ${m.name} de ${monthName(month)}: ${money(x.earned)}?`, { ok: 'Marcar pagado' }))) return;
+      const r = await staffApi('commission_payouts?on_conflict=user_id,month', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({ user_id: who, month, amount: Math.round(x.earned * 100) / 100, paid_by: me()?.name ?? '' }) });
+      if (!r?.ok) { void tell('No se pudo guardar. ¿Ya se corrió supabase/comisiones.sql?'); return; }
+      payouts = [...payouts.filter((p) => !(p.user_id === who && p.month === month)), ...(await r.json())]; repaint();
+      logActivity('Marcó una comisión pagada', `${m.name} · ${monthName(month)} · ${money(x.earned)}`);
+    }
+  });
+  $('[data-cm-calc]').addEventListener('input', () => { const m = team().find((x) => x.id === root.dataset.self) ?? { id: root.dataset.self, name: me()?.name ?? '', role: 'ads' }; calc(m); });
+  $('[data-cm-plan-close]').addEventListener('click', () => $<HTMLDialogElement>('[data-cm-plan]').close());
+  $<HTMLFormElement>('[data-cm-plan-form]').addEventListener('submit', async (e) => {
+    e.preventDefault(); const f = e.target as HTMLFormElement, who = f.dataset.who!;
+    const v = (k: string) => Math.max(0, Number((f.elements.namedItem(k) as HTMLInputElement).value) || 0);
+    const row = { user_id: who, new_pct: Math.min(100, v('new_pct')), renew_pct: Math.min(100, v('renew_pct')), bonus_pct: Math.min(100, v('bonus_pct')), goal: v('goal'), updated_at: new Date().toISOString() };
+    if (isDemo()) { plans = [...plans.filter((p) => p.user_id !== who), row]; $<HTMLDialogElement>('[data-cm-plan]').close(); repaint(); return; }
+    const r = await staffApi('sales_plans?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
+    if (!r?.ok) { const er = $('[data-cm-plan-err]'); er.textContent = 'No se pudo guardar. ¿Ya se corrió supabase/comisiones.sql?'; er.hidden = false; return; }
+    plans = [...plans.filter((p) => p.user_id !== who), row]; $<HTMLDialogElement>('[data-cm-plan]').close(); repaint();
+    logActivity('Cambió una comisión o meta', `${team().find((x) => x.id === who)?.name ?? who}: ${row.new_pct}% nuevo, ${row.renew_pct}% renovación, meta ${money(row.goal)}`);
+  });
+
+  // Loads when Ventas opens (and again if someone else signs in)
+  const watch = () => { if (location.hash === '#ventas') void load(); };
+  addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'ventas') void load(); }); // opened from the menu
+  addEventListener('hashchange', watch); addEventListener('nc-staff-change', () => { if (location.hash === '#ventas' && !root.dataset.loaded) { root.dataset.loaded = '1'; void load(); } });
+  addEventListener('nc-team', watch);
+  addEventListener('nc-sale', () => { if (location.hash === '#ventas') void load(); }); // a sale just saved with "+ Anuncio vendido"
+  watch();
+</script>
