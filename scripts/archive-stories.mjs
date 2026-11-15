@@ -1,22 +1,20 @@
-// Archive stories, one file each (2026-11-15): turns the copied batches (archive/stories/, scripts/archive-copy.mjs)
-// into one small JSON file per story, named after its old address, and uploads them to NotiCel's R2 bucket
-// "noticel-archivo" as historias/<path>.json. The site's archive function (functions/[[path]].js) opens any old
-// noticel.com address from there. Files are made a few batches at a time in a temporary folder (not on the iCloud
-// Desktop), uploaded with Wrangler's bulk upload, then deleted. Resumable: archive/historias-done.json.
-// Usage: node scripts/archive-stories.mjs [--test]
-import { readdirSync, readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync, rmSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
-import { join, dirname } from 'node:path';
+// Archive stories for the site (2026-11-15): turns the copied batches (archive/stories/, scripts/archive-copy.mjs) into
+// 4,096 files in NotiCel's R2 bucket "noticel-archivo" (historias/<000-fff>.json.gz). Each story goes in the file picked
+// by a short code worked out from its old address (shardOf, the same in functions/[[path]].js), so the site opens any
+// old noticel.com address by reading one small file. (One file per story hit Cloudflare's upload limit: days.)
+// Built in a temporary folder (not the iCloud Desktop), uploaded in steps that stay under Cloudflare's limit.
+// Run it when the copy is complete (and again after any later copy): node scripts/archive-stories.mjs
+import { readdirSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { gunzipSync, gzipSync } from 'node:zlib';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import categories from '../src/data/categories.json' with { type: 'json' };
 
-const SRC = 'archive/stories', STATE = 'archive/historias-done.json', LOG = 'archive/historias-log.txt', BUCKET = 'noticel-archivo';
+const SRC = 'archive/stories', LOG = 'archive/historias-log.txt', BUCKET = 'noticel-archivo';
 const TMP = join(tmpdir(), 'noticel-historias');
-const TEST = process.argv.includes('--test');
 const log = (m) => { const line = `${new Date().toISOString()} ${m}`; console.log(line); appendFileSync(LOG, `${line}\n`); };
 const users = Object.fromEntries(JSON.parse(readFileSync('archive/users.json', 'utf8')).map((u) => [u.id, u.name]));
-const done = new Set(existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : []);
 
 const decode = (s = '') => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;|&#8217;|&#8216;/g, "'")
   .replace(/&#8220;|&#8221;/g, '"').replace(/&#8211;/g, '–').replace(/&#8212;/g, '—').replace(/&#8230;|&hellip;/g, '…').replace(/&nbsp;/g, ' ')
@@ -41,47 +39,53 @@ function slim(p) {
     html: (p.content?.rendered ?? '').replace(/<!--[\s\S]*?-->/g, '').replace(/<p>\s*(&nbsp;)?\s*<\/p>/g, '').replace(/\n{3,}/g, '\n\n').trim(),
   };
 }
-const keyOf = (path) => `historias/${path.replace(/^\/|\/$/g, '')}.json`;
-
-const GROUP = 5; // batches per upload (about 500 stories)
-const total = () => (existsSync('archive/progress.json') ? JSON.parse(readFileSync('archive/progress.json', 'utf8')).pages : Infinity);
-// Keeps going while the copy is still saving batches; stops when every batch is done (or after 12 quiet hours)
-for (let idle = 0; ; ) {
-const batches = readdirSync(SRC).filter((f) => /^batch-\d+\.json\.gz$/.test(f) && !done.has(f)).sort();
-if (!batches.length) {
-  if (done.size >= total()) { log(`Finished: all ${done.size} batches are in R2 as single stories.`); break; }
-  if (++idle > 720 || TEST) { log('No new batches: stopping (run again to continue).'); break; }
-  await new Promise((ok) => setTimeout(ok, 60000)); continue;
+/** The file a story lives in: FNV-1a hash of its address, first 3 hex digits (4,096 files). Same in functions/[[path]].js. */
+export function shardOf(path) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < path.length; i++) { h ^= path.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16).padStart(8, '0').slice(0, 3);
 }
-idle = 0;
-const ready = batches.length >= GROUP || done.size + batches.length >= total() ? batches : [];
-if (!ready.length) { await new Promise((ok) => setTimeout(ok, 60000)); continue; }
-for (let i = 0; i < ready.length; i += GROUP) {
-  const group = TEST ? ready.slice(0, 1) : ready.slice(i, i + GROUP);
-  rmSync(TMP, { recursive: true, force: true }); mkdirSync(TMP, { recursive: true });
-  const list = [];
-  for (const b of group) {
+
+if (!process.argv[1]?.endsWith('archive-stories.mjs')) { /* imported: only shardOf */ } else {
+  rmSync(TMP, { recursive: true, force: true }); mkdirSync(join(TMP, 'parts'), { recursive: true }); mkdirSync(join(TMP, 'out'));
+  // 1. Each story into its file's list (one line each), batch by batch, so memory stays small
+  const batches = readdirSync(SRC).filter((f) => /^batch-\d+\.json\.gz$/.test(f)).sort();
+  let n = 0;
+  for (const b of batches) {
+    const lines = {};
     for (const p of JSON.parse(gunzipSync(readFileSync(join(SRC, b))).toString())) {
       if (!p.link || p.status !== 'publish') continue;
-      const s = slim(p), file = join(TMP, `${p.id}.json`);
-      writeFileSync(file, JSON.stringify(s));
-      list.push({ key: keyOf(s.path), file });
-      if (TEST && list.length >= 3) break;
+      const s = slim(p); const k = shardOf(s.path);
+      (lines[k] ??= []).push(JSON.stringify(s)); n++;
     }
+    for (const [k, l] of Object.entries(lines)) appendFileSync(join(TMP, 'parts', k), `${l.join('\n')}\n`);
   }
-  writeFileSync(join(TMP, 'list.json'), JSON.stringify(list));
-  for (let tries = 1; ; tries++) {
-    try {
-      execFileSync('npx', ['--yes', 'wrangler@4', 'r2', 'bulk', 'put', BUCKET, '--filename', join(TMP, 'list.json'), '--remote', '--content-type', 'application/json; charset=utf-8', '--concurrency', '20', '--force'], { stdio: 'pipe', timeout: 900000 });
-      break;
-    } catch (e) {
-      if (tries >= 5) { log(`upload of ${group.join(', ')} failed: ${String(e.stderr || e.message).slice(0, 300)}`); process.exit(1); }
-      await new Promise((ok) => setTimeout(ok, 30000 * tries));
+  log(`${n} stories from ${batches.length} batches sorted into files`);
+  // 2. Each file as { address: story }, compressed
+  const list = [];
+  for (const k of readdirSync(join(TMP, 'parts')).sort()) {
+    const map = {};
+    for (const line of readFileSync(join(TMP, 'parts', k), 'utf8').split('\n')) if (line) { const s = JSON.parse(line); map[s.path] = s; }
+    const file = join(TMP, 'out', `${k}.json.gz`); writeFileSync(file, gzipSync(JSON.stringify(map), { level: 9 }));
+    list.push({ key: `historias/${k}.json.gz`, file });
+  }
+  // 3. Upload in steps of 150 files about a minute apart (Cloudflare allows about 1,200 uploads per 5 minutes)
+  for (let i = 0; i < list.length; i += 150) {
+    const part = list.slice(i, i + 150); writeFileSync(join(TMP, 'list.json'), JSON.stringify(part));
+    for (let tries = 1; ; tries++) {
+      try {
+        execFileSync('npx', ['--yes', 'wrangler@4', 'r2', 'bulk', 'put', BUCKET, '--filename', join(TMP, 'list.json'), '--remote', '--content-type', 'application/gzip', '--concurrency', '3', '--force'], { stdio: 'pipe', timeout: 900000 });
+        break;
+      } catch (e) {
+        log(`upload try ${tries} (files ${i + 1}-${i + part.length}) failed: ${String(e.stderr || e.message).replace(/\s+/g, ' ').slice(-200)}`);
+        if (tries >= 8) process.exit(1);
+        await new Promise((ok) => setTimeout(ok, 60000 * tries));
+      }
     }
+    log(`${Math.min(i + 150, list.length)} of ${list.length} files uploaded`);
+    await new Promise((ok) => setTimeout(ok, 45000));
   }
-  if (TEST) { log(`test: uploaded ${list.map((x) => x.key).join(' | ')}`); process.exit(0); }
-  group.forEach((b) => done.add(b)); writeFileSync(STATE, JSON.stringify([...done].sort()));
-  log(`${done.size} batches as single stories (${list.length} stories in this upload)`);
+  writeFileSync('archive/historias-state.json', JSON.stringify({ stories: n, batches: batches.length, files: list.length, at: new Date().toISOString() }));
+  log(`Done: ${n} stories in ${list.length} files in R2 (${BUCKET}/historias/).`);
+  rmSync(TMP, { recursive: true, force: true });
 }
-}
-rmSync(TMP, { recursive: true, force: true });
