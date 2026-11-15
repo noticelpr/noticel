@@ -64,7 +64,7 @@
     me = { id: 'cccc3333-demo', name: staffMe()?.name || 'Periodista (ejemplo)', role: 'reporter' };
     team = [...teamList(), me];
     const biz = ['Restaurante El Fogón', 'Óptica Visión', 'Colmado La Placita', 'Taller El Rápido'];
-    requests = biz.map((b, i) => ({ id: `NX-EJR${i}`, created: new Date(Date.now() - (i * 9 + 2) * 864e5).toISOString(), status: i === 3 ? 'revisar' : 'aprobada', paid: i !== 1,
+    requests = biz.map((b, i) => ({ id: `NC-EJR${i}`, created: new Date(Date.now() - (i * 9 + 2) * 864e5).toISOString(), status: i === 3 ? 'revisar' : 'aprobada', paid: i !== 1,
       client: { name: '', business: `${b} (ejemplo)`, email: `r${i}@ejemplo.com`, phone: '', who: 'retail' }, formats: [['rectangle'], ['valla'], ['cuadrado'], ['infeed']][i], where: '', start: '', duration: '',
       total: [149, 89, 210, 99][i], lines: [`Referido: ${codeOf(me.id!)}`], art: { mode: 'upload', files: [] }, link: '' } as AdRequest));
   }

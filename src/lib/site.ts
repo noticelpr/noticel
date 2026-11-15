@@ -120,7 +120,7 @@ const SPORT_IMAGES: Record<'basketball' | 'baseball' | 'volleyball' | 'boxing' |
   baseball: SECTION_IMAGES.deportes,
   volleyball: { src: 'images/voleibol-balon.jpg', caption: 'Imagen de referencia.', credit: 'Foto: Sami Mlouhi, CC BY-SA 4.0, vía Wikimedia Commons', creditUrl: commons('Volleyball ball - le ballon de volley-ball - كرة الكرة الطائرة Espérance sportive de Tunis photo1.jpg') },
   boxing: { src: 'images/ring-boxeo.jpg', caption: 'Imagen de referencia.', credit: 'Foto: Micheal Kaluba, CC BY-SA 4.0, vía Wikimedia Commons', creditUrl: commons('Set-up of a boxing Ring.jpg') },
-  football: { src: 'images/futbol-americano.svg', caption: 'Imagen de referencia.', credit: 'Ilustración: Noticias Xtra', creditUrl: '' },
+  football: SECTION_IMAGES.deportes, // a free stadium photo (the earlier illustration belonged to Noticias Xtra)
   tennis: { src: 'images/pelota-tenis.jpg', caption: 'Imagen de referencia.', credit: 'Foto: Santeri Viinamäki, CC BY-SA 4.0, vía Wikimedia Commons', creditUrl: commons('Tennis ball on tennis court 20170619.jpg') },
 };
 

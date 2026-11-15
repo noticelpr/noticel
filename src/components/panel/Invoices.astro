@@ -67,7 +67,7 @@ const names = Object.fromEntries(FORMATS.map((f) => [f.id, f.name]));
 
   function sample(): { inv: Inv[]; ord: AdRequest[] } {
     const biz = ['Panadería La Esquina', 'Ferretería El Martillo', 'Clínica Dental Sonrisa', 'Gimnasio Fuerza', 'Café del Barrio', 'Mueblería Don Pepe', 'Óptica Visión Clara'];
-    const ord: AdRequest[] = Array.from({ length: 9 }, (_, i) => ({ id: `NX-EJF${i}`, created: new Date(Date.now() - i * 3.5 * 864e5).toISOString(), status: 'aprobada', paid: i % 3 !== 1,
+    const ord: AdRequest[] = Array.from({ length: 9 }, (_, i) => ({ id: `NC-EJF${i}`, created: new Date(Date.now() - i * 3.5 * 864e5).toISOString(), status: 'aprobada', paid: i % 3 !== 1,
       client: { name: 'Contacto (ejemplo)', business: `${biz[i % biz.length]} (ejemplo)`, email: 'cliente@ejemplo.com', phone: '787-555-0100', who: 'retail' },
       formats: [['rectangle'], ['valla', 'cuadrado'], ['leaderboard'], ['patrocinio']][i % 4], where: 'Puerto Rico y la diáspora', start: ymd(new Date(Date.now() - i * 3 * 864e5)), duration: ['1 mes', '2 meses', '3 meses'][i % 3],
       total: [149, 420, 350, 640, 210][i % 5], lines: ['Venta directa', `Pago: ${['ATH Móvil', 'Transferencia', 'Tarjeta'][i % 3]}`], art: { mode: 'upload', files: [] }, link: '' } as AdRequest));

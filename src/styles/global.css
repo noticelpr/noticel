@@ -4569,8 +4569,6 @@ footer{background:#000;border-top:4px solid var(--green)}
 
 /* Header right side exactly like Noticias Xtra's: round red pills, the icons in a round white pill; the sister-site
    icon (Noticias Xtra's) in a circle, like Noticias Xtra shows NotiCel's */
-.masthead .sw-nx{background:#fff;border-radius:50%;overflow:hidden}
-.masthead .sw-nx img{transform:scale(1.04)}
 
 /* Bold section names (menu) and titles (section titles, headlines) */
 .nav-links>a,.nav-dd>a,.nav-dd-label,.nav-dd-menu a{font-weight:800}

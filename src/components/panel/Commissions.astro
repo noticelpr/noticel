@@ -329,7 +329,7 @@
     const now = Date.now(), monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).valueOf();
     // 14 sales spread over this month so far (even on the 1st there's a month to show), then about one every 3 days before
     const when = (i: number) => (i < 14 ? now - (Math.max(now - monthStart, 6 * 36e5) * i) / 14 : monthStart - (i - 13) * 2.6 * 864e5);
-    requests = Array.from({ length: 50 }, (_, i) => ({ id: `NX-EJC${i}`, created: new Date(when(i)).toISOString(), status: 'aprobada', paid: i % 4 !== 1,
+    requests = Array.from({ length: 50 }, (_, i) => ({ id: `NC-EJC${i}`, created: new Date(when(i)).toISOString(), status: 'aprobada', paid: i % 4 !== 1,
       client: { name: '', business: `${biz[i % biz.length]} (ejemplo)`, email: `${i % biz.length}@ejemplo.com`, phone: '787-555-01' + String(i).padStart(2, '0'), who: 'retail' },
       formats: [['rectangle'], ['valla'], ['leaderboard'], ['patrocinio']][i % 4], where: '', start: '', duration: '', total: [149, 420, 89, 350, 175, 640, 210, 1200][i % 8],
       lines: i % 5 === 3 ? [] : i % 7 === 4 ? [`Referido: ${codeOf(writer.id)}`] : i % 2 ? ['Venta directa', `Vendido por: ${sellers[0].name}`] : [`Referido: ${codeOf(sellers[1].id)}`], art: { mode: 'upload', files: [] }, link: '' } as AdRequest));

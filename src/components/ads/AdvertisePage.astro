@@ -916,7 +916,7 @@ Notas: ${val('notes')}
         : !v('nombre') || !v('negocio') ? t('Escribe tu nombre y el de tu negocio.', 'Enter your name and your business name.') : !emailOk(v('correo')) ? t('Escribe un correo válido.', 'Enter a valid email.') : '';
       er.textContent = msg; er.hidden = !msg; if (msg) return;
       const btn = cform.querySelector<HTMLButtonElement>('[data-com-pay]')!; btn.disabled = true;
-      const id = `NX-${Date.now().toString(36).toUpperCase()}`;
+      const id = `NC-${Date.now().toString(36).toUpperCase()}`;
       const sent = await saveRequest({ id, created: new Date().toISOString(), status: k === 'written' ? 'disenar' : 'revisar', paid: false,
         client: { name: v('nombre'), business: v('negocio'), email: v('correo'), phone: v('telefono'), who: 'retail', ...(EN ? { lang: 'en' as const } : {}) },
         formats: ['comunicado'], where: '', start: new Date().toISOString().slice(0, 10), duration: k === 'written' ? 'Comunicado (lo escribimos)' : 'Comunicado (escrito por el cliente)', total: PRICE[k],
