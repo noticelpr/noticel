@@ -26,14 +26,16 @@ jobs:
           node-version-file: .node-version
       - name: Copy new and edited stories from noticel.com
         run: node scripts/sync-wp.mjs
+      - name: Read noticel.com's front page order (home page and sections, until switch day)
+        run: node scripts/portada-wp.mjs
       - name: Save them (only when something changed)
         run: |
-          git add src/content/noticias src/data/sync-state.json
-          if git diff --cached --quiet -- src/content/noticias; then
-            echo "No new or edited stories."
+          git add src/content/noticias src/data/sync-state.json src/data/portada-noticel.json
+          if git diff --cached --quiet -- src/content/noticias src/data/portada-noticel.json; then
+            echo "No new or edited stories, and the same front page order."
           else
             git config user.name "noticel-sync"
             git config user.email "noticel-sync@users.noreply.github.com"
-            git commit -m "Sync from noticel.com: $(git diff --cached --name-only -- src/content/noticias | wc -l | tr -d ' ') new or edited stories"
+            git commit -m "Sync from noticel.com: $(git diff --cached --name-only -- src/content/noticias | wc -l | tr -d ' ') new or edited stories, front page order"
             git push
           fi

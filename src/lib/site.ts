@@ -2,6 +2,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import { league } from './leagues';
 import categoryData from '../data/categories.json';
 import AJUSTES from '../data/ajustes.json'; // panel → Ajustes saves here (the site rebuilds)
+import PORTADA_NOTICEL from '../data/portada-noticel.json'; // noticel.com's own order (scripts/portada-wp.mjs)
 
 /* =========================================================
    SITE SETTINGS: edit these to change the whole site
@@ -46,6 +47,9 @@ export const SITE = {
   gaId: '',
   // GIPHY key for GIF search in comments. Empty = only our own animated GIFs.
   giphyKey: '',
+  // Until switch day the newsroom works in WordPress: the home page and sections show noticel.com's own order first
+  // (scripts/portada-wp.mjs, every 15 minutes). Set to false on switch day, when editors place stories from the panel.
+  followNoticel: true,
   // Official National Weather Service forecast for Puerto Rico
   forecastUrl: 'https://www.weather.gov/sju/',
 };
@@ -313,6 +317,19 @@ export function pinTop(stories: Story[]): Story[] {
   const pin = stories.filter((s) => s.data.pinned).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())[0];
   const rest = pinFirst(stories.filter((s) => s !== pin), 'homeLead');
   return pin ? [pin, ...rest] : rest;
+}
+
+/** Until switch day: the stories at the top of noticel.com's home page ('home') or of a section page (its slug) go
+ *  first, in noticel.com's order; everything else follows in this site's own order. Use last, after pinTop/sectionTop. */
+export function followNoticel(stories: Story[], key: string): Story[] {
+  if (!SITE.followNoticel) return stories;
+  const data = PORTADA_NOTICEL as { home?: string[]; sections?: Record<string, string[]> };
+  const order = (key === 'home' ? data.home : data.sections?.[key]) ?? [];
+  if (!order.length) return stories;
+  const norm = (p: string) => p.replace(/\/?$/, '/');
+  const byPath = new Map(stories.map((s) => [norm(s.data.path), s]));
+  const first = order.map((p) => byPath.get(norm(p))).filter((s): s is Story => !!s);
+  return [...first, ...stories.filter((s) => !first.includes(s))];
 }
 
 /** Section page order: a story pinned to its section (📌, newest pin wins) keeps the top spot with no time limit;

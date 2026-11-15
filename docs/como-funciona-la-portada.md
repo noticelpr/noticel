@@ -2,6 +2,8 @@
 
 La portada se arma sola cada vez que se publica el sitio. Los editores pueden mandar con dos botones del editor (Panel de la redacción → Escribir → la noticia → lado derecho).
 
+> **Hasta el día del cambio (sitio de prueba):** mientras la redacción publica en WordPress, la portada y las secciones del sitio nuevo copian el orden de noticel.com. Cada 15 minutos el sitio lee qué noticias tiene noticel.com arriba en su portada (las primeras 12) y en cada sección (las primeras 8), y las pone primero, en el mismo orden. Lo demás sigue las reglas de abajo. El día del cambio se apaga esa copia (en el código: `followNoticel: false`) y manda lo que los editores escojan en el panel.
+
 ## 1. El orden: quién va primero
 
 El sitio pone las noticias en fila, de la más importante a la menos importante:

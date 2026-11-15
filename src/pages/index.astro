@@ -13,14 +13,14 @@ import Label from '../components/Label.astro';
 import HomeStrip from '../components/HomeStrip.astro';
 import AdSlot from '../components/AdSlot.astro';
 import GamesTeaser from '../components/GamesTeaser.astro';
-import { getStories, topOrder, pinTop, url, SITE, SECTIONS, VIDEOS, VIDEO_SOURCES, storyUrl, sectionUrl, type SectionId } from '../lib/site';
+import { getStories, topOrder, pinTop, followNoticel, url, SITE, SECTIONS, VIDEOS, VIDEO_SOURCES, storyUrl, sectionUrl, type SectionId } from '../lib/site';
 
 const stories = await getStories();
 const F = SITE.features;
 // Top spots: a pinned story (📌) keeps the main spot; the editor's "Principal de la Portada" pick comes next; then,
 // among the last 36 hours, trending stories first, Puerto Rico next, the rest after (src/lib/site.ts). Columns
 // (Opiniones) never take the top spots; they have their own box further down.
-const ordered = pinTop(topOrder(stories)).filter((s) => s.data.section !== 'opiniones');
+const ordered = followNoticel(pinTop(topOrder(stories)), 'home').filter((s) => s.data.section !== 'opiniones');
 const lead = ordered[0];
 // Each story appears once in the top area. Spots are filled in order of importance: the headlines under the main
 // story (the editor's related stories, or else the next stories in line), the column beside it, the row of cards,

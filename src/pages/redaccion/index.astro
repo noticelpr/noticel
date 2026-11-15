@@ -22,7 +22,7 @@ import Memos from '../../components/panel/Memos.astro';
 import Referrals from '../../components/panel/Referrals.astro';
 import Columnists from '../../components/panel/Columnists.astro';
 import PhotoLibrary from '../../components/panel/PhotoLibrary.astro';
-import { getStories, url, CATEGORY_OPTIONS, SECTIONS, SITE, mainCategory, inCategory, topOrder, pinTop, sectionTop } from '../../lib/site';
+import { getStories, url, CATEGORY_OPTIONS, SECTIONS, SITE, mainCategory, inCategory, topOrder, pinTop, sectionTop, followNoticel } from '../../lib/site';
 import Time from '../../components/Time.astro';
 import Gauge from '../../components/panel/Gauge.astro';
 import { hasBackend } from '../../lib/backend';
@@ -35,13 +35,13 @@ const hasBackendBuild = hasBackend(); // Supabase connected: real accounts and t
 // Inicio → "Ahora en la portada": what's at the top of the home page and of each section right now (NotiCel's order:
 // src/lib/site.ts topOrder + pinTop, the same the home page uses; docs/como-funciona-la-portada.md)
 type Spot = { place: string; title: string; url: string; date: Date; why: string; pin: boolean };
-const homeOrder = pinTop(topOrder(stories));
+const homeOrder = followNoticel(pinTop(topOrder(stories)), 'home');
 const homeSpots: Spot[] = homeOrder.slice(0, 4).map((s, i) => ({
   place: i === 0 ? 'Noticia principal' : `Al lado, ${i}.º`, title: s.data.title, url: url(s.data.path), date: s.data.date, pin: !!s.data.pinned && i === 0,
-  why: i === 0 ? (s.data.pinned ? 'Fijada 📌 por un editor' : 'Automática: la más importante reciente') : 'Automática: de las más importantes del día',
+  why: i === 0 ? (s.data.pinned ? 'Fijada 📌 por un editor' : 'Como en noticel.com (hasta el cambio): la principal de su portada') : 'Como en noticel.com (hasta el cambio)',
 }));
 const sectionSpots: Spot[] = SECTIONS.filter((x) => x.id !== 'opiniones').flatMap((sec) => {
-  const top = sectionTop(topOrder(stories.filter((s) => s.data.section === sec.id)))[0];
+  const top = followNoticel(sectionTop(topOrder(stories.filter((s) => s.data.section === sec.id))), sec.id)[0];
   return top ? [{ place: sec.name, title: top.data.title, url: url(top.data.path), date: top.data.date, pin: !!top.data.sectionPinned,
     why: top.data.sectionPinned ? 'Fijada 📌 por un editor' : 'Automática: la más importante del día' }] : [];
 });
