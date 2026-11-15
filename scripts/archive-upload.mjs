@@ -33,6 +33,6 @@ for (;;) {
   }
   if (done.size >= total() && readdirSync(DIR).filter((f) => /^batch-\d+\.json\.gz$/.test(f)).every((f) => done.has(f))) { log(`Finished: all ${done.size} batches are in R2 (${BUCKET}/stories/).`); break; }
   idle = todo.length ? 0 : idle + 1;
-  if (idle > 60) { log('No new batches for an hour: stopping (run again to continue).'); break; }
+  if (idle > 720) { log('No new batches for 12 hours: stopping (run again to continue).'); break; }
   await new Promise((ok) => setTimeout(ok, 60000)); // wait for the copy to save more
 }

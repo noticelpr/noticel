@@ -16,14 +16,19 @@ const progress = existsSync(PROGRESS) ? JSON.parse(readFileSync(PROGRESS, 'utf8'
 const done = new Set(progress.done);
 
 // Oldest first by id: new stories published during the copy land on the last pages, so earlier pages never shift
-const first = await wp(`posts?orderby=id&order=asc&per_page=100&page=1&_fields=id`);
+const first = await wp(`posts?orderby=id&order=asc&per_page=100&page=1&_fields=id`, 20);
 const pages = first.pages;
 log(`noticel.com has ${first.total} stories (${pages} batches of 100); ${done.size} batches already copied`);
 
 for (let page = 1; page <= pages; page++) {
   if (done.has(page)) continue;
   const t = Date.now();
-  const r = await wp(`posts?orderby=id&order=asc&per_page=100&page=${page}&${EMBED}`);
+  // noticel.com busy, or the Mac asleep / offline: wait and try again instead of stopping (up to 10 minutes between tries)
+  let r;
+  for (let wait = 1; ; wait = Math.min(wait * 2, 10)) {
+    try { r = await wp(`posts?orderby=id&order=asc&per_page=100&page=${page}&${EMBED}`); break; }
+    catch (e) { log(`batch ${page}: ${e.message.slice(-80)}; trying again in ${wait} min`); await new Promise((ok) => setTimeout(ok, wait * 60_000)); }
+  }
   writeFileSync(join(OUT, `batch-${String(page).padStart(5, '0')}.json.gz`), gzipSync(JSON.stringify(r.data)));
   done.add(page);
   writeFileSync(PROGRESS, JSON.stringify({ total: first.total, pages, done: [...done].sort((a, b) => a - b), updated: new Date().toISOString() }));
