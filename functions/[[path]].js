@@ -72,7 +72,10 @@ export async function onRequest({ request, env, next }) {
   };
   page = page.split(/(<script type="application\/ld\+json">[\s\S]*?<\/script>)/).map((part, i) => fill(part, i % 2 ? json : html)).join('');
   page = page.split(html(longDate(new Date(SENTINEL_DATE)))).join(html(longDate(date)));
-  page = page.replace(/<p>ARCHBODY0<\/p>/, () => s.html || '');
+  // The story's photo gallery (from noticel.com's database export), under the text
+  const gallery = (s.gallery || []).filter((g) => g && /^https:\/\//.test(g.src));
+  const galleryHtml = gallery.length ? `<section class="arch-gal" aria-label="Galería de fotos"><h2 class="arch-gal-h">Galería de fotos <small>(${gallery.length})</small></h2>${gallery.map((g) => `<figure><img src="${html(g.src)}" alt="${html(g.caption || s.title)}" loading="lazy" decoding="async">${g.caption ? `<figcaption>${html(g.caption)}</figcaption>` : ''}</figure>`).join('')}</section>` : '';
+  page = page.replace(/<p>ARCHBODY0<\/p>/, () => (s.html || '') + galleryHtml);
 
   return new Response(request.method === 'HEAD' ? null : page, {
     status: 200,

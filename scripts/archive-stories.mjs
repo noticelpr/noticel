@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import categories from '../src/data/categories.json' with { type: 'json' };
+import { extra, galleryOf } from './apply-postmeta.mjs'; // views and galleries from noticel.com's database export
 
 const SRC = 'archive/stories', LOG = 'archive/historias-log.txt', BUCKET = 'noticel-archivo';
 const TMP = join(tmpdir(), 'noticel-historias');
@@ -36,6 +37,7 @@ function slim(p) {
     author: users[p.author] || 'NotiCel', path: new URL(p.link).pathname, cats, sec: section(cats),
     tags: (terms[1] ?? []).map((t) => decode(t.name)),
     img: media?.source_url || '', cap: strip(media?.caption?.rendered),
+    views: extra[p.id]?.views ?? 0, gallery: galleryOf(extra[p.id], media?.source_url || ''),
     html: (p.content?.rendered ?? '').replace(/<!--[\s\S]*?-->/g, '').replace(/<p>\s*(&nbsp;)?\s*<\/p>/g, '').replace(/\n{3,}/g, '\n\n').trim(),
   };
 }

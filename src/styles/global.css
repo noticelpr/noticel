@@ -5107,3 +5107,11 @@ html.cm-open .mlv{opacity:0;pointer-events:none}
    (menu, scores, leagues, tabs, chips). They still slide with a finger, a trackpad or the mouse wheel + Shift. */
 .gt-tiles,.sc-track,.sc-filters,.ys-leagues,.lg-tabs,.tb-chips,.cx-tabs,.apn-tabs,.dn-chips,.pf-chips,.ls-tabs,.op-ppl-list,.lv-info .lv-srcs,.wx-hours,.mh-nav .wrap,.nav .wrap{scrollbar-width:none !important;-ms-overflow-style:none}
 .gt-tiles::-webkit-scrollbar,.sc-track::-webkit-scrollbar,.sc-filters::-webkit-scrollbar,.ys-leagues::-webkit-scrollbar,.lg-tabs::-webkit-scrollbar,.tb-chips::-webkit-scrollbar,.cx-tabs::-webkit-scrollbar,.apn-tabs::-webkit-scrollbar,.dn-chips::-webkit-scrollbar,.pf-chips::-webkit-scrollbar,.ls-tabs::-webkit-scrollbar,.op-ppl-list::-webkit-scrollbar,.lv-info .lv-srcs::-webkit-scrollbar,.wx-hours::-webkit-scrollbar{display:none}
+
+/* Archive stories (functions/[[path]].js): the story's photo gallery under the text, from noticel.com's database */
+.arch-gal{margin:24px 0 8px;display:grid;gap:16px}
+.arch-gal-h{font-family:var(--head,"Poppins",sans-serif);font-size:20px;margin:0;padding-top:12px;border-top:3px solid #000}
+.arch-gal-h small{font-weight:600;color:var(--muted,#6B6A6A);font-size:15px}
+.arch-gal figure{margin:0}
+.arch-gal img{display:block;width:100%;height:auto;max-height:560px;object-fit:contain;background:var(--soft,#F3F4F6);border-radius:4px}
+.arch-gal figcaption{font-size:14px;color:var(--muted,#6B6A6A);margin-top:6px;line-height:1.45}

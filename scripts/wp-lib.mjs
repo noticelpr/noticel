@@ -63,9 +63,12 @@ export function saveStory(p) {
   const fromExport = join(STORY_DIR, `wp-${id}.md`);
   const file = existsSync(fromExport) ? fromExport : join(STORY_DIR, `wpa-${id}.md`);
   const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  for (const key of ['views', 'topStory']) {
+  // Kept from the file: views and top story (export, database), and the gallery (database export, scripts/apply-postmeta.mjs)
+  for (const key of ['views', 'topStory', 'gallery']) {
     const kept = before.match(new RegExp(`^${key}: (.+)$`, 'm'));
-    if (kept) text = text.replace(new RegExp(`^${key}: .+$`, 'm'), `${key}: ${kept[1]}`);
+    if (!kept) continue;
+    if (new RegExp(`^${key}: `, 'm').test(text)) text = text.replace(new RegExp(`^${key}: .+$`, 'm'), () => `${key}: ${kept[1]}`);
+    else text = text.replace(/\n---\n/, () => `\n${key}: ${kept[1]}\n---\n`); // a field the copy doesn't write (gallery)
   }
   if (before === text) return false;
   writeFileSync(file, text);
