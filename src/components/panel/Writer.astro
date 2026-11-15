@@ -40,7 +40,7 @@ const TOOLS = [
   <!-- List of my articles -->
   <div data-wr-list-view>
     <header class="sd-head">
-      <div><h1 class="pnl-h">Escribir</h1><p class="pnl-muted">Escribe y edita noticias como en WordPress. Los periodistas las programan para una hora futura o las envían a revisión; los editores las publican.</p></div>
+      <div><h1 class="pnl-h">Escribir</h1><p class="pnl-muted">Escribe y edita noticias como en WordPress. Los periodistas las envían a revisión (pueden pedir una hora para que salgan); los editores las aprueban y las publican o programan.</p></div>
       <button type="button" class="adp-btn" data-wr-new>+ Nueva noticia</button>
     </header>
     <nav class="apn-tabs pnl-sub" role="tablist" aria-label="Estado">
@@ -63,6 +63,10 @@ const TOOLS = [
       <button type="button" class="adp-btn ghost-dark" data-wr-save>Guardar borrador</button>
       <button type="button" class="adp-btn" data-wr-go>Publicar</button>
     </div>
+    {/* Possible conflict of interest: the story mentions a business its writer referred as an advertiser (editors only) */}
+    <p class="sd-warn wr-conflict" data-wr-conflict hidden></p>
+    {/* Who changed this story and what (user, 2026-11-03), newest first */}
+    <details class="wr-hist" data-wr-hist hidden><summary>Historial de cambios <b data-wr-hist-n></b></summary><ul data-wr-hist-list></ul></details>
     <div class="wr-cols">
       <div class="wr-main">
         <textarea class="wr-title" data-f="title" rows="1" maxlength="140" placeholder="Titular" aria-label="Titular"></textarea>
@@ -237,9 +241,11 @@ const TOOLS = [
   import { embedFor } from '../../lib/embeds.mjs';
   import { docCard } from '../../lib/doccard.mjs';
   import { ask, askText } from '../../lib/dialogs';
-  import { hasBackend, listArticles, putArticle, deleteArticle, uploadStoryFile, publishArticle, lastSaveError, logPanelError, getAnalytics, queueSocial, staffApi } from '../../lib/backend';
+  import { logActivity, hasBackend, repoRead, listArticles, putArticle, deleteArticle, uploadStoryFile, publishArticle, lastSaveError, logPanelError, getAnalytics, queueSocial, staffApi } from '../../lib/backend';
   import { isDemo, demoAnalytics } from '../../lib/demo';
   import { REPO, BRANCH } from '../../lib/repo';
+  import { listRequests, loadRequests } from '../../lib/adrequests';
+  import { conflictsIn } from '../../lib/sellers';
   import { drawInstagram, instagramCaption, facebookMessage, xComposeUrl, type SocialStory } from '../../lib/social';
   const root = document.querySelector<HTMLElement>('[data-wr]');
   if (root) {
@@ -248,13 +254,15 @@ const TOOLS = [
     type Art = {
       id: string; status: 'draft' | 'review' | 'scheduled' | 'published'; updated: number; owner: string; note?: string;
       title: string; description: string; section: string; league: string; place: string; author: string; date: string;
-      image: string; imageUrl: string; imageCaption: string; imageCredit: string; breaking: boolean; trending: boolean; featured: boolean; live: boolean; pinned?: boolean; homeLead?: boolean; sectionLead?: boolean; sectionPinned?: boolean;
+      image: string; imageUrl: string; imageCaption: string; imageCredit: string; breaking: boolean; trending: boolean; featured: boolean; live: boolean; pinned?: boolean; homeLead?: boolean; placedAt?: string; sectionPlacedAt?: string; leaguePinned?: boolean; leaguePlacedAt?: string; sectionLead?: boolean; sectionPinned?: boolean;
       sources: Src[]; related: string[]; correction: string; body: string; slug?: string;
       factCheck?: string; factClaim?: string; // NotiCel Fact Check: verdict and the claim checked
       path?: string; cats?: string[]; // NotiCel: the story's address on the site and its other categories (kept from the story file)
       gallery?: Gal[]; // extra photos shown as a slideshow with the main one
       aiAssisted?: boolean; fmExtra?: string; // kept from an existing story file: the AI label and fields the editor doesn't show
       social?: { ig?: boolean; fb?: boolean; igText?: string; fbText?: string }; // Redes sociales: saved with the article, never in the story file
+      edits?: Array<{ by: string; at: number; what: string[] }>; // Historial de cambios: who changed it and what (never in the story file)
+      taskId?: string; assignedBy?: string; due?: string; // started from a story assignment in Tareas (never in the story file)
     };
     const SECS: Array<{ id: string; name: string }> = JSON.parse(root.dataset.secs!);
     const CAT_PATHS: Record<string, string> = JSON.parse(root.dataset.catPaths || '{}');
@@ -274,7 +282,7 @@ const TOOLS = [
     const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
     const toast = (m: string) => { const t = $('[data-wr-toast]'); t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 4000); };
     const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
-    const canPublish = () => ['admin', 'editor'].includes(me()?.role ?? '');
+    const canPublish = () => ['admin', 'editor', 'desk'].includes(me()?.role ?? ''); // desk: an Editor (their periodistas' stories only; supabase/editores.sql)
     // With Supabase (src/lib/backend.ts) articles are shared by the team; without it they stay on this device ('nc-articles')
     const DB = hasBackend();
     const DEMO = isDemo(); // sample stories, nothing is published (src/lib/demo.ts)
@@ -324,17 +332,17 @@ const TOOLS = [
     // ---------- list ----------
     let tab: Art['status'] = 'draft';
     function renderList() {
-      const s = me(); const all = load().filter((a) => canPublish() || a.owner === s?.name); // periodistas see their own
+      const s = me(); const all = load().filter((a) => canPublish() || DB || a.owner === s?.name); // periodistas see their own (with the database, it only sends them their own)
       (['draft', 'review', 'scheduled', 'published'] as const).forEach((k) => { const n = all.filter((a) => a.status === k).length; $(`[data-wn="${k}"]`).textContent = n ? String(n) : ''; });
       const pubs = publishedList();
       $('[data-wn="published"]').textContent = pubs.length ? String(pubs.length) : '';
       if (tab === 'published') { renderPublished(pubs); return; }
       const list = all.filter((a) => a.status === tab).sort((a, b) => b.updated - a.updated);
       $('[data-wr-list]').innerHTML = list.map((a) => `<article class="pnl-row" data-id="${a.id}">
-        <div><p class="pnl-muted">${STATUS[a.status]} · ${esc(SECS.find((x) => x.id === a.section)?.name ?? '')} · ${esc(a.author || a.owner)} · ${ago(a.updated)}${a.status === 'scheduled' ? ` · sale el ${new Date(a.date).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}</p>
+        <div><p class="pnl-muted">${STATUS[a.status]} · ${esc(SECS.find((x) => x.id === a.section)?.name ?? '')} · ${esc(a.author || a.owner)} · ${ago(a.updated)}${a.status === 'scheduled' || (a.status === 'review' && Date.parse(a.date) > Date.now() + 60000) ? ` · ${a.status === 'review' ? 'pide salir' : 'sale'} el ${new Date(a.date).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}</p>
           <h2>${esc(a.title || 'Sin titular')}</h2>${a.note ? `<p class="sd-warn">Nota del editor: ${esc(a.note)}</p>` : ''}</div>
         <div class="pnl-row-acts">
-          ${a.status === 'review' && canPublish() ? '<button type="button" class="adp-btn" data-la="approve">Aprobar y publicar</button><button type="button" class="pnl-link" data-la="return">Devolver</button>' : ''}
+          ${a.status === 'review' && canPublish() ? `<button type="button" class="adp-btn" data-la="approve">${Date.parse(a.date) > Date.now() + 60000 ? 'Aprobar y programar' : 'Aprobar y publicar'}</button>` + '<button type="button" class="pnl-link" data-la="return">Devolver</button>' : ''}
           <button type="button" class="adp-btn ghost-dark" data-la="preview">Vista previa</button>
           <button type="button" class="adp-btn ghost-dark" data-la="edit">${a.status === 'published' ? 'Editar o corregir' : 'Editar'}</button>
           <button type="button" class="pnl-link" data-la="dup">Duplicar</button>
@@ -383,22 +391,92 @@ const TOOLS = [
     // ---------- editor ----------
     const body = $('[data-body]');
     let cur: Art | null = null, dirty = false, timer = 0;
+    // ---- Historial de cambios (user, 2026-11-03): one line per editing session, with who and what changed. Kept when
+    // someone edits another person's story, or any story already sent to review, scheduled or published. ----
+    let opened: Art | null = null, sessionAt = 0;
+    const plainWords = (h: string) => (h || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').match(/\S+/g)?.length ?? 0;
+    function whatChanged(a: Art, b: Art): string[] {
+      const out: string[] = [];
+      const ne = (k: keyof Art) => String(a[k] ?? '') !== String(b[k] ?? '');
+      if (ne('title')) out.push('el titular');
+      if (ne('description')) out.push('el resumen');
+      if (ne('body')) { const d = plainWords(b.body) - plainWords(a.body); out.push(`el texto${d ? ` (${d > 0 ? '+' : ''}${d} palabras)` : ''}`); }
+      if (ne('section') || ne('league')) out.push('la sección');
+      if (ne('place')) out.push('el lugar');
+      if (ne('author')) out.push('el autor');
+      if (ne('date')) out.push('la fecha y hora');
+      if (ne('image') || ne('imageUrl')) out.push('la foto principal');
+      if (ne('imageCaption') || ne('imageCredit')) out.push('el pie o el crédito de la foto');
+      if (JSON.stringify(a.gallery ?? []) !== JSON.stringify(b.gallery ?? [])) out.push('la galería');
+      if (ne('correction')) out.push('la nota de corrección');
+      if ((['featured', 'homeLead', 'pinned', 'sectionLead', 'sectionPinned', 'leaguePinned'] as const).some((k) => !!a[k] !== !!b[k])) out.push('el lugar en la portada');
+      if ((['breaking', 'trending', 'live'] as const).some((k) => !!a[k] !== !!b[k])) out.push('las etiquetas (última hora, tendencia, en vivo)');
+      if (JSON.stringify(a.sources ?? []) !== JSON.stringify(b.sources ?? [])) out.push('las fuentes');
+      return out;
+    }
+    function noteEdit() {
+      if (!cur || !opened) return;
+      const by = me()?.name || 'Equipo';
+      const track = by !== (opened.owner || '') || ['review', 'scheduled', 'published'].includes(opened.status);
+      const what = whatChanged(opened, cur);
+      if (!track || !what.length) return;
+      const list = (cur.edits ?? []).filter((e) => !(e.by === by && e.at === sessionAt));
+      cur.edits = [{ by, at: sessionAt, what }, ...list].slice(0, 30);
+    }
+    const whenTxt = (t: number) => new Date(t).toLocaleString('es-PR', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    function paintHistory() {
+      const box = $<HTMLDetailsElement>('[data-wr-hist]'), list = cur?.edits ?? [];
+      box.hidden = !list.length; $('[data-wr-hist-n]').textContent = list.length ? `(${list.length})` : '';
+      $('[data-wr-hist-list]').innerHTML = list.map((e) => `<li><b>${esc(e.by)}</b> · ${whenTxt(e.at)}<br>Cambió ${esc(e.what.join(', '))}.</li>`).join('');
+    }
     const blank = (): Art => ({ id: `A-${Date.now().toString(36)}`, status: 'draft', updated: Date.now(), owner: me()?.name ?? '', title: '', description: '', section: 'noticias', league: '',
       place: '', author: me()?.name ?? 'NotiCel', date: localNow(), image: '', imageUrl: '', imageCaption: '', imageCredit: '', breaking: false, trending: false, featured: false, live: false, pinned: false, homeLead: false, sectionLead: false, sectionPinned: false,
       sources: [], related: [], correction: '', factCheck: '', factClaim: '', body: '' });
     const field = (k: string) => $<HTMLInputElement>(`[data-f="${k}"]`);
+    // "Lugar en la Portada / en su sección": one choice each, stored as the story's flags (the strongest one wins)
+    const PLACE = { 'wr-home': ['featured', 'homeLead', 'pinned'], 'wr-sec': ['sectionLead', 'sectionPinned'], 'wr-lig': ['leaguePinned'] } as const;
+    function syncPlace() {
+      for (const [name, keys] of Object.entries(PLACE)) {
+        const on = [...keys].reverse().find((k) => field(k).checked) ?? '';
+        root.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`).forEach((r) => (r.checked = r.value === on));
+      }
+    }
+    root.addEventListener('change', (e) => {
+      const r = e.target as HTMLInputElement; const keys = PLACE[r.name as keyof typeof PLACE];
+      if (!keys || r.type !== 'radio') return;
+      keys.forEach((k) => (field(k).checked = k === r.value));
+      if (r.name === 'wr-home' && cur) cur.placedAt = r.value ? new Date().toISOString() : undefined; // a side spot lasts 1 day from now
+      if (r.name === 'wr-sec' && cur) cur.sectionPlacedAt = r.value ? new Date().toISOString() : undefined;
+      if (r.name === 'wr-lig' && cur) cur.leaguePlacedAt = r.value ? new Date().toISOString() : undefined;
+      field(keys[0]).dispatchEvent(new Event('input', { bubbles: true })); // counts as an edit (autosave)
+    });
     function openEditor(a: Art) {
-      cur = structuredClone(a);
+      cur = structuredClone(a); opened = structuredClone(a); sessionAt = Date.now(); paintHistory();
       $('[data-gal-list]').dataset.sig = ''; ($('[data-wr-gal]') as HTMLDetailsElement).open = !!cur.gallery?.length;
       (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => (field(k).value = String(cur![k] ?? '')));
       (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (field(k).checked = !!cur![k]));
       body.innerHTML = cur.body || '<p><br></p>';
       body.querySelectorAll<HTMLElement>('figure.wr-embed').forEach(paintEmbed);
       $$('[data-editor-only]').forEach((e) => (e.hidden = !canPublish()));
+      $$('[data-chief-only]').forEach((e) => (e.hidden = me()?.role === 'desk')); // the front page is the Editor en jefe's
       $('[data-wr-list-view]').hidden = true; $('[data-wr-editor]').hidden = false;
       sync(); dirty = false; $('[data-wr-saved]').textContent = ''; scrollTo({ top: 0 });
-      paintSocial(true); void paintSocialStatus();
+      paintSocial(true); void paintSocialStatus(); void paintConflict();
       ($('[data-f="title"]') as HTMLTextAreaElement).focus();
+    }
+    /** Editors: businesses this story mentions that its writer referred as advertisers (src/lib/sellers.ts conflictsIn). */
+    async function storyConflicts(a: Art): Promise<string[]> {
+      if (!canPublish() || !DB) return [];
+      const reqs = listRequests().length ? listRequests() : await loadRequests();
+      const text = `${a.title} ${a.description} ${(a.body || '').replace(/<[^>]+>/g, ' ')}`;
+      return [...new Set([a.author, a.owner].filter(Boolean).flatMap((w) => conflictsIn(text, String(w), reqs)))];
+    }
+    async function paintConflict() {
+      const box = $('[data-wr-conflict]'); box.hidden = true; if (!cur) return;
+      const c = await storyConflicts(cur);
+      if (!c.length || !cur) return;
+      box.textContent = `⚠ Posible conflicto de interés: ${cur.author || cur.owner} refirió como anunciante a ${c.join(', ')}, y esta noticia lo menciona. Revisa que sea noticia de verdad y que el tono sea neutral antes de publicar.`;
+      box.hidden = false;
     }
     function closeEditor() { if (dirty) void persist(); cur = null; $('[data-wr-editor]').hidden = true; $('[data-wr-list-view]').hidden = false; renderList(); }
     function readEditor() {
@@ -411,12 +489,14 @@ const TOOLS = [
     async function persist(status?: Art['status']) {
       readEditor(); if (!cur) return false;
       if (status) cur.status = status;
-      // A reporter's change to a published story goes back to an editor (their scheduled stories stay scheduled)
+      // A reporter's change to a published story goes back to an editor
       if (!canPublish() && cur.status === 'published') cur.status = 'review';
       cur.updated = Date.now();
+      noteEdit();
       const a = structuredClone(cur);
       if (!(await store(a))) return false;
       dirty = false; $('[data-wr-saved]').textContent = `Guardado ${new Date().toLocaleTimeString('es-PR', { hour: 'numeric', minute: '2-digit' })}`;
+      paintHistory();
       return true;
     }
 
@@ -426,7 +506,7 @@ const TOOLS = [
       readEditor();
       const words = (body.innerText.trim().match(/\S+/g) || []).length;
       $('[data-wcount]').textContent = `${words} palabras · ${Math.max(1, Math.round(words / 220))} min de lectura${words > 450 ? ' · nuestras noticias suelen tener 250 a 450 palabras' : ''}`;
-      $('[data-cnt="title"]').textContent = `${cur.title.length}/110 caracteres${cur.title.length > 110 ? ' · muy largo para Google y redes' : ''}`;
+      $('[data-cnt="title"]').textContent = `${cur.title.length}/70 caracteres${cur.title.length > 70 ? ' · muy largo: Google lo corta' : ''}`;
       $('[data-cnt="description"]').textContent = `${cur.description.length}/200`;
       const photo = cur.image || cur.imageUrl;
       $('[data-photo-empty]').hidden = !!photo; $('[data-photo-full]').hidden = !photo; $('[data-photo-meta]').hidden = !photo;
@@ -446,11 +526,11 @@ const TOOLS = [
       paintRelSearch();
       const future = new Date(cur.date).valueOf() > Date.now() + 60000;
       const go = $<HTMLButtonElement>('[data-wr-go]');
-      go.textContent = future || (!canPublish() && cur.status === 'scheduled') ? 'Programar' : !canPublish() ? 'Enviar a revisión' : cur.status === 'published' ? 'Actualizar' : 'Publicar';
+      go.textContent = !canPublish() ? (future ? 'Enviar a revisión (programada)' : 'Enviar a revisión') : future ? 'Programar' : cur.status === 'published' ? 'Actualizar' : 'Publicar';
       $('[data-wr-state]').textContent = STATUS[cur.status];
       $('[data-wr-state]').className = `wr-state ${cur.status}`;
       const checks: Array<[boolean, string]> = [
-        [cur.title.length >= 20 && cur.title.length <= 110, 'Titular claro (20 a 110 caracteres)'],
+        [cur.title.length >= 20 && cur.title.length <= 70, 'Titular claro (20 a 70 caracteres, para que Google no lo corte)'],
         [cur.description.length >= 40, 'Subtítulo de una o dos oraciones'],
         [words >= 80, 'Al menos 80 palabras'],
         [!!cur.place, 'Lugar'],
@@ -704,10 +784,17 @@ const TOOLS = [
     /** A story on the site as an article of the team (opened before, or brought from its file now). */
     async function storyArt(id: string): Promise<Art | null> {
       if (DB) await refresh(); // the team's latest: someone may have opened this story already
-      const have = load().find((a) => a.slug === id); if (have) return have;
+      const have = load().find((a) => a.slug === id);
       toast('Abriendo la noticia…');
-      const r = await fetch(`${RAW}${encodeURIComponent(id)}.md?t=${Date.now()}`).catch(() => null);
-      const a = r?.ok ? fromFile(id, await r.text()) : null;
+      // The story's file: through the staff-only "repo" function (the code is private); the preview reads GitHub directly
+      const text = DB ? await repoRead('story', id) : await fetch(`${RAW}${encodeURIComponent(id)}.md?t=${Date.now()}`).then((r) => (r.ok ? r.text() : null)).catch(() => null);
+      const a = text ? fromFile(id, text) : null;
+      if (have) {
+        // Opened before: keep the team's copy, but take the fields the editor doesn't show (origin, via, importance…)
+        // from the file as it is now, so a save never drops something added to the file later
+        if (a && a.fmExtra !== have.fmExtra) { have.fmExtra = a.fmExtra; await store(have); }
+        return have;
+      }
       if (!a) { toast('No pudimos abrir esa noticia. Intenta otra vez en un minuto.'); return null; }
       if (!(await store(a))) return null; // saved for the team, linked to the story on the site
       return a;
@@ -728,6 +815,7 @@ const TOOLS = [
       await store({ ...a, status: 'draft', updated: Date.now(), note: `Quitada del sitio el ${new Date().toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}. Corrígela y publícala otra vez si hace falta.` });
       await refresh(); renderList(); dispatchEvent(new Event('nc-articles-changed'));
       toast('Quitada. Desaparece del sitio en unos 2 minutos. Está en Escribir → Borradores.');
+      logActivity('Quitó una noticia del sitio', a.title);
       return true;
     }
     addEventListener('nc-takedown', async (e) => {
@@ -737,6 +825,7 @@ const TOOLS = [
     });
     root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-import]'); if (b) void importStory(b.dataset.import!); });
     addEventListener('nc-edit-story', (e) => void importStory((e as CustomEvent).detail.id)); // "Editar" in Noticias → Vistazo rápido
+
 
     /** The gallery in the story file. Without a main photo, the first gallery photo becomes the main one (toFile). */
     const galleryYaml = (a: Art) => {
@@ -957,15 +1046,16 @@ const TOOLS = [
     /** Puts a saved article on the site: the "publicar" function saves its file in GitHub (shared database only). */
     /** Only one story is pinned (📌) in the Portada: publishing a pinned story unpins the others for real. */
     async function unpinOthers(a: Art): Promise<string[]> {
-      if (!a.pinned && !a.sectionPinned) return [];
+      if (!a.pinned && !a.sectionPinned && !a.leaguePinned) return [];
       const live = (x: Art) => x.id !== a.id && (x.status === 'published' || x.status === 'scheduled');
-      const old = load().filter((x) => live(x) && ((a.pinned && x.pinned) || (a.sectionPinned && x.sectionPinned && x.section === a.section)));
+      const old = load().filter((x) => live(x) && ((a.pinned && x.pinned) || (a.sectionPinned && x.sectionPinned && x.section === a.section) || (a.leaguePinned && x.leaguePinned && x.league === a.league)));
       const done: string[] = [];
       for (const o of old) {
         const u: Art = structuredClone(o); u.updated = Date.now();
-        // The replaced story moves to the first spot under the new one (Portada and/or its section)
-        if (a.pinned && u.pinned) { u.pinned = false; u.homeLead = true; }
-        if (a.sectionPinned && u.sectionPinned && u.section === a.section) { u.sectionPinned = false; u.sectionLead = true; }
+        // The replaced story moves to one of the 3 spots next to the new one for a day (Portada), or under it (its section)
+        if (a.pinned && u.pinned) { u.pinned = false; u.homeLead = false; u.featured = true; u.placedAt = new Date().toISOString(); }
+        if (a.sectionPinned && u.sectionPinned && u.section === a.section) { u.sectionPinned = false; u.sectionLead = true; u.sectionPlacedAt = new Date().toISOString(); }
+        if (a.leaguePinned && u.leaguePinned && u.league === a.league) { u.leaguePinned = false; } // it simply goes back in line on the league page
         if (!(await store(u))) continue;
         if (DB && u.slug) { const r = await publishArticle({ id: u.id, slug: u.slug, file: toFile(u), title: u.title, scheduled: u.status === 'scheduled' }); if (!r.ok) continue; }
         done.push(u.title || 'Sin titular');
@@ -974,6 +1064,9 @@ const TOOLS = [
     }
     const unpinNote = (titles: string[]) => (titles.length ? ` Se desfijó “${titles.join('”, “')}”.` : '');
     async function goLive(a: Art): Promise<boolean> {
+      // A story about a business its writer referred: the editor confirms it on purpose
+      const conflicts = await storyConflicts(a);
+      if (conflicts.length && !(await ask(`⚠ Posible conflicto de interés: ${a.author || a.owner} refirió como anunciante a ${conflicts.join(', ')}, y esta noticia lo menciona. ¿Publicarla de todos modos?`, { ok: 'Sí, es noticia', danger: true }))) return false;
       const future = new Date(a.date).valueOf() > Date.now() + 60000;
       if (!DB) {
         a.path = pathOf(a); a.status = future ? 'scheduled' : 'published'; a.updated = Date.now(); await store(a);
@@ -987,11 +1080,16 @@ const TOOLS = [
       const r = await publishArticle({ id: a.id, slug: slug(a), file: toFile(a), title: a.title, scheduled: future });
       if (!r.ok) { toast(`No se publicó: ${r.error}`); void logPanelError(me()?.name ?? '', `${future ? 'Programar' : 'Publicar'}: ${a.title || 'Sin titular'}`, r.error ?? ''); return false; }
       a.status = future ? 'scheduled' : 'published'; a.slug = r.slug; a.updated = Date.now();
+      // The panel's lists (Vistazo rápido, Publicadas) come with the page: show the new title there right away
+      dispatchEvent(new CustomEvent('nc-story-saved', { detail: { id: r.slug, title: a.title, section: a.section, author: a.author || a.owner, date: new Date(a.date || Date.now()).toISOString(),
+        placed: !!((a as any).pinned || (a as any).homeLead || (a as any).sectionPinned || (a as any).sectionLead || (a as any).leaguePinned) } }));
       await refresh();
       const un = await unpinOthers(a);
       if (un.length) await refresh();
       toast((future ? `Programada: sale sola el ${when(a.date)}.` : 'Publicada. Aparece en el sitio en unos 2 minutos.') + unpinNote(un));
       if (a.social?.ig || a.social?.fb) void sendSocial(a);
+      if (a.taskId && !future) dispatchEvent(new CustomEvent('nc-task-done', { detail: { taskId: a.taskId } })); // its assignment in Tareas is done
+      logActivity(future ? 'Programó una noticia' : 'Publicó una noticia', `${a.title}${a.owner && a.owner !== me()?.name ? ` (de ${a.owner})` : ''}`);
       return true;
     }
 
@@ -1067,14 +1165,13 @@ const TOOLS = [
       goBtn.disabled = true;
       try {
         const future = new Date(cur.date).valueOf() > Date.now() + 60000;
-        if (!canPublish() && cur.status === 'scheduled' && !future) { toast('Escoge una fecha y hora futura. Para publicarla ahora, pídele a un editor.'); return; }
-        if (!canPublish() && future) { // periodistas schedule their own stories; labels and pins are for editors
-          (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (cur![k] = false)); cur.note = '';
-          if (!(await persist(cur.status === 'scheduled' ? 'scheduled' : 'draft'))) return;
-          if (await goLive(structuredClone(cur))) { closeEditor(); dispatchEvent(new Event('nc-articles-changed')); }
+        // Periodistas never publish: every story (also one with a future time) goes to an editor, who approves it;
+        // with a future time the approval schedules it for then. Labels and pins are for editors.
+        if (!canPublish()) {
+          (['breaking', 'trending', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned', 'leaguePinned'] as const).forEach((k) => (cur![k] = false)); cur.note = '';
+          if (await persist('review')) { toast(future ? `Enviada a revisión para salir el ${when(cur.date)}. Un editor la aprueba y sale a esa hora.` : 'Enviada a revisión. Un editor la revisará y la publicará.'); closeEditor(); dispatchEvent(new Event('nc-articles-changed')); }
           return;
         }
-        if (!canPublish()) { cur.note = ''; if (await persist('review')) { toast('Enviada a revisión. Un editor la revisará.'); closeEditor(); dispatchEvent(new Event('nc-articles-changed')); } return; }
         // Save first (as it is now), then publish the saved copy
         if (!(await persist(cur.status === 'published' || cur.status === 'scheduled' ? cur.status : 'draft'))) return;
         if (await goLive(structuredClone(cur))) { closeEditor(); dispatchEvent(new Event('nc-articles-changed')); }
@@ -1082,6 +1179,16 @@ const TOOLS = [
     });
     $('[data-wr-back]').addEventListener('click', closeEditor);
     $('[data-wr-new]').addEventListener('click', () => openEditor(blank()));
+    // Tareas → «Escribir esta noticia»: a new draft with the assignment's title (or the one already started)
+    addEventListener('nc-write-assignment', async (e) => {
+      const d = (e as CustomEvent).detail as { taskId: string; articleId?: string; title: string; by: string; due: string };
+      const had = d.articleId ? load().find((x) => x.id === d.articleId) : undefined;
+      if (had) { openEditor(had); return; }
+      const a = { ...blank(), title: d.title, taskId: d.taskId, assignedBy: d.by, due: d.due };
+      if (await store(a)) dispatchEvent(new CustomEvent('nc-task-link', { detail: { taskId: d.taskId, articleId: a.id } }));
+      openEditor(a);
+      toast(`Asignada por ${d.by}${d.due ? ` para el ${new Date(`${d.due}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}` : ''}. Cuando se publique, la tarea se marca hecha.`);
+    });
     root.addEventListener('click', async (e) => {
       const t = e.target as HTMLElement;
       const st = t.closest<HTMLElement>('[data-ws]');
