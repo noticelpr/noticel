@@ -109,7 +109,8 @@ drop policy if exists "staff see team" on staff;
 create policy "staff see team" on staff for select using (staff_role() is not null and (not is_owner or staff_role() = 'admin' or user_id = auth.uid()));
 
 -- …and the same in the team list the panel loads (with usernames and emails)
-create or replace function staff_list() returns table (user_id uuid, name text, role text, username text, email text)
+drop function if exists staff_list();
+create function staff_list() returns table (user_id uuid, name text, role text, username text, email text)
 language sql stable security definer set search_path = public as $$
   select s.user_id, s.name, s.role, p.username, u.email::text
   from staff s left join profiles p on p.id = s.user_id left join auth.users u on u.id = s.user_id
