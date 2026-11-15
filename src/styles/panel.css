@@ -1290,3 +1290,13 @@ canvas.apr-drag:active{cursor:grabbing}
 /* from Noticias Xtra components-CommentQueue.css (2026-11-15) */
 .mod-auto{grid-column:1/-1;margin:0;font-size:13.5px;color:var(--muted)}
 .mod-legal{margin:8px 0 0;font-size:13px;color:var(--muted)}
+
+/* Analítica → «Lo más leído en noticel.com» and Publicadas' order buttons (2026-11-15) */
+.an-noticel{margin-top:16px}
+.an-noticel-list{margin:8px 0 0;padding-left:22px;display:grid;gap:8px}
+.an-noticel-list li{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:baseline}
+.an-noticel-list li a{font-weight:700;color:inherit;text-decoration:none}
+.an-noticel-list li a:hover{text-decoration:underline}
+.an-noticel-list li span{grid-column:1}
+.an-noticel-list li b{grid-column:2;grid-row:1 / span 2;font-variant-numeric:tabular-nums}
+.pnl-pub-sort{margin:8px 0 4px}

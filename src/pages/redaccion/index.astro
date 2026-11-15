@@ -46,8 +46,11 @@ const sectionSpots: Spot[] = SECTIONS.filter((x) => x.id !== 'opiniones').flatMa
     why: top.data.sectionPinned ? 'Fijada 📌 por un editor' : 'Automática: la más importante del día' }] : [];
 });
 const secName = (id: string) => CATEGORY_OPTIONS.find((x) => x.id === id)?.short ?? '';
-// Everything on the site, for Escribir → Publicadas (with views once analytics is connected)
-const published = stories.map((s) => ({ id: s.id, title: s.data.title, section: secName(mainCategory(s)), author: s.data.author, date: s.data.date.toISOString(), url: url(s.data.path), ai: s.data.aiAssisted }));
+// Everything on the site, for Escribir → Publicadas, with each story's views (noticel.com's own count, from its
+// database: post_views_count; the site's own counter and Google Analytics add to it later)
+const published = stories.map((s) => ({ id: s.id, title: s.data.title, section: secName(mainCategory(s)), author: s.data.author, date: s.data.date.toISOString(), url: url(s.data.path), ai: s.data.aiAssisted, views: s.data.views }));
+// Analítica → «Lo más leído en noticel.com»: the most-viewed stories on the site
+const topViewed = [...published].filter((p) => p.views > 0).sort((a, b) => b.views - a.views).slice(0, 20);
 // The story pinned (📌) in the home page's main spot, for the reminder on Inicio
 const pinnedStory = stories.filter((s) => s.data.pinned).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())[0];
 const pin = pinnedStory ? { title: pinnedStory.data.title, date: pinnedStory.data.date.toISOString(), url: url(pinnedStory.data.path) } : null;
@@ -107,7 +110,7 @@ const TABS = [
 ];
 ---
 <Base title="Panel de la redacción" description="Panel interno de NotiCel (uso del personal)." noindex staff>
-  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(CATEGORY_OPTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url }) => ({ id, title, section, author, date, url })))} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()}>
+  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(CATEGORY_OPTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url, views }) => ({ id, title, section, author, date, url, views })))} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()}>
     <form class="pnl-login" data-login hidden>
       <p class="pnl-kicker">NotiCel</p>
       <h1>Panel de la redacción</h1>
@@ -322,6 +325,13 @@ const TABS = [
           <header class="sd-head"><div><h1 class="pnl-h">Analítica <span class="sp-demo" data-an-demo hidden>DEMO</span></h1><p class="pnl-muted"><span data-an-real>Visitas reales del sitio, de Google Analytics.</span> <span data-an-at></span></p><p class="pnl-note" data-an-demo hidden><span class="sp-demo">DEMO</span> Números de ejemplo para mostrar cómo funciona esta pestaña. Con el panel real, aquí salen las visitas de Google Analytics.</p></div>
             <div class="pnl-range" role="group" aria-label="Período"><button type="button" data-range="1">Hoy</button><button type="button" data-range="7" aria-pressed="true">7 días</button><button type="button" data-range="28">28 días</button></div></header>
           <div data-an-msg hidden></div>
+          {topViewed.length > 0 && (
+            <div class="pnl-card an-noticel">
+              <h2 class="pnl-h3">Lo más leído en noticel.com</h2>
+              <p class="pnl-muted pnl-small">Vistas de cada noticia según la base de datos de noticel.com (el contador de WordPress), para las noticias que hay en el sitio nuevo. Cuando se conecte Google Analytics, sus números salen arriba.</p>
+              <ol class="an-noticel-list">{topViewed.map((p) => <li><a href={p.url} target="_blank" rel="noopener">{p.title}</a><span class="pnl-muted pnl-small">{p.section} · {new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Puerto_Rico' })}</span><b>{p.views.toLocaleString('es-PR')}</b></li>)}</ol>
+            </div>
+          )}
           <div data-an-body>
             <div class="pnl-kpis" data-an-kpis></div>
             <div class="pnl-card"><h2 class="pnl-h3" data-an-chart-h>Visitantes por día</h2><div class="pnl-chart" data-an-chart></div></div>
@@ -1182,7 +1192,8 @@ const TABS = [
             || '<p class="apr-empty">🎉 Ya le diste un vistazo a todo.</p>';
         } else if (nf === 'pub') {
           // Every story on the site: search, edit in Escribir, see it, or take it down
-          box.innerHTML = `<input type="search" class="pl-q pnl-pub-q" data-pub-q placeholder="Buscar en las ${PUBLISHED.length} noticias publicadas…" aria-label="Buscar noticias publicadas" value="${esc(pubQ)}" /><div data-pub-list></div>`;
+          box.innerHTML = `<input type="search" class="pl-q pnl-pub-q" data-pub-q placeholder="Buscar en las ${PUBLISHED.length} noticias publicadas…" aria-label="Buscar noticias publicadas" value="${esc(pubQ)}" /><div class="pnl-range pnl-pub-sort" role="group" aria-label="Orden"><button type="button" data-pub-sort="new" aria-pressed="${pubSort === 'new'}">Más recientes</button><button type="button" data-pub-sort="views" aria-pressed="${pubSort === 'views'}">Más vistas</button></div><div data-pub-list></div>`;
+          box.querySelectorAll<HTMLButtonElement>('[data-pub-sort]').forEach((b) => b.addEventListener('click', () => { pubSort = b.dataset.pubSort as typeof pubSort; box.querySelectorAll('[data-pub-sort]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); paintPub(); }));
           paintPub();
           $<HTMLInputElement>('[data-pub-q]', box).addEventListener('input', (e) => { pubQ = (e.target as HTMLInputElement).value; paintPub(); });
         }
@@ -1337,15 +1348,16 @@ const TABS = [
     // ---------- actions ----------
     let nf = 'pending';
     // ---------- Noticias → Publicadas: every story on the site ----------
-    const PUBLISHED: Array<{ id: string; title: string; section: string; author: string; date: string; url: string }> = JSON.parse(root.dataset.published || '[]');
-    let pubQ = ''; const takenDown = new Set<string>();
+    const PUBLISHED: Array<{ id: string; title: string; section: string; author: string; date: string; url: string; views?: number }> = JSON.parse(root.dataset.published || '[]');
+    let pubQ = '', pubSort: 'new' | 'views' = 'new'; const takenDown = new Set<string>();
     const plainTxt = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     function paintPub() {
       const words = plainTxt(pubQ.trim()).split(/\s+/).filter(Boolean);
-      const rows = PUBLISHED.filter((p) => words.every((w) => plainTxt(`${p.title} ${p.section} ${p.author}`).includes(w))).slice(0, 60);
+      const found = PUBLISHED.filter((p) => words.every((w) => plainTxt(`${p.title} ${p.section} ${p.author}`).includes(w)));
+      const rows = (pubSort === 'views' ? [...found].sort((a, b) => (b.views ?? 0) - (a.views ?? 0)) : found).slice(0, 60);
       const canEdit = ['admin', 'editor', 'desk'].includes(me()?.role ?? '');
       $('[data-pub-list]').innerHTML = rows.map((p) => `<article class="pnl-row" data-pub="${esc(p.id)}">
-        <div><p class="pnl-muted">✍️ Escrita por <b>${esc(p.author || 'NotiCel')}</b> · ${esc(p.section)} · ${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}${takenDown.has(p.id) ? ' · <b class="pnl-down">Quitada: desaparece en unos minutos</b>' : ''}</p>
+        <div><p class="pnl-muted">✍️ Escrita por <b>${esc(p.author || 'NotiCel')}</b> · ${esc(p.section)} · ${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}${p.views ? ` · 👁 <b>${Number(p.views).toLocaleString('es-PR')}</b> vistas` : ''}${takenDown.has(p.id) ? ' · <b class="pnl-down">Quitada: desaparece en unos minutos</b>' : ''}</p>
           <h2><a href="${p.url}" target="_blank" rel="noopener">${esc(p.title)}</a></h2></div>
         <div class="pnl-row-acts"><button type="button" class="adp-btn ghost-dark" data-pub-edit>Editar</button><a class="adp-btn ghost-dark" href="${p.url}" target="_blank" rel="noopener">Ver en el sitio ↗</a>${canEdit && !takenDown.has(p.id) ? '<button type="button" class="apr-reject" data-pub-down>Quitar del sitio</button>' : ''}${me()?.role === 'admin' && !takenDown.has(p.id) ? '<button type="button" class="apr-reject" data-pub-del title="Solo el administrador">Borrar para siempre</button>' : ''}</div></article>`).join('')
         || `<p class="apr-empty">No encontramos noticias con “${esc(pubQ)}”.</p>`;
