@@ -5102,3 +5102,8 @@ details.adp-com[open] > summary{margin-bottom:12px}
 .cm-body > p{-webkit-user-select:text;user-select:text}
 html.cm-open .mlv{opacity:0;pointer-events:none}
 .cm-hidden .cm-heart,.cm-hidden .cm-likecount{display:none}
+
+/* No visible scroll bar on rows that slide sideways (user, 2026-11-15): the games row, and every other sliding row
+   (menu, scores, leagues, tabs, chips). They still slide with a finger, a trackpad or the mouse wheel + Shift. */
+.gt-tiles,.sc-track,.sc-filters,.ys-leagues,.lg-tabs,.tb-chips,.cx-tabs,.apn-tabs,.dn-chips,.pf-chips,.ls-tabs,.op-ppl-list,.lv-info .lv-srcs,.wx-hours,.mh-nav .wrap,.nav .wrap{scrollbar-width:none !important;-ms-overflow-style:none}
+.gt-tiles::-webkit-scrollbar,.sc-track::-webkit-scrollbar,.sc-filters::-webkit-scrollbar,.ys-leagues::-webkit-scrollbar,.lg-tabs::-webkit-scrollbar,.tb-chips::-webkit-scrollbar,.cx-tabs::-webkit-scrollbar,.apn-tabs::-webkit-scrollbar,.dn-chips::-webkit-scrollbar,.pf-chips::-webkit-scrollbar,.ls-tabs::-webkit-scrollbar,.op-ppl-list::-webkit-scrollbar,.lv-info .lv-srcs::-webkit-scrollbar,.wx-hours::-webkit-scrollbar{display:none}
