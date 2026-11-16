@@ -15,7 +15,7 @@
 //
 // Deploy: Supabase → Edge Functions → Deploy a new function → Via Editor → name "correos" → paste this file.
 // Secret: RESEND_API_KEY (Edge Functions → Secrets), from resend.com, with the noticel.com domain verified there.
-// Optional secrets: FROM_EMAIL (default below), REPLY_TO and TEAM_EMAIL (default: the newsroom Gmail).
+// Other secrets: SITE_URL, MAIL_FROM (sender, default below), TEAM_EMAIL (sales inbox: team emails and replies), REPLY_TO (optional).
 
 // Settings from Supabase secrets; the site's email preview page (src/pages/redaccion/correos.astro) imports these
 // templates outside Supabase, where there are no secrets: then the defaults below are used
@@ -23,8 +23,6 @@ const env = (k: string): string => (typeof Deno !== 'undefined' ? Deno.env.get(k
 const SITE = (env('SITE_URL') || 'https://noticel.com').replace(/\/$/, '');
 const DEFAULT_FROM = env('MAIL_FROM') || 'NotiCel <anuncios@noticel.com>';
 const DEFAULT_TEAM = env('TEAM_EMAIL') || ''; // NotiCel's sales inbox; replies go here too
-// The logo (PNG; email apps don't show SVG), from noticel.com/email/: the password gate leaves that folder open
-// (cloudflare/password-gate.js), since the code on GitHub is private now.
 const LOGO = `${SITE}/logo.png`; // NotiCel's logo (PNG: email apps don't show SVG)
 const PURPLE = '#000000', BLUE = '#009DE9', INK = '#16161D', MUTED = '#5C5F6E', LINE = '#E2E3EA';
 
@@ -311,9 +309,11 @@ if (typeof Deno !== 'undefined') Deno.serve(async (req) => {
   async function send(logKey: string, to: string, mail: Mail) {
     if (!okEmail(to) || sent.length >= 40) return; // a cap per run keeps a mistake from flooding inboxes
     const claim = await fetch(`${base}/rest/v1/email_log`, { method: 'POST', headers: { ...db, Prefer: 'return=representation,resolution=ignore-duplicates' }, body: JSON.stringify({ key: logKey, to_email: to, subject: mail.subject }) });
-    if (!claim.ok || !(await claim.json()).length) return; // already sent
+    if (!claim.ok) { failed.push(`${logKey}: no se pudo anotar en email_log (${claim.status} ${(await claim.text()).slice(0, 120)})`); return; }
+    if (!(await claim.json()).length) return; // already sent
     const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to: [to], reply_to: replyTo, subject: mail.subject, html: mail.html }) });
+    await new Promise((ok) => setTimeout(ok, 600)); // Resend takes at most 2 emails a second
     if (r.ok) sent.push(logKey);
     else { failed.push(`${logKey}: ${(await r.text()).slice(0, 160)}`); await fetch(`${base}/rest/v1/email_log?key=eq.${encodeURIComponent(logKey)}`, { method: 'DELETE', headers: db }); }
   }
@@ -322,6 +322,7 @@ if (typeof Deno !== 'undefined') Deno.serve(async (req) => {
   // every 10 minutes, so the whole set can be checked in a real inbox without waiting for real dates
   const body = await req.json().catch(() => ({}));
   if (body?.prueba === true) {
+    if (!okEmail(team)) return out({ error: 'Falta el secreto TEAM_EMAIL (un correo válido) en Supabase → Edge Functions → Secrets.' }, 400);
     const slot = new Date().toISOString().slice(0, 15);
     const { req: r, camp: c, stats: s, lead: l } = SAMPLE;
     const all: [string, Mail][] = [['recibida', TEMPLATES.recibida(r)], ['cambios', TEMPLATES.cambios(r)], ['aprobada', TEMPLATES.aprobada(r, c)], ['rechazada', TEMPLATES.rechazada(r)],
