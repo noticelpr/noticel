@@ -5128,3 +5128,24 @@ html.cm-open .mlv{opacity:0;pointer-events:none}
 .cp-vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden}
 .cp-vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .cp-vlink{display:grid;place-items:center;aspect-ratio:16/9;background:var(--soft,#F3F4F6);border-radius:6px;font-weight:800;color:inherit;text-decoration:none}
+
+/* Confirmation boxes (src/lib/dialogs.ts: "¿Seguir de todos modos?", "¿Borrar…?"), in NotiCel's look (2026-11-16) */
+.nc-ask{width:min(440px,calc(100vw - 32px));padding:0;border:0;border-radius:16px;background:var(--card,#fff);color:var(--ink,#171717);box-shadow:0 24px 60px rgba(0,0,0,.35);border-top:5px solid #009DE9}
+.nc-ask::backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.nc-ask[open]{animation:nc-ask-in .18s ease-out}
+@keyframes nc-ask-in{from{opacity:0;transform:translateY(8px) scale(.97)}}
+.nc-ask form{display:grid;gap:14px;padding:22px 22px 18px}
+.nc-ask-msg{margin:0;font-family:var(--head,"Poppins",sans-serif);font-weight:700;font-size:17px;line-height:1.4}
+.nc-ask-html{font-size:14px;line-height:1.5;color:var(--muted,#6B6A6A)}
+.nc-ask-in{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line,#D4D4D8);border-radius:10px;background:var(--bg,#fff);color:inherit;font:inherit;font-size:15px;resize:vertical}
+.nc-ask-in:focus{outline:2px solid #009DE9;outline-offset:1px}
+.nc-ask-btns{display:flex;justify-content:flex-end;gap:8px}
+.nc-ask-btns button{border:0;border-radius:999px;padding:10px 20px;font-family:var(--head,"Poppins",sans-serif);font-weight:700;font-size:14px;cursor:pointer}
+.nc-ask-no{background:var(--soft,#F3F4F6);color:inherit}
+.nc-ask-no:hover{filter:brightness(.95)}
+.nc-ask-ok{background:#009DE9;color:#fff}
+.nc-ask-ok:hover{background:#007BB6}
+.nc-ask-ok.danger{background:#D7263D}
+.nc-ask-ok.danger:hover{background:#B71C30}
+.nc-ask-btns button:focus-visible{outline:3px solid #92D000;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.nc-ask[open]{animation:none}}
