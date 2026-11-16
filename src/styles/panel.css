@@ -1319,3 +1319,6 @@ canvas.apr-drag:active{cursor:grabbing}
 .an-all-list li span{grid-column:1}
 .an-all-list li b{grid-column:2;grid-row:1 / span 2;font-variant-numeric:tabular-nums}
 .an-all-more{text-align:center;margin:12px 0 0}
+.an-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:16px}
+.an-totals .an-total{margin-top:0}
+.an-totals .an-total[hidden]{display:none}

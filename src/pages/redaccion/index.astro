@@ -326,7 +326,11 @@ const TABS = [
             <div class="pnl-range" role="group" aria-label="Período"><button type="button" data-range="1">Hoy</button><button type="button" data-range="7" aria-pressed="true">7 días</button><button type="button" data-range="28">28 días</button></div></header>
           <div data-an-msg hidden></div>
           {/* Every story of all time (archive + recent), from the search database (functions/api/buscar.js) */}
-          <button type="button" class="pnl-card an-total" data-all-open hidden><span class="an-total-k">Total de noticias</span><b data-all-total>…</b><span class="pnl-muted pnl-small" data-all-range></span><span class="an-total-go">Ver y buscar ›</span></button>
+          <div class="an-totals">
+            <button type="button" class="pnl-card an-total" data-all-open hidden><span class="an-total-k">Total de noticias</span><b data-all-total>…</b><span class="pnl-muted pnl-small" data-all-range></span><span class="an-total-go">Ver y buscar ›</span></button>
+            {/* Every photo of noticel.com's archive (functions/api/fotos.js); opens Fotos → Archivo */}
+            <button type="button" class="pnl-card an-total" data-fotos-open hidden><span class="an-total-k">Total de fotos</span><b data-fotos-total>…</b><span class="pnl-muted pnl-small" data-fotos-range></span><span class="an-total-go">Ver y buscar ›</span></button>
+          </div>
           <dialog class="sd-dlg an-all" data-all-dlg aria-labelledby="an-all-h">
             <header class="sd-dlg-h"><h2 id="an-all-h">Todas las noticias <small class="pnl-muted" data-all-n></small></h2><button type="button" class="sd-x" data-all-x aria-label="Cerrar">✕</button></header>
             <form class="an-all-f" data-all-form>
@@ -1408,6 +1412,16 @@ const TABS = [
         if (au.options.length < 2) au.insertAdjacentHTML('beforeend', d.authors.map((x) => `<option>${esc(x.author)}</option>`).join(''));
       });
       addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'analitica') showCard(); });
+      // «Total de fotos»: every photo in noticel.com's archive; the box opens Fotos → Archivo
+      const fotosCard = $('[data-fotos-open]');
+      const showFotos = () => void fetch(`${API.replace(/buscar$/, 'fotos')}?resumen=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((d) => {
+        if (!d?.total) return;
+        fotosCard.hidden = false; $('[data-fotos-total]').textContent = Number(d.total).toLocaleString('es-PR');
+        if (d.oldest) $('[data-fotos-range]').textContent = `desde el ${fmtDay(d.oldest)} hasta hoy`;
+      });
+      addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'analitica') showFotos(); });
+      if ((location.hash.slice(1) || 'inicio') === 'analitica') showFotos();
+      fotosCard.addEventListener('click', () => { showTab('fotos'); scrollTo({ top: 0 }); setTimeout(() => document.querySelector<HTMLButtonElement>('[data-pane="fotos"] [data-pl-src="arch"]')?.click(), 50); });
       if ((location.hash.slice(1) || 'inicio') === 'analitica') showCard();
       let page = 0, run = 0;
       const params = () => Object.fromEntries([...new FormData(form)].map(([k, v]) => [k, String(v)]));

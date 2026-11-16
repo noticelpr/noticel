@@ -71,6 +71,18 @@ export async function searchPublished(q: string): Promise<Photo[]> {
   return published!.filter((p) => { const t = plain(`${p.caption} ${p.credit} ${p.story} ${p.section}`); return words.every((w) => t.includes(w)); });
 }
 
+/** noticel.com's whole photo archive (~296,000, functions/api/fotos.js): 48 per page, newest first. null = not available yet. */
+export async function searchArchive(q: string, page = 0, f: Filters = {}): Promise<{ rows: Photo[]; total: number } | null> {
+  const u = new URL(`${(document.body.dataset.base ?? '/').replace(/\/?$/, '/')}api/fotos`, location.origin);
+  u.searchParams.set('q', q); u.searchParams.set('pagina', String(page + 1)); u.searchParams.set('por', '48');
+  if (f.from) u.searchParams.set('desde', f.from); if (f.to) u.searchParams.set('hasta', f.to);
+  const r = await fetch(u).catch(() => null);
+  if (!r?.ok) return null;
+  const d = await r.json() as { total: number; results: Array<{ id: number; src: string; caption: string; alt: string; title: string; date: string; w: number | null; h: number | null; story: string; path: string }> };
+  return { total: d.total, rows: d.results.map((x) => ({ src: x.src, thumb: x.src, width: x.w, height: x.h, caption: x.caption || x.alt || x.title || '', credit: '', taken_on: x.date?.slice(0, 10) ?? null,
+    story: x.story || undefined, storyUrl: x.path || undefined, section: 'Archivo de noticel.com', date: x.date })) };
+}
+
 // ---------- adding photos ----------
 /** A picture file → a web version (longest side 2000 px) and a thumbnail (480 px), both JPEG. */
 async function versions(file: File) {

@@ -16,7 +16,7 @@ const tools = `
   <div class="pl-tools">
     <input type="search" class="pl-q" data-pl-q placeholder="Buscar: persona, lugar, tema, fotógrafo…" aria-label="Buscar fotos" />
     <select class="pl-sel" data-pl-album aria-label="Álbum" hidden><option value="">Todos los álbumes</option></select>
-    <div class="pnl-range pl-src" role="group" aria-label="Fuente"><button type="button" data-pl-src="all" aria-pressed="true">Todas</button><button type="button" data-pl-src="lib" aria-pressed="false">Biblioteca</button><button type="button" data-pl-src="pub" aria-pressed="false">Publicadas</button></div>
+    <div class="pnl-range pl-src" role="group" aria-label="Fuente"><button type="button" data-pl-src="all" aria-pressed="true">Todas</button><button type="button" data-pl-src="lib" aria-pressed="false">Biblioteca</button><button type="button" data-pl-src="pub" aria-pressed="false">Publicadas</button><button type="button" data-pl-src="arch" aria-pressed="false" title="Todas las fotos de noticel.com">Archivo</button></div>
     <button type="button" class="pnl-link" data-pl-ftoggle hidden aria-expanded="false">Filtros</button>
     <button type="button" class="pnl-link" data-pl-seltoggle hidden>Seleccionar</button>
   </div>
@@ -56,7 +56,7 @@ const tools = `
 )}
 
 <script>
-  import { searchLibrary, searchPublished, addPhoto, updatePhoto, deletePhoto, checkV2, hasV2, listAlbums, createAlbum, setAlbumCover, findDuplicate, updateMany, canUpload, RIGHTS, type Photo, type Meta, type Album, type Filters } from '../../lib/photos';
+  import { searchLibrary, searchPublished, searchArchive, addPhoto, updatePhoto, deletePhoto, checkV2, hasV2, listAlbums, createAlbum, setAlbumCover, findDuplicate, updateMany, canUpload, RIGHTS, type Photo, type Meta, type Album, type Filters } from '../../lib/photos';
   import { readPhotoInfo, fingerprint, type PhotoInfo } from '../../lib/photo-meta';
   import { ask } from '../../lib/dialogs';
   import { isDemo } from '../../lib/demo';
@@ -159,17 +159,29 @@ const tools = `
     const q$ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s);
     const grid = q$('[data-pl-grid]')!, more = q$('[data-pl-more]')!, count = q$('[data-pl-count]')!, warn = q$('[data-pl-warn]')!;
     const qIn = q$<HTMLInputElement>('[data-pl-q]')!, albSel = q$<HTMLSelectElement>('[data-pl-album]')!;
-    let q = '', src: 'all' | 'lib' | 'pub' = 'all', page = 0, done = false, busy = false, run = 0, items: Array<{ p: Photo; lib: boolean }> = [], libTotal = 0, pubLeft: Photo[] = [];
+    let q = '', src: 'all' | 'lib' | 'pub' | 'arch' = 'all', page = 0, done = false, busy = false, run = 0, items: Array<{ p: Photo; lib: boolean }> = [], libTotal = 0, pubLeft: Photo[] = [];
     let target = '', selecting = false; const filters: Filters = {};
 
     const card = (p: Photo, lib: boolean, i: number) => `<button type="button" class="pl-item${p.sensitive ? ' sens' : ''}${p.id && selection.has(p.id) ? ' picked' : ''}" data-i="${i}" title="${esc(p.caption || p.story || '')}">
       <img src="${esc(p.thumb || p.src)}" alt="${esc(p.caption || '')}" loading="lazy" decoding="async" />
       <span class="pl-cap">${esc(p.caption || p.story || 'Sin descripción')}${p.photographer ? `<small>${esc(p.photographer)}</small>` : ''}</span>
-      ${lib ? '' : '<span class="pl-tag">Publicada</span>'}${p.rights && p.rights !== 'propia' ? `<span class="pl-tag pl-r">${esc(RIGHTS[p.rights].split(' ')[0])}</span>` : ''}
+      ${lib ? '' : `<span class="pl-tag">${p.section === 'Archivo de noticel.com' ? 'Archivo' : 'Publicada'}</span>`}${p.rights && p.rights !== 'propia' ? `<span class="pl-tag pl-r">${esc(RIGHTS[p.rights].split(' ')[0])}</span>` : ''}
       ${p.rating ? `<span class="pl-stars">${stars(p.rating)}</span>` : ''}${lib && selecting ? `<span class="pl-check" aria-hidden="true">${p.id && selection.has(p.id) ? '✓' : ''}</span>` : ''}</button>`;
     async function next() {
       if (busy || done) return; busy = true; const mine = run;
       await ensureV2();
+      // Archivo: noticel.com's whole photo archive, 48 at a time (functions/api/fotos.js)
+      if (src === 'arch') {
+        const r = await searchArchive(q, Math.max(0, page), filters);
+        if (mine !== run) return;
+        if (!r) { warn.textContent = 'El archivo de fotos de noticel.com todavía no está disponible. Se carga después de copiar las noticias.'; warn.hidden = false; done = true; busy = false; count.textContent = ''; return; }
+        warn.hidden = true; page = Math.max(0, page) + 1;
+        const start = items.length; items.push(...r.rows.map((p) => ({ p, lib: false })));
+        grid.insertAdjacentHTML('beforeend', r.rows.map((p, k) => card(p, false, start + k)).join(''));
+        count.textContent = `${r.total.toLocaleString('es-PR')} ${r.total === 1 ? 'foto' : 'fotos'} en el archivo de noticel.com${q ? ` con “${q}”` : ''}`;
+        if (items.length >= r.total || !r.rows.length) done = true;
+        busy = false; return;
+      }
       const add: Array<{ p: Photo; lib: boolean }> = [];
       const filtering = Object.values(filters).some(Boolean);
       if (src !== 'pub' && page >= 0) {
