@@ -1330,3 +1330,97 @@ canvas.apr-drag:active{cursor:grabbing}
 .staff .mh-staff{font-size:14px;font-weight:700}
 .staff .mh-site{font-size:13px}
 .staff .masthead .mh-ico{width:32px;height:32px}
+
+
+/* ===== Panel pieces from Noticias Xtra's main style file that NotiCel was missing (2026-11-16): tab bars, "Ahora en la portada", chips, advertiser cards, earnings, phone layouts; NotiCel colors ===== */
+.adp-btn[hidden],.pnl-link[hidden],.apr-reject[hidden],.pnl-add[hidden]{display:none}
+.pnl-me .pnl-mail:empty{display:none}
+.sp-demo[hidden]{display:none}
+.pnl-row-acts .adp-btn{white-space:nowrap}
+.pnl-pane[hidden]{display:none!important}
+.apr-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px dashed var(--line);border-radius:12px;margin-bottom:12px}
+.sl-acts{display:flex;align-items:center;gap:6px;flex:none}
+.nowp{display:grid;gap:10px}
+.nowp-list{list-style:none;margin:0;padding:0;display:grid}
+.nowp{gap:6px}
+.nowp > .pnl-h3{margin:0}
+.nowp > p.pnl-small{margin:0 0 4px}
+.apr-out,.apr-empty{padding:18px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.apr-card header{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.apn-st.warn{background:#FFE9E3;color:#9A2A12}
+.apn-st.off{background:var(--soft);color:var(--muted)}
+.apr[hidden],.apr [hidden]{display:none!important}
+.ds-thumbs figure{position:relative;margin:0;width:150px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}
+.ds-thumbs img{display:block;width:100%;height:80px;object-fit:contain}
+.ds-thumbs figcaption{margin-top:4px;font-size:12px;line-height:1.3}
+.sd-form .sd-chk input[type=radio]{width:18px;height:18px;padding:0;border:0;flex:none}
+.pnl-acct{max-width:460px}
+.pnl-chip{font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px}
+.pnl-chip.ok{background:color-mix(in srgb,#13804A 15%,var(--card));color:#13804A}
+.pnl-chip.warn{background:color-mix(in srgb,#B7791F 18%,var(--card));color:#8A5A10}
+[data-theme="dark"] .pnl-chip.ok{color:#4ADE80}
+[data-theme="dark"] .pnl-chip.warn{color:#F6C26B}
+.pnl-acct [hidden]{display:none!important}
+.earn-list{list-style:none;margin:0;padding:0}
+.earn-list li{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.earn-list li:first-child{border-top:0}
+.earn-list li span:first-child{display:grid;min-width:0}
+.earn-list small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.earn-list b:last-child{font-family:var(--head)}
+.earn-sub .pnl-link{font-size:14px}
+[data-earn] .pnl-card{margin:0 0 16px}
+[data-earn] .sd-head{margin-bottom:14px}
+.cm[hidden],.cm [hidden]{display:none!important}
+.cm-head .pnl-h3{margin:0}
+.cm .pnl-card{margin:0 0 14px}
+.cm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.cm-grid .pnl-card{margin:0 0 14px}
+.cm-link{display:flex;gap:8px;margin-top:8px}
+.cm-link input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--card);color:var(--ink)}
+.cm-link .adp-btn{padding:8px 14px;font-size:13px;white-space:nowrap}
+.nowp[hidden],.pnl-todo[hidden]{display:none!important}
+.an-switch[hidden],[data-earn][hidden],[data-an-visits][hidden]{display:none!important}
+.ds-fit-prev figure{margin:0;flex:1 1 220px;min-width:0}
+.ds-fit-prev canvas{display:block;width:100%;height:auto;border:1px dashed var(--line);border-radius:6px;background:#eee;touch-action:none}
+.ds-fit-prev figcaption{font-size:12px;color:var(--muted);margin-top:4px}
+.ds-fit-zoom[hidden]{display:none}
+.ds-disc label{display:grid;gap:4px;margin-bottom:8px}
+.ds-disc .sd-chk{display:flex}
+.rf-share{margin:10px 0 0;font-size:14px}
+.rf-pass .cm-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.role-badge{display:inline-block;padding:1px 8px;border-radius:999px;font:700 11px var(--head);letter-spacing:.02em}
+.pnl-link.danger{color:var(--red)}
+.rf{margin:22px 0}
+.rf .cm-head{margin-bottom:4px}
+.rf > .pnl-muted{margin:0 0 14px}
+.rf .pnl-kpis{margin:0 0 16px}
+.rf .cm-grid{gap:16px;margin-bottom:16px}
+.rf .cm-grid .pnl-card{margin:0}
+.rf .pnl-card{padding:16px 18px}
+.rf .pnl-card .pnl-h4{margin:0 0 6px}
+.rf .pnl-card > .pnl-muted.pnl-small{margin:0 0 12px}
+.sd-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--card);width:fit-content;max-width:100%}
+.cm-bar.sm{display:block;height:6px;margin-top:6px;max-width:220px}
+.adp-btn.sm{padding:5px 12px;font-size:13px}
+.sd,[data-sdv],.cm,[data-cm-team]{min-width:0;max-width:100%}
+.cm-who .pnl-link{justify-self:start;padding:0;font-size:12.5px}
+.rf .cm-head .pnl-h{margin:0}
+.sd [data-sd-kpis]{margin:10px 0 18px}
+.mynews{display:grid;gap:8px;margin-bottom:16px}
+.mynews[hidden]{display:none}
+.sd-prop-dlg .sd-dlg-h{padding:14px 18px 6px}
+.sd-head > div:first-child{flex:1 1 260px;min-width:0}
+.wr > div{min-width:0}
+.apn-tabs.pnl-sub{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.apn-tabs.pnl-sub::-webkit-scrollbar{display:none}
+.apn-tabs.pnl-sub button{flex:none}
+[data-pane="inicio"] .pnl-kpis{grid-template-columns:repeat(auto-fit,minmax(min(100%,118px),1fr));gap:8px}
+[data-pane="inicio"] .pnl-kpi{padding:10px 11px}
+[data-pane="inicio"] .pnl-kpi span{font-size:11.5px;line-height:1.25}
+[data-pane="inicio"] .pnl-kpi b{font-size:21px}
+[data-pane="inicio"] .pnl-kpi small{font-size:11px;line-height:1.35}
+@media (max-width:760px){.cm[data-comments]{position:fixed;left:0;right:0;bottom:var(--kb,0px);z-index:70;display:none;flex-direction:column;height:86dvh;max-height:calc(100dvh - var(--kb,0px) - 24px);margin:0;padding:0 14px;border:0;border-radius:20px 20px 0 0;box-shadow:0 -10px 40px rgba(22,22,29,.25)}footer .wrap{display:flex;flex-direction:column;gap:10px;padding-top:16px;padding-bottom:6px}}
+@media (max-width:700px){.pnl-row{flex-direction:column;align-items:stretch;gap:12px;padding:14px}.pnl-row-acts{flex-wrap:wrap;gap:8px}.pnl-row-acts .adp-btn{flex:1 1 auto;justify-content:center;text-align:center}.pnl-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Outline ring only for keyboard users (Tab key), never after a mouse click or tap */
+.pnl button:focus:not(:focus-visible),.pnl a:focus:not(:focus-visible),.pnl [role="tab"]:focus:not(:focus-visible){outline:none;box-shadow:none}
+.pnl button:focus-visible,.pnl [role="tab"]:focus-visible{outline:2px solid #92D000;outline-offset:2px}
