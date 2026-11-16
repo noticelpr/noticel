@@ -91,7 +91,7 @@ function frame(title: string, body: string, button?: { text: string; url: string
 <span style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preheader)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F3F8"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:${INK}">
-<tr><td style="padding:20px 28px 16px;border-bottom:4px solid ${PURPLE}"><a href="${SITE}" style="text-decoration:none"><img src="${LOGO}" width="140" height="59" alt="NotiCel" style="display:block;border:0;width:140px;height:56px;color:${PURPLE};font-size:22px;font-weight:bold"></a></td></tr>
+<tr><td style="padding:20px 28px 16px;border-bottom:4px solid ${PURPLE}"><a href="${SITE}" style="text-decoration:none"><img src="${LOGO}" width="140" height="59" alt="NotiCel" style="display:block;border:0;width:140px;height:59px;color:${PURPLE};font-size:22px;font-weight:bold"></a></td></tr>
 <tr><td style="background:${BLUE};height:3px;line-height:3px;font-size:0">&nbsp;</td></tr>
 <tr><td style="padding:28px 28px 8px"><h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;color:${PURPLE}">${esc(title)}</h1>${body}</td></tr>
 ${btn}
