@@ -1322,3 +1322,11 @@ canvas.apr-drag:active{cursor:grabbing}
 .an-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:16px}
 .an-totals .an-total{margin-top:0}
 .an-totals .an-total[hidden]{display:none}
+
+/* Staff panel: a slim header (owner, 2026-11-16: "way smaller"): small logo, little padding; the site keeps its own */
+.staff .masthead .wrap{min-height:0 !important;padding-top:6px !important;padding-bottom:6px !important;row-gap:0 !important}
+.staff .masthead .logo img{height:34px !important;width:auto}
+.staff .masthead .logo .tagline,.staff .masthead .logo small{display:none !important}
+.staff .mh-staff{font-size:14px;font-weight:700}
+.staff .mh-site{font-size:13px}
+.staff .masthead .mh-ico{width:32px;height:32px}
