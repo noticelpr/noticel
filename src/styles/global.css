@@ -5115,3 +5115,9 @@ html.cm-open .mlv{opacity:0;pointer-events:none}
 .arch-gal figure{margin:0}
 .arch-gal img{display:block;width:100%;height:auto;max-height:560px;object-fit:contain;background:var(--soft,#F3F4F6);border-radius:4px}
 .arch-gal figcaption{font-size:14px;color:var(--muted,#6B6A6A);margin-top:6px;line-height:1.45}
+
+/* Search page filters (2026-11-16) */
+.bs-filters{display:flex;flex-wrap:wrap;gap:10px 14px;margin:10px 0 18px}
+.bs-filters label{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted,#6B6A6A)}
+.bs-filters select,.bs-filters input{font:inherit;font-size:15px;padding:7px 10px;border:1px solid var(--line,#D4D4D8);border-radius:8px;background:var(--card,#fff);color:inherit}
+.bs-more{text-align:center;margin:18px 0 30px}

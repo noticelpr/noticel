@@ -325,6 +325,21 @@ const TABS = [
           <header class="sd-head"><div><h1 class="pnl-h">Analítica <span class="sp-demo" data-an-demo hidden>DEMO</span></h1><p class="pnl-muted"><span data-an-real>Visitas reales del sitio, de Google Analytics.</span> <span data-an-at></span></p><p class="pnl-note" data-an-demo hidden><span class="sp-demo">DEMO</span> Números de ejemplo para mostrar cómo funciona esta pestaña. Con el panel real, aquí salen las visitas de Google Analytics.</p></div>
             <div class="pnl-range" role="group" aria-label="Período"><button type="button" data-range="1">Hoy</button><button type="button" data-range="7" aria-pressed="true">7 días</button><button type="button" data-range="28">28 días</button></div></header>
           <div data-an-msg hidden></div>
+          {/* Every story of all time (archive + recent), from the search database (functions/api/buscar.js) */}
+          <button type="button" class="pnl-card an-total" data-all-open hidden><span class="an-total-k">Total de noticias</span><b data-all-total>…</b><span class="pnl-muted pnl-small" data-all-range></span><span class="an-total-go">Ver y buscar ›</span></button>
+          <dialog class="sd-dlg an-all" data-all-dlg aria-labelledby="an-all-h">
+            <header class="sd-dlg-h"><h2 id="an-all-h">Todas las noticias <small class="pnl-muted" data-all-n></small></h2><button type="button" class="sd-x" data-all-x aria-label="Cerrar">✕</button></header>
+            <form class="an-all-f" data-all-form>
+              <input type="search" name="q" placeholder="Palabras del título, resumen o autor" aria-label="Palabras" />
+              <label>Desde<input type="date" name="desde" /></label>
+              <label>Hasta<input type="date" name="hasta" /></label>
+              <label>Sección<select name="seccion"><option value="">Todas</option></select></label>
+              <label>Autor<select name="autor"><option value="">Todos</option></select></label>
+              <label>Orden<select name="orden"><option value="fecha">Más recientes</option><option value="vistas">Más vistas</option></select></label>
+            </form>
+            <ol class="an-all-list" data-all-list></ol>
+            <p class="an-all-more"><button type="button" class="adp-btn ghost-dark" data-all-more hidden>Ver más</button></p>
+          </dialog>
           {topViewed.length > 0 && (
             <div class="pnl-card an-noticel">
               <h2 class="pnl-h3">Lo más leído en noticel.com</h2>
@@ -1174,7 +1189,7 @@ const TABS = [
         const c = counts();
         $('[data-nn="pending"]').textContent = c.pending ? String(c.pending) : '';
         $('[data-nn="check"]').textContent = c.check ? String(c.check) : '';
-        $('[data-nn="pub"]').textContent = String(PUBLISHED.length);
+        $('[data-nn="pub"]').textContent = archiveTotal !== null ? archiveTotal.toLocaleString('es-PR') : String(PUBLISHED.length); // every story (archive included) once the search database answers
         const box = $('[data-news]');
         if (nf === 'pending') {
           const canApprove = ['admin', 'editor', 'desk'].includes(me()?.role ?? ''); // the Editor approves too (user, 2026-11-03)
@@ -1351,7 +1366,71 @@ const TABS = [
     const PUBLISHED: Array<{ id: string; title: string; section: string; author: string; date: string; url: string; views?: number }> = JSON.parse(root.dataset.published || '[]');
     let pubQ = '', pubSort: 'new' | 'views' = 'new'; const takenDown = new Set<string>();
     const plainTxt = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    // The whole archive, from the search database (functions/api/buscar.js): null = not connected (local list only)
+    type Found = { id: number; path: string; title: string; secName: string; author: string; date: string; views: number };
+    // var (not let): paintCounts, defined earlier, reads archiveTotal before this line runs
+    var archiveTotal: number | null = null, archiveSummary: { total: number; oldest: string; newest: string; sections: Array<{ sec: string; name: string; n: number }>; authors: Array<{ author: string; n: number }> } | null = null;
+    const API = `${root.dataset.base!.replace(/\/$/, '')}/api/buscar`;
+    const loadSummary = () => (archiveSummary ? Promise.resolve(archiveSummary) : fetch(`${API}?resumen=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null).then((d) => { archiveSummary = d; archiveTotal = d?.total ?? null; return d; }));
+    const searchArchive = (params: Record<string, string>) => { const u = new URL(API, location.origin); for (const [k, v] of Object.entries(params)) if (v) u.searchParams.set(k, v); return fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<{ total: number; results: Found[] } | null>; };
+    const localByPath = () => new Map(PUBLISHED.map((p) => [new URL(p.url, location.origin).pathname, p]));
+    let pubRun = 0;
+    void loadSummary().then((d) => { const el = document.querySelector('[data-nn="pub"]'); if (d && el) el.textContent = d.total.toLocaleString('es-PR'); }); // Publicadas shows the full total from the start
     function paintPub() {
+      if (archiveTotal !== null) { void paintPubArchive(); return; }
+      void loadSummary().then((d) => { if (d) { const b = document.querySelector('[data-nn="pub"]'); if (b) b.textContent = d.total.toLocaleString('es-PR'); paintPubArchive(); } });
+      paintPubLocal();
+    }
+    async function paintPubArchive() {
+      const run = ++pubRun, box = $('[data-pub-list]');
+      const d = await searchArchive({ q: pubQ.trim(), orden: pubSort === 'views' ? 'vistas' : 'fecha', por: '60' });
+      if (run !== pubRun) return;
+      if (!d) { paintPubLocal(); return; }
+      const local = localByPath(), canEdit = ['admin', 'editor', 'desk'].includes(me()?.role ?? '');
+      box.innerHTML = `<p class="pnl-muted pnl-small">${d.total.toLocaleString('es-PR')} ${d.total === 1 ? 'noticia' : 'noticias'}${pubQ.trim() ? ` con “${esc(pubQ.trim())}”` : ' en total, desde 2010'} · se muestran ${Math.min(60, d.total)}</p>` + (d.results.map((r) => {
+        const mine = local.get(r.path), id = mine?.id ?? `wpa-${r.id}`;
+        return `<article class="pnl-row" data-pub="${esc(id)}" data-path="${esc(r.path)}">
+        <div><p class="pnl-muted">✍️ Escrita por <b>${esc(r.author || 'NotiCel')}</b> · ${esc(r.secName)} · ${new Date(r.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}${r.views ? ` · 👁 <b>${r.views.toLocaleString('es-PR')}</b> vistas` : ''}${mine ? '' : ' · <span class="pnl-tag">Archivo</span>'}</p>
+          <h2><a href="${esc(r.path)}" target="_blank" rel="noopener">${esc(r.title)}</a></h2></div>
+        <div class="pnl-row-acts">${canEdit ? '<button type="button" class="adp-btn ghost-dark" data-pub-edit>Editar</button>' : ''}<a class="adp-btn ghost-dark" href="${esc(r.path)}" target="_blank" rel="noopener">Ver en el sitio ↗</a></div></article>`;
+      }).join('') || `<p class="apr-empty">No encontramos noticias con “${esc(pubQ)}”.</p>`);
+    }
+    // Analítica → «Total de noticias»: every story of all time, searchable with filters (dates, section, author, words, order)
+    {
+      const card = $('[data-all-open]'), dlg = $<HTMLDialogElement>('[data-all-dlg]'), form = $<HTMLFormElement>('[data-all-form]'), list = $('[data-all-list]'), moreBtn = $<HTMLButtonElement>('[data-all-more]');
+      const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+      const showCard = () => void loadSummary().then((d) => {
+        if (!d) return; // the archive is real, public data: shown in demo mode too
+        card.hidden = false; $('[data-all-total]').textContent = d.total.toLocaleString('es-PR');
+        $('[data-all-range]').textContent = `desde el ${fmtDay(d.oldest)} hasta hoy`;
+        const sec = form.elements.namedItem('seccion') as HTMLSelectElement, au = form.elements.namedItem('autor') as HTMLSelectElement;
+        if (sec.options.length < 2) sec.insertAdjacentHTML('beforeend', d.sections.map((x) => `<option value="${esc(x.sec)}">${esc(x.name)} (${x.n.toLocaleString('es-PR')})</option>`).join(''));
+        if (au.options.length < 2) au.insertAdjacentHTML('beforeend', d.authors.map((x) => `<option>${esc(x.author)}</option>`).join(''));
+      });
+      addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'analitica') showCard(); });
+      if ((location.hash.slice(1) || 'inicio') === 'analitica') showCard();
+      let page = 0, run = 0;
+      const params = () => Object.fromEntries([...new FormData(form)].map(([k, v]) => [k, String(v)]));
+      const search = async (reset: boolean) => {
+        if (reset) { page = 0; list.innerHTML = '<li class="pnl-muted">Buscando…</li>'; }
+        page++; const mine = ++run; moreBtn.disabled = true;
+        const d = await searchArchive({ ...params(), pagina: String(page), por: '50' });
+        if (mine !== run) return;
+        if (!d) { list.innerHTML = '<li class="pnl-muted">No se pudo buscar. Intenta otra vez en un momento.</li>'; return; }
+        $('[data-all-n]').textContent = `(${d.total.toLocaleString('es-PR')})`;
+        const html = d.results.map((r) => `<li><a href="${esc(r.path)}" target="_blank" rel="noopener">${esc(r.title)}</a><span class="pnl-muted pnl-small">${esc(r.secName)} · ${esc(r.author || 'NotiCel')} · ${fmtDay(r.date)}</span><b>${r.views ? `👁 ${r.views.toLocaleString('es-PR')}` : ''}</b></li>`).join('');
+        if (page === 1) list.innerHTML = html || '<li class="pnl-muted">No hay noticias con esos filtros.</li>'; else list.insertAdjacentHTML('beforeend', html);
+        moreBtn.hidden = page * 50 >= d.total; moreBtn.disabled = false;
+      };
+      card.addEventListener('click', () => { dlg.showModal(); void search(true); });
+      $('[data-all-x]').addEventListener('click', () => dlg.close());
+      dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+      form.addEventListener('submit', (e) => { e.preventDefault(); void search(true); });
+      let typing = 0;
+      form.addEventListener('input', (e) => { clearTimeout(typing); typing = window.setTimeout(() => void search(true), (e.target as HTMLElement).matches('input[type=search]') ? 350 : 0); });
+      moreBtn.addEventListener('click', () => void search(false));
+    }
+    function paintPubLocal() {
       const words = plainTxt(pubQ.trim()).split(/\s+/).filter(Boolean);
       const found = PUBLISHED.filter((p) => words.every((w) => plainTxt(`${p.title} ${p.section} ${p.author}`).includes(w)));
       const rows = (pubSort === 'views' ? [...found].sort((a, b) => (b.views ?? 0) - (a.views ?? 0)) : found).slice(0, 60);
@@ -1399,8 +1478,10 @@ const TABS = [
     });
     root.addEventListener('click', async (e) => {
       const t = e.target as HTMLElement; const row = t.closest<HTMLElement>('[data-pub]'); if (!row) return;
-      const p = PUBLISHED.find((x) => x.id === row.dataset.pub); if (!p) return;
-      if (t.closest('[data-pub-edit]')) { dispatchEvent(new CustomEvent('nc-edit-story', { detail: { id: p.id } })); showTab('escribir'); scrollTo({ top: 0 }); }
+      const p = PUBLISHED.find((x) => x.id === row.dataset.pub);
+      // An old story from the archive (not built into the site): it opens in Escribir from the archive
+      if (!p) { if (t.closest('[data-pub-edit]')) { dispatchEvent(new CustomEvent('nc-edit-story', { detail: { id: row.dataset.pub!, path: row.dataset.path ?? '' } })); showTab('escribir'); scrollTo({ top: 0 }); } return; }
+      if (t.closest('[data-pub-edit]')) { dispatchEvent(new CustomEvent('nc-edit-story', { detail: { id: p.id, path: (t.closest<HTMLElement>('[data-path]')?.dataset.path ?? '') } })); showTab('escribir'); scrollTo({ top: 0 }); }
       if (t.closest('[data-pub-down]')) {
         if (!(await ask(`¿Quitar “${p.title}” del sitio? Desaparece en unos 2 minutos. Quedará en Escribir → Borradores para corregirla y publicarla otra vez.`, { ok: 'Quitar del sitio', danger: true }))) return;
         (t as HTMLButtonElement).disabled = true; (t as HTMLButtonElement).textContent = 'Quitando…';

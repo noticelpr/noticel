@@ -1,40 +1,72 @@
 ---
+// Search (2026-11-16): every NotiCel story, the ~230,000 in the archive and the recent ones, through /api/buscar
+// (functions/api/buscar.js, Cloudflare D1). Filters: section, dates, order (newest or most read). If the archive
+// search isn't connected yet, it falls back to the site's own small index (search-index.json, recent stories only).
 import Base from '../layouts/Base.astro';
-import { url } from '../lib/site';
+import { url, SECTIONS } from '../lib/site';
 ---
 <Base title="Buscar" noindex>
   <main class="wrap" id="main">
     <div class="sec-h" style="margin-top:0"><h1 style="font-size:28px;margin:0;color:var(--purple)" id="searchTitle">Buscar noticias</h1><span class="time" id="searchCount"></span></div>
-    <form class="search page-search" role="search" action={url('buscar')} method="get">
+    <form class="search page-search" role="search" action={url('buscar')} method="get" id="searchForm">
       <label for="pageq" class="sr">Buscar noticias</label>
       <input id="pageq" name="q" type="search" placeholder="Un pueblo o un tema, como “Caguas”" />
       <button type="submit" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg></button>
     </form>
-    <div class="list" id="results" data-index={url('search-index.json')}></div>
+    <div class="bs-filters" id="filters">
+      <label>Sección<select name="seccion" form="searchForm"><option value="">Todas</option>{SECTIONS.map((s) => <option value={s.id}>{s.name}</option>)}</select></label>
+      <label>Desde<input type="date" name="desde" form="searchForm" /></label>
+      <label>Hasta<input type="date" name="hasta" form="searchForm" /></label>
+      <label>Orden<select name="orden" form="searchForm"><option value="fecha">Más recientes</option><option value="vistas">Más leídas</option></select></label>
+    </div>
+    <div class="list" id="results" data-index={url('search-index.json')} data-api={url('api/buscar')}></div>
+    <p class="bs-more"><button type="button" class="adp-btn ghost-dark" id="more" hidden>Ver más</button></p>
   </main>
   <script>
-    const box = document.getElementById('results')!;
+    const box = document.getElementById('results')!, more = document.getElementById('more') as HTMLButtonElement;
+    const params = new URLSearchParams(location.search);
     // Old WordPress tag links arrive as /buscar/?q=tema-con-guiones (see public/_redirects): hyphens become spaces
-    const q = (new URLSearchParams(location.search).get('q') ?? '').replace(/-/g, ' ').trim();
-    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+    const q = (params.get('q') ?? '').replace(/-/g, ' ').trim();
+    const f = { seccion: params.get('seccion') ?? '', desde: params.get('desde') ?? '', hasta: params.get('hasta') ?? '', orden: params.get('orden') ?? 'fecha' };
+    const esc = (s = '') => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
     for (const id of ['q', 'pageq']) { const i = document.getElementById(id) as HTMLInputElement | null; if (i) i.value = q; }
-    if (!q) (document.getElementById('pageq') as HTMLInputElement).focus();
-    if (!q) {
-      box.innerHTML = '<div class="empty"><p>Escribe un pueblo o un tema en el buscador, como “Caguas” o “béisbol”.</p></div>';
+    for (const [k, v] of Object.entries(f)) { const el = document.querySelector<HTMLInputElement>(`#filters [name="${k}"]`); if (el) el.value = v; }
+    const anyFilter = !!(f.seccion || f.desde || f.hasta);
+    const day = (iso: string) => new Date(iso).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+    const item = (i: { url: string; title: string; descr: string; section: string; date?: string; views?: number }) =>
+      `<article class="item" style="grid-template-columns:1fr"><div><span class="badge">${esc(i.section)}</span><a href="${esc(i.url)}"><h3 class="hl">${esc(i.title)}</h3></a><p style="margin:0 0 4px;color:var(--muted)">${esc(i.descr)}</p><span class="time">${i.date ? day(i.date) : ''}</span></div></article>`;
+    const none = () => `<div class="empty"><p>No encontramos noticias${q ? ` con “${esc(q)}”` : ''}. Prueba con otras palabras o quita algún filtro.</p></div>`;
+    if (!q && !anyFilter) {
+      box.innerHTML = '<div class="empty"><p>Escribe un pueblo o un tema en el buscador, como “Caguas” o “béisbol”. Buscamos en todas las noticias de NotiCel, también las de años anteriores.</p></div>';
+      (document.getElementById('pageq') as HTMLInputElement).focus();
     } else {
-      document.getElementById('searchTitle')!.textContent = `Resultados para “${q}”`;
-      const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      fetch(box.dataset.index!)
-        .then((r) => r.json())
-        .then((items: Array<{ url: string; title: string; description: string; section: string; place: string; date: string; text: string }>) => {
-          const t = norm(q);
-          const hits = items.filter((i) => norm(`${i.title} ${i.description} ${i.place} ${i.text}`).includes(t));
-          document.getElementById('searchCount')!.textContent = `${hits.length} ${hits.length === 1 ? 'noticia' : 'noticias'}`;
-          box.innerHTML = hits.length
-            ? hits.map((i) => `<article class="item" style="grid-template-columns:1fr"><div><span class="badge">${esc(i.section)}</span><a href="${i.url}"><h3 class="hl">${esc(i.title)}</h3></a><p style="margin:0 0 4px;color:var(--muted)">${esc(i.description)}</p><span class="time">${esc(i.place)}</span></div></article>`).join('')
-            : `<div class="empty"><p>No encontramos noticias con “${esc(q)}”. Prueba con un pueblo o un tema, como “Caguas” o “béisbol”.</p></div>`;
-        })
-        .catch(() => { box.innerHTML = '<div class="empty"><p>No se pudo cargar la búsqueda. Recarga la página para intentarlo otra vez.</p></div>'; });
+      document.getElementById('searchTitle')!.textContent = q ? `Resultados para “${q}”` : 'Noticias';
+      let page = 0;
+      const load = async () => {
+        page++; more.disabled = true;
+        const u = new URL(box.dataset.api!, location.origin);
+        u.searchParams.set('q', q); u.searchParams.set('pagina', String(page)); u.searchParams.set('por', '20');
+        for (const [k, v] of Object.entries(f)) if (v) u.searchParams.set(k, v);
+        const r = await fetch(u).catch(() => null);
+        if (!r || !r.ok) throw new Error('archive search not available');
+        const d = await r.json() as { total: number; results: Array<{ path: string; title: string; descr: string; secName: string; date: string; views: number }> };
+        document.getElementById('searchCount')!.textContent = `${d.total.toLocaleString('es-PR')} ${d.total === 1 ? 'noticia' : 'noticias'}`;
+        const html = d.results.map((i) => item({ url: i.path, title: i.title, descr: i.descr, section: i.secName, date: i.date })).join('');
+        if (page === 1) box.innerHTML = html || none(); else box.insertAdjacentHTML('beforeend', html);
+        more.hidden = page * 20 >= d.total; more.disabled = false;
+      };
+      more.addEventListener('click', () => void load());
+      // The site's own small index (recent stories) when the archive search isn't connected
+      const fallback = () => fetch(box.dataset.index!).then((r) => r.json()).then((items: Array<{ url: string; title: string; description: string; section: string; place: string; text: string }>) => {
+        const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const t = norm(q);
+        const hits = items.filter((i) => norm(`${i.title} ${i.description} ${i.place} ${i.text}`).includes(t));
+        document.getElementById('searchCount')!.textContent = `${hits.length} ${hits.length === 1 ? 'noticia' : 'noticias'}`;
+        box.innerHTML = hits.length ? hits.map((i) => item({ url: i.url, title: i.title, descr: i.description, section: i.section })).join('') : none();
+      }).catch(() => { box.innerHTML = '<div class="empty"><p>No se pudo cargar la búsqueda. Recarga la página para intentarlo otra vez.</p></div>'; });
+      load().catch(() => void fallback());
     }
+    // A changed filter searches again at once
+    document.querySelectorAll('#filters select, #filters input').forEach((el) => el.addEventListener('change', () => (document.getElementById('searchForm') as HTMLFormElement).requestSubmit()));
   </script>
 </Base>

@@ -782,12 +782,25 @@ const TOOLS = [
         sources, related, gallery, correction: unq(fm.correction || ''), factCheck: unq(fm.factCheck || ''), factClaim: unq(fm.factClaim || ''), body: mdToHtml(m[2]) };
     }
     /** A story on the site as an article of the team (opened before, or brought from its file now). */
-    async function storyArt(id: string): Promise<Art | null> {
+    /** An old story that lives only in the archive (functions/api/historia.js), as a story file: saving it in Escribir
+     *  makes it a regular story built into the site, at the same address. */
+    async function archiveFile(path: string): Promise<string | null> {
+      const r = await fetch(`${BASE}/api/historia?path=${encodeURIComponent(path)}`).catch(() => null);
+      if (!r?.ok) return null;
+      const s = await r.json() as { id: number; title: string; desc: string; date: string; author: string; path: string; cats: string[]; img: string; cap: string; html: string; views?: number; gallery?: Array<{ src: string; caption: string; credit: string }> };
+      const y = (v: unknown) => JSON.stringify(v);
+      return ['---', `wpId: ${s.id}`, `title: ${y(s.title)}`, `description: ${y(s.desc)}`, `date: ${y(s.date)}`, `author: ${y(s.author || 'NotiCel')}`, `path: ${y(s.path)}`,
+        `categories: ${y(s.cats)}`, ...(s.img ? [`image: ${y(s.img)}`] : []), ...(s.cap ? [`imageCaption: ${y(s.cap)}`] : []), 'topStory: false', `views: ${s.views ?? 0}`,
+        ...(s.gallery?.length ? [`gallery: ${y(s.gallery)}`] : []), '---', '', s.html, ''].join('\n');
+    }
+    async function storyArt(id: string, path = ''): Promise<Art | null> {
       if (DB) await refresh(); // the team's latest: someone may have opened this story already
       const have = load().find((a) => a.slug === id);
       toast('Abriendo la noticia…');
-      // The story's file: through the staff-only "repo" function (the code is private); the preview reads GitHub directly
-      const text = DB ? await repoRead('story', id) : await fetch(`${RAW}${encodeURIComponent(id)}.md?t=${Date.now()}`).then((r) => (r.ok ? r.text() : null)).catch(() => null);
+      // The story's file: NotiCel's code is public, so it's read straight from GitHub; an old story that isn't built into
+      // the site comes from the archive (fixed 2026-11-16: Noticias Xtra's private "repo" function doesn't exist here)
+      let text = await fetch(`${RAW}${encodeURIComponent(id)}.md?t=${Date.now()}`).then((r) => (r.ok ? r.text() : null)).catch(() => null);
+      if (!text && path) text = await archiveFile(path);
       const a = text ? fromFile(id, text) : null;
       if (have) {
         // Opened before: keep the team's copy, but take the fields the editor doesn't show (origin, via, importance…)
@@ -799,8 +812,8 @@ const TOOLS = [
       if (!(await store(a))) return null; // saved for the team, linked to the story on the site
       return a;
     }
-    async function importStory(id: string) {
-      const a = await storyArt(id); if (!a) return;
+    async function importStory(id: string, path = '') {
+      const a = await storyArt(id, path); if (!a) return;
       openEditor(a); toast('Lista para editar. Al tocar “Actualizar”, se corrige la misma noticia en el sitio.');
     }
     /** Takes a story off the site (its file gets draft: true; the site rebuilds in about 2 minutes). It stays in
@@ -824,7 +837,7 @@ const TOOLS = [
       dispatchEvent(new CustomEvent('nc-takedown-done', { detail: { id, ok } }));
     });
     root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-import]'); if (b) void importStory(b.dataset.import!); });
-    addEventListener('nc-edit-story', (e) => void importStory((e as CustomEvent).detail.id)); // "Editar" in Noticias → Vistazo rápido
+    addEventListener('nc-edit-story', (e) => void importStory((e as CustomEvent).detail.id, (e as CustomEvent).detail.path ?? '')); // "Editar" in Noticias → Vistazo rápido
 
 
     /** The gallery in the story file. Without a main photo, the first gallery photo becomes the main one (toFile). */

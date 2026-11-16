@@ -8,3 +8,4 @@ Disallow: /guardadas
 
 Sitemap: https://noticel.com/sitemap.xml
 Sitemap: https://noticel.com/news-sitemap.xml
+Sitemap: https://noticel.com/sitemaps/index.xml
