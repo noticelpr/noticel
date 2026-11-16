@@ -44,7 +44,7 @@ console.log(`${rows.size} stories`);
 // 3. SQL files of 20,000 stories each, then Wrangler sends them to D1
 const q = (v) => (v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 rmSync(TMP, { recursive: true, force: true }); mkdirSync(TMP, { recursive: true });
-const head = `DROP TABLE IF EXISTS fts; DROP TABLE IF EXISTS stories;
+const head = `DROP TABLE IF EXISTS fts; DROP TABLE IF EXISTS stories; DROP TABLE IF EXISTS resumen;
 CREATE TABLE stories (id INTEGER PRIMARY KEY, path TEXT NOT NULL, title TEXT NOT NULL, descr TEXT, date TEXT NOT NULL, sec TEXT, cats TEXT, author TEXT, views INTEGER DEFAULT 0, img TEXT);
 CREATE VIRTUAL TABLE fts USING fts5(title, descr, author, content='', tokenize='unicode61 remove_diacritics 2');
 `;
@@ -53,7 +53,7 @@ const files = [];
 for (let i = 0; i < list.length; i += 20000) {
   const part = list.slice(i, i + 20000), file = join(TMP, `part-${String(i / 20000).padStart(2, '0')}.sql`);
   const ins = part.map((r) => `INSERT INTO stories VALUES (${[r.id, r.path, r.title, r.descr, r.date, r.sec, ` ${r.cats.join(' ')} `, r.author, r.views, r.img].map(q).join(',')});\nINSERT INTO fts(rowid,title,descr,author) VALUES (${[r.id, r.title, r.descr, r.author].map(q).join(',')});`).join('\n');
-  writeFileSync(file, (i === 0 ? head : '') + ins + (i + 20000 >= list.length ? '\nCREATE INDEX stories_date ON stories(date); CREATE INDEX stories_sec ON stories(sec); CREATE INDEX stories_views ON stories(views); CREATE INDEX stories_author ON stories(author); CREATE UNIQUE INDEX stories_path ON stories(path);\n' : ''));
+  writeFileSync(file, (i === 0 ? head : '') + ins + (i + 20000 >= list.length ? '\nCREATE INDEX stories_date ON stories(date); CREATE INDEX stories_author ON stories(author); CREATE INDEX stories_sec ON stories(sec); CREATE INDEX stories_views ON stories(views); CREATE INDEX stories_author ON stories(author); CREATE UNIQUE INDEX stories_path ON stories(path);\n' : ''));
   files.push(file);
 }
 if (process.argv.includes('--dry')) { console.log(`dry run: ${files.length} files in ${TMP}`); process.exit(0); }

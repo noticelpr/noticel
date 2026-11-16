@@ -34,7 +34,7 @@ for (const f of readdirSync('archive/media').filter((x) => /^page-\d+\.json\.gz$
 console.log(`${rows.length} photos (${rows.filter((r) => r.story).length} with their story, ${rows.filter((r) => r.caption).length} with a caption)`);
 const q = (v) => (v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 rmSync(TMP, { recursive: true, force: true }); mkdirSync(TMP, { recursive: true });
-const head = `DROP TABLE IF EXISTS fotos_fts; DROP TABLE IF EXISTS fotos;
+const head = `DROP TABLE IF EXISTS fotos_fts; DROP TABLE IF EXISTS fotos; CREATE TABLE IF NOT EXISTS resumen (k TEXT PRIMARY KEY, v TEXT NOT NULL); DELETE FROM resumen WHERE k = 'fotos';
 CREATE TABLE fotos (id INTEGER PRIMARY KEY, src TEXT NOT NULL, caption TEXT, alt TEXT, title TEXT, date TEXT, w INTEGER, h INTEGER, story TEXT, path TEXT);
 CREATE VIRTUAL TABLE fotos_fts USING fts5(caption, alt, title, story, content='', tokenize='unicode61 remove_diacritics 2');
 `;
