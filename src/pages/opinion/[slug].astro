@@ -22,6 +22,14 @@ const links = [
   c.facebook && { label: 'Facebook', href: handle(c.facebook, 'facebook.com') },
   c.website && { label: 'Sitio web', href: /^https?:\/\//.test(c.website) ? c.website : `https://${c.website}` },
 ].filter(Boolean) as Array<{ label: string; href: string }>;
+// Videos on the profile (panel → Columnistas → Videos): YouTube and Vimeo play here; Facebook opens in a new tab
+const videos = (c.videos ?? []).map((v) => {
+  const yt = v.match(/(?:youtube(?:-nocookie)?\.com\/(?:embed\/|watch\?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1];
+  const vm = v.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1];
+  return yt ? { kind: 'yt', src: `https://www.youtube-nocookie.com/embed/${yt}`, thumb: `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`, href: `https://www.youtube.com/watch?v=${yt}` }
+    : vm ? { kind: 'vimeo', src: `https://player.vimeo.com/video/${vm}`, thumb: '', href: `https://vimeo.com/${vm}` }
+    : { kind: 'link', src: '', thumb: '', href: v };
+});
 const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' });
 ---
 <Base title={`${c.name} · Opinión`} active="opinion" description={c.bio ?? `Columnas de ${c.name} en NotiCel.`}>
@@ -52,6 +60,15 @@ const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', mo
             <div class="empty"><p>{c.demo ? 'Este perfil es un ejemplo. Aquí aparecerán sus columnas.' : 'Su primera columna llega muy pronto.'}</p><a class="btn" href={sectionUrl('opiniones')}>Ver todas las columnas</a></div>
           )}
         </section>
+
+        {videos.length > 0 && (
+          <section class="cp-videos" aria-labelledby="cp-videos-h">
+            <div class="sec-h"><h2 id="cp-videos-h">Videos de {c.name}</h2></div>
+            <div class="cp-vgrid">{videos.map((v) => v.kind === 'link'
+              ? <a class="cp-vlink" href={v.href} target="_blank" rel="noopener">Ver video ↗</a>
+              : <div class="cp-vid"><iframe src={v.src} title={`Video de ${c.name}`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>)}</div>
+          </section>
+        )}
 
         <AdSlot size="infeed" />
 

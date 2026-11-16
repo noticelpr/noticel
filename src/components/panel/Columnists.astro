@@ -32,6 +32,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
         <p class="pnl-note">Tiene que ser igual al autor de sus columnas (por ejemplo, «Lcdo. Ramón Alejandro Pabón»), para que el sitio las junte en su perfil.</p>
         <label>Cargo o posición<input name="role" maxlength="80" placeholder="Ej.: Abogado y analista político" /></label>
         <label>Biografía<textarea name="bio" rows="5" maxlength="700" placeholder="Quién es, a qué se dedica y de qué escribe."></textarea></label>
+        <label>Videos <small>(uno por línea: YouTube, Facebook o Vimeo; salen en su perfil)</small><textarea name="videos" rows="4" placeholder="https://www.youtube.com/watch?v=…"></textarea></label>
         <div class="cl-two">
           <label>Correo público<input name="email" type="email" maxlength="80" placeholder="opcional" autocapitalize="off" /></label>
           <label>Sitio web<input name="website" maxlength="120" placeholder="opcional" autocapitalize="off" /></label>
@@ -100,6 +101,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       $('[data-cl-form-h]').textContent = c ? `Editar: ${c.name}` : 'Nuevo columnista';
       form.reset();
       for (const k of ['name', 'role', 'bio', 'photo', 'email', 'website', 'x', 'instagram', 'facebook'] as const) f(k).value = (c?.[k] as string) ?? '';
+      f('videos').value = (c?.videos ?? []).join('\n');
       f('sort').value = String(c?.sort ?? rows.length + 1);
       f('active').checked = c ? c.active : true;
       $('[data-cl-err]').hidden = true;
@@ -150,7 +152,8 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       const slug = editing?.slug ?? slugify(name);
       if (!editing && rows.some((r) => r.slug === slug)) return err('Ya existe un columnista con ese nombre. Búscalo en la lista y edítalo.');
       const v = (k: string) => f(k).value.trim() || null;
-      const row: ColumnistRow = { slug, name, role: v('role') ?? 'Columnista', bio: v('bio'), photo: v('photo'), email: v('email'), website: v('website'), x: v('x'), instagram: v('instagram'), facebook: v('facebook'), active: f('active').checked, sort: Number(f('sort').value) || 0 };
+      const videos = f('videos').value.split(/\s+/).map((x) => x.trim()).filter((x) => /^https?:\/\//.test(x)).slice(0, 24);
+      const row: ColumnistRow = { videos, slug, name, role: v('role') ?? 'Columnista', bio: v('bio'), photo: v('photo'), email: v('email'), website: v('website'), x: v('x'), instagram: v('instagram'), facebook: v('facebook'), active: f('active').checked, sort: Number(f('sort').value) || 0 };
       const btn = $<HTMLButtonElement>('[data-cl-save]'); btn.disabled = true;
       const problem = live() ? await saveColumnist(row) : '';
       btn.disabled = false;

@@ -12,6 +12,7 @@ import type { Story } from './site';
 export type Columnist = {
   name: string; role?: string; bio?: string; photo?: string; demo?: boolean; slug: string;
   email?: string; x?: string; instagram?: string; facebook?: string; website?: string;
+  videos?: string[]; // video links for the profile page
 };
 
 export const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -31,13 +32,16 @@ async function fromDatabase(): Promise<Columnist[] | null> {
     return rows.filter((c) => c.kind !== 'periodista').map((c) => ({
       slug: c.slug!, name: c.name!, role: clean(c.role), bio: clean(c.bio), photo: clean(c.photo), email: clean(c.email),
       x: clean(c.x), instagram: clean(c.instagram), facebook: clean(c.facebook), website: clean(c.website),
+      videos: Array.isArray(c.videos) ? (c.videos as unknown as string[]).filter((v) => /^https?:\/\//.test(v)) : [],
     }));
   } catch { return null; }
 }
 
 export const COLUMNISTS: Columnist[] = (await fromDatabase()) ?? fromFile;
-export const columnistOf = (author: string) => COLUMNISTS.find((c) => c.name === author);
-export const columnsBy = (stories: Story[], c: Columnist) => stories.filter((s) => s.data.section === 'opiniones' && s.data.author === c.name);
+// A columnist signs with or without their title ("Walter Pérez" and "Lcdo. Walter Pérez" are one profile)
+const plainName = (s = '') => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^(lcdo|lcda|lic|dr|dra)\.?\s+/, '').replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+export const columnistOf = (author: string) => COLUMNISTS.find((c) => c.name === author) ?? COLUMNISTS.find((c) => plainName(c.name) === plainName(author));
+export const columnsBy = (stories: Story[], c: Columnist) => stories.filter((s) => s.data.section === 'opiniones' && plainName(s.data.author) === plainName(c.name));
 export const initials = (n: string) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 /** A photo address for <img>: uploaded photos are full addresses; older ones are paths inside the site. */
 export const photoSrc = (p: string, base = import.meta.env.BASE_URL) => (/^https?:\/\//.test(p) ? p : `${base.replace(/\/?$/, '/')}${p.replace(/^\//, '')}`);

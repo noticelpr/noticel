@@ -350,6 +350,7 @@ export type ColumnistRow = {
   slug: string; name: string; role: string; bio?: string | null; photo?: string | null; email?: string | null;
   x?: string | null; instagram?: string | null; facebook?: string | null; website?: string | null; active: boolean; sort: number;
   kind?: 'columnista' | 'periodista'; owner?: string | null; // supabase/perfiles.sql
+  videos?: string[] | null; // video links shown on the profile page (supabase/columnistas-noticel.sql)
 };
 /** The signed-in team member's own public profile (by their name as author), or null. */
 export async function myProfile(name: string): Promise<ColumnistRow | null> {
