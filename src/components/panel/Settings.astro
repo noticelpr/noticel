@@ -3,6 +3,9 @@
 //   · Datos del sitio: tagline, description, contact emails, phone, legal name, postal address and the days to pay an
 //     invoice, in one place instead of in the code (src/data/ajustes.json, saved through "publicar"; the site rebuilds).
 //   · Registro de actividad: who did what in the panel and when (activity_log, supabase/permisos-equipo.sql).
+//   · Precios de anuncios (owner, 2026-11-16): the self-serve square plans, the design fee and the paid press release.
+//     Saved in Supabase (ad_prices, supabase/precios-anuncios.sql), never in the code; only the administrator can
+//     change them (the database checks it). Anúnciate reads them at once; the "pagos" function charges exactly these.
 import { SITE } from '../../lib/site';
 const cur = { tagline: SITE.tagline, description: SITE.description, email: SITE.email, salesEmail: SITE.salesEmail, phone: SITE.phone, legalName: SITE.legalName, address: SITE.address, invoiceDays: SITE.invoiceDays };
 ---
@@ -21,9 +24,17 @@ const cur = { tagline: SITE.tagline, description: SITE.description, email: SITE.
       <label>Dirección postal<input name="address" maxlength="200" placeholder="ej. PO Box 1234, San Juan, PR 00936" /></label>
       <label>Días para pagar una factura<input name="invoiceDays" type="number" min="0" max="90" /></label>
     </div>
-    <p class="pnl-muted pnl-small">El nombre, el logo, los colores y los precios de los anuncios todavía se cambian en el código: pídemelos y los paso aquí si los necesitas cambiar seguido.</p>
+    <p class="pnl-muted pnl-small">El nombre, el logo y los colores todavía se cambian en el código. Los precios de los anuncios están aquí abajo.</p>
     <p class="cm-err" data-st-err hidden></p>
     <div class="st-save"><button type="submit" class="adp-btn">Guardar ajustes</button><span class="pnl-muted pnl-small" data-st-ok></span></div>
+  </form>
+
+  <form class="pnl-card sd-form" data-st-prices novalidate>
+    <h2 class="pnl-h3">Precios de anuncios</h2>
+    <p class="pnl-muted pnl-small">Lo que paga un cliente en Anúnciate (en dólares). Se guardan en la base de datos, no en el código. Si dejas uno vacío, Anúnciate dice «Precio por confirmar» y ese plan no se puede pagar en línea. Los clientes directos tienen su propio precio en Ventas.</p>
+    <div class="st-prices" data-st-price-list><p class="pnl-muted">Cargando…</p></div>
+    <p class="cm-err" data-st-price-err hidden></p>
+    <div class="st-save"><button type="submit" class="adp-btn">Guardar precios</button><span class="pnl-muted pnl-small" data-st-price-ok></span></div>
   </form>
 
   <div class="pnl-card st-log">
@@ -35,7 +46,7 @@ const cur = { tagline: SITE.tagline, description: SITE.description, email: SITE.
 </section>
 
 <script>
-  import { hasBackend, staffApi, saveSettings, logActivity } from '../../lib/backend';
+  import { hasBackend, staffApi, saveSettings, logActivity, adPriceRows, saveAdPrices, type AdPriceRow } from '../../lib/backend';
   import { isDemo } from '../../lib/demo';
   const root = document.querySelector<HTMLElement>("[data-ajustes]")!;
   const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
@@ -84,5 +95,38 @@ const cur = { tagline: SITE.tagline, description: SITE.description, email: SITE.
     ok.textContent = '✓ Guardado. El sitio se actualiza en unos 2 minutos.';
   });
   $('[data-st-who]').addEventListener('change', paintLog);
+
+  // ---- Precios de anuncios (ad_prices) ----
+  const pf = $<HTMLFormElement>('[data-st-prices]');
+  let prices: AdPriceRow[] = [];
+  async function loadPrices() {
+    const list = pf.querySelector<HTMLElement>('[data-st-price-list]')!;
+    if (isDemo() || !hasBackend()) { list.innerHTML = '<p class="pnl-muted">Modo demo: los precios están en la base de datos real.</p>'; return; }
+    const r = await adPriceRows();
+    if (!r) { list.innerHTML = '<p class="pnl-muted">Falta un paso en la base de datos: corre supabase/precios-anuncios.sql en Supabase.</p>'; return; }
+    prices = r;
+    const when = (x: AdPriceRow) => (x.updated_by ? `${x.updated_by}, ${new Date(x.updated_at!).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' })}` : '');
+    list.innerHTML = prices.map((x) => `<label><span>${esc(x.label)}${when(x) ? `<br><small class="pnl-muted">Cambiado por ${esc(when(x))}</small>` : ''}</span><input type="number" min="0" step="0.01" inputmode="decimal" name="${esc(x.id)}" value="${x.amount ?? ''}" placeholder="Por confirmar" /></label>`).join('');
+  }
+  pf.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const er = pf.querySelector<HTMLElement>('[data-st-price-err]')!, ok = pf.querySelector<HTMLElement>('[data-st-price-ok]')!;
+    er.hidden = true; ok.textContent = '';
+    if (isDemo() || !hasBackend() || !prices.length) { ok.textContent = 'No hay precios que guardar.'; return; }
+    const rows = prices.map((x) => {
+      const v = (pf.elements.namedItem(x.id) as HTMLInputElement).value.trim();
+      return { id: x.id, label: x.label, sort: x.sort, amount: v === '' ? null : Math.round(Number(v) * 100) / 100 };
+    });
+    if (rows.some((x) => x.amount !== null && !(x.amount >= 0))) { er.textContent = 'Revisa los precios: solo números, sin el signo $.'; er.hidden = false; return; }
+    const b = pf.querySelector<HTMLButtonElement>('button[type=submit]')!; b.disabled = true;
+    const saved = await saveAdPrices(rows);
+    b.disabled = false;
+    if (!saved) { er.textContent = 'No se pudo guardar. Solo el administrador puede cambiar los precios; revisa tu sesión e intenta otra vez.'; er.hidden = false; return; }
+    const changed = rows.filter((x) => x.amount !== (prices.find((p) => p.id === x.id)?.amount ?? null)).map((x) => x.label);
+    logActivity('Cambió los precios de anuncios', changed.join(', '));
+    ok.textContent = '✓ Guardado. Anúnciate ya muestra los precios nuevos.';
+    void loadPrices();
+  });
+  addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'ajustes') void loadPrices(); });
   addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'ajustes') void load(); });
 </script>

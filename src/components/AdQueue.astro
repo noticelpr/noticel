@@ -78,7 +78,7 @@ const Tag = embedded ? 'section' : 'main';
   import { ask, askText } from '../lib/dialogs';
   import { drawAd, THEMES, fitImage, imageFrom, loadImage, placeImage } from '../lib/adcreative';
   import { listRequests, loadRequests, saveRequest, updateRequest, updateRequestLocal, refundRequest, deleteRequests, type AdRequest } from '../lib/adrequests';
-  import { hasBackend, publishCampaign, campaignStats, logActivity } from '../lib/backend';
+  import { hasBackend, publishCampaign, campaignStats, logActivity, getDeal } from '../lib/backend';
   import type { Campaign, AdSize } from '../lib/ads';
   import { mineRequest } from '../lib/sellers';
   import { isComunicado, comunicadoSection, comunicadoToEscribir } from '../lib/comunicados';
@@ -316,8 +316,10 @@ const Tag = embedded ? 'section' : 'main';
         const v = (k: string) => d.querySelector<HTMLInputElement>(`[data-k="${k}"]`)!.value;
         patch.art = { ...r.art, title: v('title'), msg: v('msg'), cta: v('cta'), theme: v('theme'), files: [...d.querySelectorAll('canvas')].map((c) => ({ name: `${c.dataset.w}x${c.dataset.h}.png`, w: Number(c.dataset.w), h: Number(c.dataset.h), data: c.toDataURL('image/png') })) };
       }
-      // Client's own art: every space it bought gets an image of exactly its size (the closest-shaped file, fitted)
-      if (!d && r.art.mode === 'upload' && r.art.files.length) {
+      // Client's own art: every space it bought gets an image of exactly its size (the closest-shaped file, fitted).
+      // Not for a direct sale (Ventas): its images keep the size that was sold, any size (src/lib/ads.ts, SPACE_BOXES)
+      const direct = (r.lines ?? [])[0]?.startsWith('Venta directa') ?? false;
+      if (!d && !direct && r.art.mode === 'upload' && r.art.files.length) {
         const need = [...new Map(FMT.filter((f) => r.formats.includes(f.id)).flatMap((f) => f.art).map((x) => [x.join('x'), x])).values()];
         try {
           const imgs = await Promise.all(r.art.files.map((f) => imageFrom(f.data)));
@@ -332,7 +334,11 @@ const Tag = embedded ? 'section' : 'main';
       logActivity('Aprobó un anuncio', `${r.client.business} · ${r.id}`);
       if (hasBackend()) {
         // Automatic publishing: live for every reader right away
-        publishCampaign(campaignOf({ ...r, ...patch } as AdRequest)).then((ok) => {
+        // A direct sale keeps the size and the pages Ventas chose (ad_campaign_deals, supabase/precios-anuncios.sql)
+        const camp = campaignOf({ ...r, ...patch } as AdRequest);
+        (direct ? getDeal(camp.id).then((dl) => { const p = dl?.placement as Campaign['placement'] & { width?: number; height?: number } | undefined;
+          if (p) { camp.placement = { pages: p.pages, banner: p.banner }; camp.width = p.width; camp.height = p.height; } }).catch(() => {}) : Promise.resolve())
+        .then(() => publishCampaign(camp)).then((ok) => {
           toast(ok ? `Aprobado y publicado: ya sale para todos los lectores.` : 'Se aprobó, pero no se pudo publicar. Revisa tu sesión e intenta otra vez.');
           if (ok) dispatchEvent(new Event('nc-campaigns')); // Ventas → Campañas shows it right away
         });
