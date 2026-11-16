@@ -1324,8 +1324,9 @@ canvas.apr-drag:active{cursor:grabbing}
 .an-totals .an-total[hidden]{display:none}
 
 /* Staff panel: a slim header (owner, 2026-11-16: "way smaller"): small logo, little padding; the site keeps its own */
-.staff .masthead .wrap{min-height:0 !important;padding-top:6px !important;padding-bottom:6px !important;row-gap:0 !important}
-.staff .masthead .logo img{height:34px !important;width:auto}
+.staff .masthead .wrap{min-height:0 !important;padding-top:8px !important;padding-bottom:8px !important;row-gap:0 !important}
+.staff .masthead .logo img{height:40px !important;width:auto} /* same as Noticias Xtra's panel (owner, 2026-11-16) */
+@media (max-width:760px){.staff .masthead .logo img{height:34px !important}}
 .staff .masthead .logo .tagline,.staff .masthead .logo small{display:none !important}
 .staff .mh-staff{font-size:14px;font-weight:700}
 .staff .mh-site{font-size:13px}
@@ -1424,3 +1425,6 @@ canvas.apr-drag:active{cursor:grabbing}
 /* Outline ring only for keyboard users (Tab key), never after a mouse click or tap */
 .pnl button:focus:not(:focus-visible),.pnl a:focus:not(:focus-visible),.pnl [role="tab"]:focus:not(:focus-visible){outline:none;box-shadow:none}
 .pnl button:focus-visible,.pnl [role="tab"]:focus-visible{outline:2px solid #92D000;outline-offset:2px}
+
+/* Panel → Correos: preview of the automatic emails to advertisers (2026-11-16) */
+

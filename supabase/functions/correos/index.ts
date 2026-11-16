@@ -17,9 +17,12 @@
 // Secret: RESEND_API_KEY (Edge Functions → Secrets), from resend.com, with the noticel.com domain verified there.
 // Optional secrets: FROM_EMAIL (default below), REPLY_TO and TEAM_EMAIL (default: the newsroom Gmail).
 
-const SITE = (Deno.env.get('SITE_URL') || 'https://noticel.com').replace(/\/$/, '');
-const DEFAULT_FROM = Deno.env.get('MAIL_FROM') || 'NotiCel <anuncios@noticel.com>';
-const DEFAULT_TEAM = Deno.env.get('TEAM_EMAIL') || ''; // NotiCel's sales inbox; replies go here too
+// Settings from Supabase secrets; the site's email preview page (src/pages/redaccion/correos.astro) imports these
+// templates outside Supabase, where there are no secrets: then the defaults below are used
+const env = (k: string): string => (typeof Deno !== 'undefined' ? Deno.env.get(k) ?? '' : '');
+const SITE = (env('SITE_URL') || 'https://noticel.com').replace(/\/$/, '');
+const DEFAULT_FROM = env('MAIL_FROM') || 'NotiCel <anuncios@noticel.com>';
+const DEFAULT_TEAM = env('TEAM_EMAIL') || ''; // NotiCel's sales inbox; replies go here too
 // The logo (PNG; email apps don't show SVG), from noticel.com/email/: the password gate leaves that folder open
 // (cloudflare/password-gate.js), since the code on GitHub is private now.
 const LOGO = `${SITE}/logo.png`; // NotiCel's logo (PNG: email apps don't show SVG)
@@ -269,18 +272,18 @@ export const TEMPLATES = {
 /** Sample data for the panel's preview page. */
 export const SAMPLE = {
   req: { id: 'R-EJEMPLO', status: 'aprobada', paid: false, client: { name: 'María Rivera', business: 'Panadería La Esquina', email: 'maria@ejemplo.com', phone: '787-555-0100' },
-    formats: ['rectangle', 'cuadrado'], placement: 'Puerto Rico y la diáspora', start: '2026-11-03', duration: '1 mes', total: 59, note: 'La imagen se ve borrosa; ¿nos envías una versión más grande (600 × 600)?' } as Req,
+    formats: ['rectangle', 'cuadrado'], placement: 'Puerto Rico y la diáspora', start: '2026-11-03', duration: '1 mes', total: 0, note: 'La imagen se ve borrosa; ¿nos envías una versión más grande (600 × 600)?' } as Req,
   camp: { id: 'r-ejemplo', start_date: '2026-11-03', end_date: '2026-12-02', status: 'active' } as Camp,
   stats: { views: 18450, clicks: 212 } as Stats,
   month: { n: 2, from: '2026-12-03', to: '2027-01-02', views: 6120 } as Month,
   sale: { id: 'V-EJEMPLO', status: 'aprobada', paid: true, client: { name: 'Carlos Ortiz', business: 'Ferretería El Martillo', email: 'carlos@ejemplo.com', phone: '787-555-0142' },
-    formats: ['rectangle', 'leaderboard'], placement: 'Solo Puerto Rico', start: '2026-11-03', duration: '2 meses', total: 350,
+    formats: ['rectangle', 'leaderboard'], placement: 'Solo Puerto Rico', start: '2026-11-03', duration: '2 meses', total: 0,
     lines: ['Venta directa', 'Pago: ATH Móvil · 2026-11-01', 'Factura: 1043', 'Acordado: 2 meses + 2 semanas gratis; cambia el arte en diciembre.', 'Vendido por: Ventas (ejemplo)'] } as Req,
   // English-speaking clients (client.lang 'en'): the same samples, in English
   reqEn: { id: 'R-SAMPLE', status: 'aprobada', paid: false, client: { name: 'Mary Rivers', business: 'Corner Bakery', email: 'mary@example.com', phone: '407-555-0100', lang: 'en' },
-    formats: ['rectangle', 'cuadrado'], placement: 'Solo la diáspora', start: '2026-11-03', duration: '1 mes', total: 59, note: 'The image looks blurry; could you send us a larger version (600 × 600)?' } as Req,
+    formats: ['rectangle', 'cuadrado'], placement: 'Solo la diáspora', start: '2026-11-03', duration: '1 mes', total: 0, note: 'The image looks blurry; could you send us a larger version (600 × 600)?' } as Req,
   saleEn: { id: 'V-SAMPLE', status: 'aprobada', paid: true, client: { name: 'Charles Porter', business: 'Porter Hardware', email: 'charles@example.com', phone: '407-555-0142', lang: 'en' },
-    formats: ['rectangle', 'leaderboard'], placement: 'Puerto Rico y la diáspora', start: '2026-11-03', duration: '2 meses', total: 350,
+    formats: ['rectangle', 'leaderboard'], placement: 'Puerto Rico y la diáspora', start: '2026-11-03', duration: '2 meses', total: 0,
     lines: ['Venta directa', 'Pago: Transferencia · 2026-11-01', 'Factura: 1044', 'Acordado: 2 months + 2 free weeks; new artwork in December.', 'Vendido por: Ventas (ejemplo)'] } as Req,
   lead: { business: 'Taller El Rápido', contact: 'José Torres', email: 'jose@ejemplo.com', phone: '787-555-0199', requests: 'Quiero anunciarme en Deportes durante el BSN.' } as Lead,
 };

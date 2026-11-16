@@ -1,0 +1,88 @@
+---
+// Preview of the automatic emails to advertisers, with sample data (labeled EJEMPLO): exactly what the "correos"
+// Edge Function sends (it shares the templates: supabase/functions/correos/index.ts). Internal: hidden from search engines.
+import Base from '../../layouts/Base.astro';
+import { url } from '../../lib/site';
+import { TEMPLATES, SAMPLE } from '../../../supabase/functions/correos/index.ts';
+
+const { req, camp, stats, lead } = SAMPLE;
+const list = [
+  { who: 'Cliente', when: 'Al enviar su solicitud en Anúnciate', mail: TEMPLATES.recibida(req) },
+  { who: 'Cliente', when: 'Cuando pones «Pedir cambios» con una nota', mail: TEMPLATES.cambios({ ...req, status: 'cambios' }) },
+  { who: 'Cliente', when: 'Cuando apruebas el anuncio', mail: TEMPLATES.aprobada(req, camp) },
+  { who: 'Cliente', when: 'Cuando rechazas el anuncio', mail: TEMPLATES.rechazada({ ...req, status: 'rechazada', note: '' }) },
+  { who: 'Cliente', when: 'El primer día que sale', mail: TEMPLATES.aire(req, camp) },
+  { who: 'Cliente', when: '3 días antes de terminar (campañas de 2 semanas o más; nunca a suscripciones mensuales)', mail: TEMPLATES.pronto(req, camp, { views: 15200, clicks: 171 }) },
+  { who: 'Cliente', when: 'Cuando termina la campaña (suscripción mensual: solo cuando cancela y termina su último mes)', mail: TEMPLATES.fin(req, camp, stats) },
+  { who: 'Cliente', when: 'Suscripción mensual: al cumplir cada mes pagado (en vez de «termina pronto»)', mail: TEMPLATES.mes(req, camp, stats, SAMPLE.month) },
+  { who: 'Cliente', when: 'Venta directa: al guardar «Anuncio vendido» en Ventas', mail: TEMPLATES.venta(SAMPLE.sale, camp) },
+  { who: 'Equipo', when: 'Venta directa: copia para el récord', mail: TEMPLATES.ventaEquipo(SAMPLE.sale) },
+  { who: 'Equipo', when: 'Cada solicitud nueva', mail: TEMPLATES.equipo(req) },
+  { who: 'Equipo', when: 'Cuando alguien pide «Prefiero hablar con alguien»', mail: TEMPLATES.lead(lead) },
+];
+// The same emails for an English-speaking client (client.lang 'en': ordered from /en/advertise/ or a direct sale marked English)
+const { reqEn, saleEn } = SAMPLE;
+const listEn = [
+  { who: 'Cliente', when: 'Al enviar su solicitud en Advertise', mail: TEMPLATES.recibida(reqEn) },
+  { who: 'Cliente', when: 'Cuando pones «Pedir cambios» con una nota', mail: TEMPLATES.cambios({ ...reqEn, status: 'cambios' }) },
+  { who: 'Cliente', when: 'Cuando apruebas el anuncio', mail: TEMPLATES.aprobada(reqEn, camp) },
+  { who: 'Cliente', when: 'Cuando rechazas el anuncio', mail: TEMPLATES.rechazada({ ...reqEn, status: 'rechazada', note: '' }) },
+  { who: 'Cliente', when: 'El primer día que sale', mail: TEMPLATES.aire(reqEn, camp) },
+  { who: 'Cliente', when: '3 días antes de terminar (campañas de 2 semanas o más; nunca a suscripciones mensuales)', mail: TEMPLATES.pronto(reqEn, camp, { views: 15200, clicks: 171 }) },
+  { who: 'Cliente', when: 'Cuando termina la campaña', mail: TEMPLATES.fin(reqEn, camp, stats) },
+  { who: 'Cliente', when: 'Suscripción mensual: al cumplir cada mes pagado', mail: TEMPLATES.mes(reqEn, camp, stats, SAMPLE.month) },
+  { who: 'Cliente', when: 'Venta directa: al guardar «Anuncio vendido» en Ventas (idioma: English)', mail: TEMPLATES.venta(saleEn, camp) },
+  { who: 'Equipo', when: 'Venta directa: copia para el récord (con la nota de cliente en inglés)', mail: TEMPLATES.ventaEquipo(saleEn) },
+  { who: 'Equipo', when: 'Cada solicitud nueva (con la nota de cliente en inglés)', mail: TEMPLATES.equipo(reqEn) },
+];
+const sets = [{ id: 'es', list }, { id: 'en', list: listEn }];
+---
+<Base title="Correos a los anunciantes" description="Vista previa interna de los correos automáticos." noindex staff>
+  <main class="wrap page cr-page" id="main">
+    <p><a href={url('redaccion')}>← Volver al panel</a></p>
+    <h1>Correos automáticos <span class="sp-demo">EJEMPLO</span></h1>
+    <p>Así los recibe cada persona. Los datos son de ejemplo (Panadería La Esquina). Se envían solos, una sola vez cada uno; las respuestas llegan al correo de ventas de NotiCel (el que se ponga en Supabase como TEAM_EMAIL).</p>
+    <p>Los clientes que pidieron en inglés (/en/advertise/, o una venta directa con idioma English) reciben sus correos en inglés. Los del equipo siguen en español, con una nota de «Cliente en inglés».</p>
+    <div class="cr-tabs" role="tablist" aria-label="Idioma de los correos">
+      <button type="button" role="tab" aria-selected="true" data-cr-tab="es">Español</button>
+      <button type="button" role="tab" aria-selected="false" data-cr-tab="en">English</button>
+    </div>
+    {sets.map((set) => (
+      <div class="cr-list" data-cr-set={set.id} hidden={set.id !== 'es'}>
+        {set.list.map((x) => (
+          <section class="cr-item">
+            <p class="cr-when"><span class={`cr-who ${x.who === 'Equipo' ? 'team' : ''}`}>{x.who}</span> {x.when}</p>
+            <p class="cr-subj"><small>Asunto:</small> {x.mail.subject}</p>
+            <iframe class="cr-frame" title={x.mail.subject} srcdoc={x.mail.html} loading="lazy"></iframe>
+          </section>
+        ))}
+      </div>
+    ))}
+  </main>
+  <script>
+    // Each preview grows to its email's full height
+    const fit = (f: HTMLIFrameElement) => { const h = f.contentDocument?.body?.scrollHeight; if (h) f.style.height = `${h + 8}px`; };
+    document.querySelectorAll<HTMLIFrameElement>('.cr-frame').forEach((f) => f.addEventListener('load', () => fit(f)));
+    // Español / English: shows one set of samples (hidden frames measure 0, so they're fitted when shown)
+    const tabs = document.querySelectorAll<HTMLButtonElement>('[data-cr-tab]');
+    tabs.forEach((b) => b.addEventListener('click', () => {
+      tabs.forEach((t) => t.setAttribute('aria-selected', String(t === b)));
+      document.querySelectorAll<HTMLElement>('[data-cr-set]').forEach((s) => { s.hidden = s.dataset.crSet !== b.dataset.crTab; if (!s.hidden) s.querySelectorAll<HTMLIFrameElement>('.cr-frame').forEach(fit); });
+    }));
+  </script>
+</Base>
+<style>
+  .cr-page{max-width:1300px;padding-bottom:40px}
+  .cr-tabs{display:flex;gap:8px;margin-top:14px}
+  .cr-tabs button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--card);color:inherit;border-radius:999px;padding:6px 16px;cursor:pointer}
+  .cr-tabs button[aria-selected="true"]{background:var(--purple-bg);border-color:var(--purple-bg);color:#fff}
+  .cr-list[hidden]{display:none}
+  .cr-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:22px;margin-top:18px}
+  .cr-item{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--card)}
+  .cr-when{margin:0 0 6px;font-size:14px;color:var(--muted)}
+  .cr-who{display:inline-block;background:var(--purple-bg);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;margin-right:6px}
+  .cr-who.team{background:var(--blue-ink)}
+  .cr-subj{margin:0 0 10px;font-weight:700}
+  .cr-subj small{font-weight:400;color:var(--muted)}
+  .cr-frame{width:100%;height:600px;border:0;border-radius:8px;background:#F2F2F2}
+</style>
