@@ -53,7 +53,7 @@ const sets = [{ id: 'es', list }, { id: 'en', list: listEn }];
           <section class="cr-item">
             <p class="cr-when"><span class={`cr-who ${x.who === 'Equipo' ? 'team' : ''}`}>{x.who}</span> {x.when}</p>
             <p class="cr-subj"><small>Asunto:</small> {x.mail.subject}</p>
-            <iframe class="cr-frame" title={x.mail.subject} srcdoc={x.mail.html.replaceAll("https://noticel.com/logo.png", "/logo.png")} loading="lazy"></iframe>
+            <iframe class="cr-frame" title={x.mail.subject} srcdoc={x.mail.html.replaceAll("cid:nc-logo", "/logo.png")} loading="lazy"></iframe>
           </section>
         ))}
       </div>
