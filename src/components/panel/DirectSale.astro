@@ -6,16 +6,21 @@
 // It also adds an approved request for the client (ad_requests, lines starting "Venta directa"), so the automatic emails
 // go out (the deal in writing, live, ending soon, results: supabase/functions/correos) and the client sees the campaign
 // in the advertiser panel with their email. "Idioma de los correos al cliente" → English saves client.lang 'en', so those emails go in English.
-import { VOLUME_TIERS, PREPAY_DISCOUNT, DIRECT_MAX_DISCOUNT, COMUNICADO_PRICES } from '../../lib/ads';
+// Any size (owner, 2026-11-16): each image gets a standard size or a custom width × height, and the campaign can be
+// limited to some pages (Portada, noticias, secciones, a section) and, for the wide banner, to the top or the bottom.
+// The agreed price is also kept in ad_campaign_deals (private; supabase/precios-anuncios.sql). Ventas → Campañas →
+// "Editar" opens this same form to change a campaign that's running or scheduled (event 'nc-campaign-edit').
+import { VOLUME_TIERS, PREPAY_DISCOUNT, DIRECT_MAX_DISCOUNT, COMUNICADO_PRICES, PAGE_CHOICES, SPACE_BOXES } from '../../lib/ads';
 import { SECTIONS } from '../../lib/site';
+const boxes = (b: ReadonlyArray<readonly [number, number]>) => b.map(([w, h]) => `${w} × ${h}`).join(', ');
 const money = (n: number) => `$${n.toLocaleString('en-US')}`;
 ---
 <button type="button" class="adp-btn" data-ds-open>+ Anuncio vendido</button>
 <dialog class="sd-dlg ds-dlg" data-ds-dlg aria-labelledby="ds-h">
   <form method="dialog" class="sd-form" data-ds-form novalidate>
-    <header class="sd-dlg-h"><h2 id="ds-h">Anuncio vendido</h2><button type="button" class="sd-x" data-ds-close aria-label="Cerrar">✕</button></header>
+    <header class="sd-dlg-h"><h2 id="ds-h" data-ds-title>Anuncio vendido</h2><button type="button" class="sd-x" data-ds-close aria-label="Cerrar">✕</button></header>
     <p class="pnl-muted pnl-small ds-intro">Para ventas que cerraste directamente. Antes de guardar verás un resumen para revisarlo. <span data-ds-intro>El anuncio sale en el sitio en la fecha que pongas</span> y la venta queda en <b>Ganadas</b> con sus datos.</p>
-    <div class="ds-mode ds-what" role="radiogroup" aria-label="Qué vendiste">
+    <div class="ds-mode ds-what" role="radiogroup" aria-label="Qué vendiste" data-ds-new>
       <label class="sd-chk"><input type="radio" name="what" value="ad" checked /><span>Anuncio<small>banner, rectángulo, toma…</small></span></label>
       <label class="sd-chk"><input type="radio" name="what" value="com" /><span>Comunicado de prensa<small>sale como «Comunicado pagado»</small></span></label>
     </div>
@@ -23,11 +28,11 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
       <fieldset><legend>Cliente</legend>
         <div class="sd-2">
           <label>Negocio<input name="business" required maxlength="60" /></label>
-          <label>Persona de contacto<input name="contact" maxlength="60" /></label>
-          <label>Teléfono<input name="phone" type="tel" maxlength="20" /></label>
-          <label>Correo <small>(le llegan la confirmación y los resultados)</small><input name="email" type="email" maxlength="80" /></label>
-          <label>Idioma de los correos al cliente<select name="lang"><option value="es" selected>Español</option><option value="en">English</option></select></label>
-          <label>Referido por <small>(si un periodista te pasó el cliente)</small><select name="ref" data-ds-ref><option value="">Nadie</option></select></label>
+          <label data-ds-new>Persona de contacto<input name="contact" maxlength="60" /></label>
+          <label data-ds-new>Teléfono<input name="phone" type="tel" maxlength="20" /></label>
+          <label data-ds-new>Correo <small>(le llegan la confirmación y los resultados)</small><input name="email" type="email" maxlength="80" /></label>
+          <label data-ds-new>Idioma de los correos al cliente<select name="lang"><option value="es" selected>Español</option><option value="en">English</option></select></label>
+          <label data-ds-new>Referido por <small>(si un periodista te pasó el cliente)</small><select name="ref" data-ds-ref><option value="">Nadie</option></select></label>
         </div>
       </fieldset>
       {/* Comunicado pagado: goes to Escribir "En revisión" for an editor to publish (src/lib/comunicados.ts) */}
@@ -47,14 +52,16 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
       <fieldset data-ds-ad><legend>El anuncio</legend>
         <p class="ds-lab">Espacios</p>
         <div class="sd-fmts ds-sizes">
-          <label class="sd-chk"><input type="checkbox" name="size" value="leaderboard" /><span>Banner de arriba<small>728 × 90 · celular 320 × 100</small></span></label>
-          <label class="sd-chk"><input type="checkbox" name="size" value="rectangle" checked /><span>Rectángulo o cuadrado<small>300 × 250 · 600 × 600</small></span></label>
-          <label class="sd-chk"><input type="checkbox" name="size" value="halfpage" /><span>Media página<small>300 × 600</small></span></label>
-          <label class="sd-chk"><input type="checkbox" name="size" value="infeed" /><span>Entre noticias<small>728 × 90 · celular 320 × 100</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="size" value="leaderboard" /><span>Banner de arriba y abajo<small>{boxes(SPACE_BOXES.leaderboard.desktop)} · celular {boxes(SPACE_BOXES.leaderboard.phone)}</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="size" value="rectangle" checked /><span>Al lado de las noticias<small>{boxes(SPACE_BOXES.rectangle.desktop)}</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="size" value="halfpage" /><span>Media página<small>{boxes(SPACE_BOXES.halfpage.desktop)}</small></span></label>
+          <label class="sd-chk"><input type="checkbox" name="size" value="infeed" /><span>Entre noticias y dentro de la noticia<small>{boxes(SPACE_BOXES.infeed.desktop)}</small></span></label>
           <label class="sd-chk"><input type="checkbox" name="takeover" /><span>Toma de portada<small>todos los espacios del sitio</small></span></label>
         </div>
+        <p class="pnl-muted pnl-small">En celular, todos los espacios menos el banner de arriba muestran cuadrados (300 × 300), rectángulos (300 × 250, 336 × 280) o banners de celular (320 × 100, 320 × 50).</p>
         <label class="ds-lab">Imágenes del anuncio <small>(una por tamaño; cada espacio usa la que le queda)</small>
           <input name="files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple data-ds-files /></label>
+        <p class="pnl-muted pnl-small">Debajo de cada imagen escoge el tamaño que se vendió (uno estándar u «Otro tamaño» con ancho × alto). Regla: el anuncio sale en los espacios que tienen su misma forma (15% de margen), achicado para caber, nunca estirado ni cortado.</p>
         <div class="ds-thumbs" data-ds-thumbs></div>
         <p class="sd-warn" data-ds-fitwarn hidden></p>
         {/* Ajustar: makes a version of an uploaded image for each space that has none (whole + blurred edges, or cropped) */}
@@ -63,6 +70,16 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
           <label>Enlace al tocar el anuncio<input name="link" type="url" maxlength="300" placeholder="https://…" /></label>
           <label>Dónde sale<select name="regions"><option value="all">Puerto Rico y la diáspora</option><option value="island">Solo Puerto Rico</option><option value="diaspora">Solo la diáspora</option></select></label>
         </div>
+        <p class="ds-lab">Páginas <small>(sin marcar ninguna: en todas)</small></p>
+        <div class="sd-fmts ds-sizes">
+          {PAGE_CHOICES.map((p) => <label class="sd-chk sm"><input type="checkbox" name="page" value={p.id} /><span>{p.name}</span></label>)}
+        </div>
+        <details class="ds-secs"><summary class="ds-lab">Solo en algunas secciones <small>(su página y sus noticias)</small></summary>
+          <div class="sd-fmts ds-sizes">
+            {SECTIONS.map((x) => <label class="sd-chk sm"><input type="checkbox" name="page" value={`seccion:${x.id}`} /><span>{x.name}</span></label>)}
+          </div>
+        </details>
+        <label data-ds-banner hidden>Banner ancho<select name="banner"><option value="">Arriba y abajo</option><option value="top">Solo el de arriba</option><option value="bottom">Solo el de abajo</option></select></label>
         <p class="ds-lab">Cómo se vendió</p>
         <div class="ds-mode" role="radiogroup">
           <label class="sd-chk"><input type="radio" name="mode" value="time" checked /><span>Por tiempo<small>sale entre dos fechas</small></span></label>
@@ -75,22 +92,22 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
         </div>
       </fieldset>
       <fieldset><legend>Precio y pago</legend>
-        <div class="ds-mode" role="radiogroup" aria-label="¿Ya pagó?">
+        <div class="ds-mode" role="radiogroup" aria-label="¿Ya pagó?" data-ds-new>
           <label class="sd-chk"><input type="radio" name="state" value="paid" checked /><span>Pagada<small>el cliente ya pagó</small></span></label>
           <label class="sd-chk"><input type="radio" name="state" value="due" /><span>Por pagar<small>queda en «Por cobrar»</small></span></label>
         </div>
         <div class="sd-2">
-          <label>Precio del anuncio ($)<input name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="antes de descuentos" /></label>
-          <label><span data-ds-method-l>Forma de pago</span><select name="method"><option>ATH Móvil</option><option>Tarjeta</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Factura a la agencia</option><option>Intercambio (canje)</option><option>Cortesía</option><option>Otra</option></select></label>
+          <label>Precio acordado ($) <small>(se guarda en la base de datos, solo lo ve Ventas)</small><input name="price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="antes de descuentos" /></label>
+          <label data-ds-new><span data-ds-method-l>Forma de pago</span><select name="method"><option>ATH Móvil</option><option>Tarjeta</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Factura a la agencia</option><option>Intercambio (canje)</option><option>Cortesía</option><option>Otra</option></select></label>
         </div>
-        <div class="ds-disc">
+        <div class="ds-disc" data-ds-new>
           <p class="ds-lab">Descuentos <small>(hasta {DIRECT_MAX_DISCOUNT}% en total)</small></p>
           <label>Por volumen<select name="volume" data-ds-volume><option value="0">Sin descuento</option>{VOLUME_TIERS.map((t) => <option value={t.pct} data-from={t.from}>{t.pct}% · desde {money(t.from)}</option>)}</select></label>
           <label class="sd-chk sm"><input type="checkbox" name="prepay" data-ds-prepay /><span>Pronto pago: pagó todo por adelantado (−{PREPAY_DISCOUNT}%)</span></label>
           <p class="pnl-muted pnl-small" data-ds-disc-hint></p>
           <p class="ds-total"><span>Total a cobrar</span><b data-ds-total>$0</b></p>
         </div>
-        <div class="sd-2">
+        <div class="sd-2" data-ds-new>
           <label data-ds-paidon>Fecha del pago<input name="paidOn" type="date" /></label>
           <label>Factura o recibo #<input name="invoice" maxlength="40" /></label>
         </div>
@@ -106,14 +123,14 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
 </dialog>
 
 <script>
-  import { publishCampaign, hasBackend, staffApi, uploadStoryFile, uploadAdImage } from '../../lib/backend';
+  import { publishCampaign, hasBackend, staffApi, uploadStoryFile, uploadAdImage, saveDeal, getDeal, logActivity, type CampaignRow } from '../../lib/backend';
   import { comunicadoToEscribir } from '../../lib/comunicados';
   import type { AdRequest } from '../../lib/adrequests';
   import { kickEmails } from '../../lib/adrequests';
   import { sharedList } from '../../lib/shared';
   import { myId, teamList, codeOf, isReferrer } from '../../lib/sellers';
-  import type { AdSize, Campaign } from '../../lib/ads';
-  import { VOLUME_TIERS, PREPAY_DISCOUNT, DIRECT_MAX_DISCOUNT, COMUNICADO_PRICES } from '../../lib/ads';
+  import type { AdSize, Campaign, Placement } from '../../lib/ads';
+  import { VOLUME_TIERS, PREPAY_DISCOUNT, DIRECT_MAX_DISCOUNT, COMUNICADO_PRICES, STANDARD_SIZES, boxFor } from '../../lib/ads';
   import { fitImage, placeImage, imageFrom } from '../../lib/adcreative';
   import { tell, ask } from '../../lib/dialogs';
   const dlg = document.querySelector<HTMLDialogElement>('[data-ds-dlg]');
@@ -125,11 +142,22 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
     const addDays = (s: string, n: number) => { const d = new Date(`${s}T12:00:00`); d.setDate(d.getDate() + n); return iso(d); };
     const money = (n: number) => `$${(Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
     const esc = (s = '') => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-    // Which spaces an image fits (same shapes and tolerance the site uses to place it, AdSlot.astro)
-    const RATIO: Record<AdSize, number[]> = { leaderboard: [728 / 90, 320 / 100], infeed: [728 / 90, 320 / 100], rectangle: [300 / 250, 1], halfpage: [300 / 600] };
-    const NAME: Record<AdSize, string> = { leaderboard: 'Banner de arriba', infeed: 'Entre noticias', rectangle: 'Rectángulo', halfpage: 'Media página' };
-    const fits = (w: number, h: number, s: AdSize) => RATIO[s].some((r) => Math.abs(w / h - r) / r < 0.15);
-    type Img = { data: string; w: number; h: number; name: string };
+    // Which spaces an ad of this size fits on computers (the same rule the site uses: src/lib/ads.ts, boxFor); the top
+    // banner also counts phone banners (320 × 100, 320 × 50). On phones the other spaces take squares and phone banners.
+    const SPACES: AdSize[] = ['leaderboard', 'rectangle', 'halfpage', 'infeed'];
+    const NAME: Record<AdSize, string> = { leaderboard: 'Banner de arriba y abajo', infeed: 'Entre noticias', rectangle: 'Al lado de las noticias', halfpage: 'Media página' };
+    const fits = (w: number, h: number, s: AdSize) => !!(boxFor(w, h, s, false) || (s === 'leaderboard' && boxFor(w, h, s, true)));
+    // w × h: the picture's real pixels; sw × sh: the size sold (a standard size or a custom one), used to place it
+    type Img = { data: string; w: number; h: number; name: string; sw: number; sh: number; custom?: boolean };
+    const fitsImg = (m: Img, s: AdSize) => fits(m.sw, m.sh, s);
+    /** The standard size with the same shape as the picture (closest in pixels), or the picture's own size. */
+    const sizeFor = (w: number, h: number): [number, number] => {
+      const same = STANDARD_SIZES.filter((z) => Math.abs(w / h - z.w / z.h) / (z.w / z.h) < 0.03).sort((a, b) => Math.abs(a.w - w) - Math.abs(b.w - w));
+      return same.length ? [same[0].w, same[0].h] : [w, h];
+    };
+    const makeImg = (data: string, w: number, h: number, name: string): Img => { const [sw, sh] = sizeFor(w, h); return { data, w, h, name, sw, sh, custom: !STANDARD_SIZES.some((z) => z.w === sw && z.h === sh) }; };
+    let editing: CampaignRow | null = null; // Ventas → Campañas → Editar
+    let editImgs = '';
     let imgs: Img[] = [];
     const leads = sharedList<any>('sales_leads', 'nc-leads', 'nc-leads');
 
@@ -168,10 +196,17 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
       const byViews = (form.elements.namedItem('mode') as RadioNodeList).value === 'views';
       $('[data-ds-end]').hidden = byViews; $('[data-ds-views]').hidden = !byViews;
       $('[data-ds-thumbs]').innerHTML = imgs.map((m, i) => {
-        const where = (Object.keys(RATIO) as AdSize[]).filter((s) => fits(m.w, m.h, s)).map((s) => NAME[s]);
-        return `<figure><img src="${m.data}" alt=""><figcaption>${m.w} × ${m.h}<br><small>${where.length ? esc(where.join(', ')) : 'No le queda a ningún espacio'}</small></figcaption><button type="button" class="sd-x sm" data-ds-rm="${i}" aria-label="Quitar">✕</button></figure>`;
+        const where = SPACES.filter((s) => fitsImg(m, s)).map((s) => NAME[s]);
+        const std = STANDARD_SIZES.map((z) => `<option value="${z.w}x${z.h}"${!m.custom && z.w === m.sw && z.h === m.sh ? ' selected' : ''}>${z.w} × ${z.h} · ${esc(z.name)}</option>`).join('');
+        const off = Math.abs(m.w / m.h - m.sw / m.sh) / (m.sw / m.sh) > 0.03; // the picture isn't the shape of the size picked
+        return `<figure><img src="${m.data}" alt=""><figcaption>${m.w && m.h ? `Imagen: ${m.w} × ${m.h}` : ''}
+          <label class="ds-size">Tamaño vendido<select data-ds-size="${i}" aria-label="Tamaño de la imagen ${i + 1}">${std}<option value="custom"${m.custom ? ' selected' : ''}>Otro tamaño…</option></select></label>
+          ${m.custom ? `<span class="ds-custom"><input type="number" min="10" max="4000" value="${m.sw}" data-ds-cw="${i}" aria-label="Ancho en píxeles"> × <input type="number" min="10" max="4000" value="${m.sh}" data-ds-ch="${i}" aria-label="Alto en píxeles"></span>` : ''}
+          ${off ? '<small class="sd-warn">⚠ La imagen no tiene la forma de ese tamaño: se verá completa, con espacio a los lados.</small>' : ''}
+          <small>${where.length ? `Sale en: ${esc(where.join(', '))}` : 'Este tamaño no le queda a ningún espacio'}</small></figcaption><button type="button" class="sd-x sm" data-ds-rm="${i}" aria-label="Quitar">✕</button></figure>`;
       }).join('');
-      const missing = imgs.length ? sizes().filter((s) => !imgs.some((m) => fits(m.w, m.h, s))) : [];
+      $('[data-ds-banner]').hidden = !sizes().includes('leaderboard') || $<HTMLInputElement>('[name="takeover"]').checked;
+      const missing = imgs.length ? sizes().filter((s) => !imgs.some((m) => fitsImg(m, s))) : [];
       const w = $('[data-ds-fitwarn]'); w.hidden = !missing.length;
       if (missing.length) w.textContent = `Falta una imagen para: ${missing.map((s) => NAME[s]).join(', ')}. Ajústala aquí abajo o sube una de ese tamaño.`;
       paintFit(missing);
@@ -227,7 +262,7 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
         // Each preview becomes an image of its own size (sharp: drawn at twice the size)
         $(`[data-fit="${sp}"]`).querySelectorAll<HTMLCanvasElement>('[data-fit-c]').forEach((c) => {
           const [w, h] = c.dataset.fitC!.split('x').map(Number), src = imgs[fitOf(sp).src] ?? imgs[0];
-          imgs.push({ data: c.toDataURL(src.data.startsWith('data:image/png') ? 'image/png' : 'image/jpeg', 0.9), w, h, name: `${(src.name || 'anuncio').replace(/\.\w+$/, '')}-${w}x${h}` });
+          imgs.push(makeImg(c.toDataURL(src.data.startsWith('data:image/png') ? 'image/png' : 'image/jpeg', 0.9), w, h, `${(src.name || 'anuncio').replace(/\.\w+$/, '')}-${w}x${h}`));
         });
         fitState.delete(sp); paint();
       }
@@ -247,7 +282,7 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
     fitBox.addEventListener('pointerup', () => (drag = null));
     const read = (f: File) => new Promise<Img>((ok, bad) => {
       const r = new FileReader();
-      r.onload = () => { const im = new Image(); im.onload = () => ok({ data: String(r.result), w: im.naturalWidth, h: im.naturalHeight, name: f.name }); im.onerror = bad; im.src = String(r.result); };
+      r.onload = () => { const im = new Image(); im.onload = () => ok(makeImg(String(r.result), im.naturalWidth, im.naturalHeight, f.name)); im.onerror = bad; im.src = String(r.result); };
       r.onerror = bad; r.readAsDataURL(f);
     });
     $<HTMLInputElement>('[data-ds-files]').addEventListener('change', async (e) => {
@@ -256,10 +291,29 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
       input.value = ''; paint();
     });
     form.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds-rm]'); if (b) { imgs.splice(Number(b.dataset.dsRm), 1); paint(); } });
+    // The size sold, per image: a standard size or a custom width × height (runs before the form's own change → paint)
+    $('[data-ds-thumbs]').addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement | HTMLSelectElement;
+      const i = Number(t.dataset.dsSize ?? t.dataset.dsCw ?? t.dataset.dsCh), m = imgs[i]; if (!m) return;
+      if (t.dataset.dsSize !== undefined) {
+        if (t.value === 'custom') { m.custom = true; if (!m.w) { m.w = m.sw; m.h = m.sh; } }
+        else { const [w, h] = t.value.split('x').map(Number); m.sw = w; m.sh = h; m.custom = false; }
+      } else {
+        const n = Math.round(Number(t.value));
+        if (n >= 10 && n <= 4000) { if (t.dataset.dsCw !== undefined) m.sw = n; else m.sh = n; }
+      }
+    });
     form.addEventListener('change', paint);
     form.addEventListener('change', () => ($('[data-ds-save]').textContent = saveLabel())); // Anuncio or Comunicado
     form.addEventListener('input', (e) => { if ((e.target as HTMLElement).matches('[name="price"]')) paintPrice(); }); // the total follows the price as it's typed
+    /** New sale or editing a campaign: editing hides the client's contact, payment and discount fields. */
+    function setMode() {
+      form.querySelectorAll<HTMLElement>('[data-ds-new]').forEach((el) => (el.hidden = !!editing));
+      $('[data-ds-title]').textContent = editing ? `Editar campaña · ${editing.client}` : 'Anuncio vendido';
+      $<HTMLElement>('.ds-intro').hidden = !!editing;
+    }
     document.querySelector('[data-ds-open]')!.addEventListener('click', () => {
+      editing = null; editImgs = ''; setMode();
       form.reset(); imgs = []; $('[data-ds-err]').hidden = true; delete $<HTMLSelectElement>('[data-ds-volume]').dataset.auto;
       (form.elements.namedItem('start') as HTMLInputElement).value = today;
       (form.elements.namedItem('end') as HTMLInputElement).value = addDays(today, 29);
@@ -271,6 +325,43 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
       paint(); dlg.showModal();
     });
     form.querySelectorAll('[data-ds-close]').forEach((b) => b.addEventListener('click', () => dlg.close()));
+    // Ventas → Campañas → Editar: the same form, filled with the campaign (and its private price, ad_campaign_deals)
+    let editDeal: Awaited<ReturnType<typeof getDeal>> = null;
+    addEventListener('nc-campaign-edit', async (e) => {
+      const c = (e as CustomEvent<CampaignRow>).detail; if (!c) return;
+      editing = c; form.reset(); $('[data-ds-err]').hidden = true;
+      const set = (k: string, v: string) => { const el = form.elements.namedItem(k) as HTMLInputElement | null; if (el) el.value = v; };
+      ($<HTMLInputElement>('[name="what"][value="ad"]')).checked = true;
+      set('business', c.client);
+      form.querySelectorAll<HTMLInputElement>('[name="size"]').forEach((b) => (b.checked = c.sizes.includes(b.value)));
+      $<HTMLInputElement>('[name="takeover"]').checked = !!c.takeover;
+      imgs = (c.creatives ?? []).filter((x) => x.img).map((x) => { const w = x.w ?? 0, h = x.h ?? 0; return { data: x.img, w, h, name: '', sw: w || 300, sh: h || 250, custom: !STANDARD_SIZES.some((z) => z.w === w && z.h === h) }; });
+      editImgs = JSON.stringify(imgs.map((m) => [m.data, m.sw, m.sh]));
+      const link = c.creatives?.find((x) => x.url && x.url !== '#')?.url ?? '';
+      set('link', link); set('regions', c.regions || 'all');
+      const byViews = c.views != null && c.views > 0;
+      ($<HTMLInputElement>(`[name="mode"][value="${byViews ? 'views' : 'time'}"]`)).checked = true;
+      set('start', c.start); set('end', c.end); if (byViews) set('views', String(c.views));
+      const pages = c.placement?.pages ?? [];
+      form.querySelectorAll<HTMLInputElement>('[name="page"]').forEach((b) => (b.checked = pages.includes(b.value)));
+      if (pages.some((x) => x.startsWith('seccion:'))) $<HTMLDetailsElement>('.ds-secs').open = true;
+      set('banner', c.placement?.banner ?? '');
+      editDeal = hasBackend() ? await getDeal(c.id) : null;
+      set('price', editDeal?.price != null ? String(editDeal.price) : ''); set('terms', editDeal?.notes ?? '');
+      setMode(); $('[data-ds-save]').textContent = 'Revisar y guardar cambios';
+      paint(); dlg.showModal();
+    });
+    /** Pages (and banner position) picked for the campaign. */
+    const placementOf = (): Placement => {
+      const pages = [...form.querySelectorAll<HTMLInputElement>('[name="page"]:checked')].map((b) => b.value);
+      const banner = String(new FormData(form).get('banner') || '') as Placement['banner'] | '';
+      return { ...(pages.length ? { pages } : {}), ...(banner && sizes().includes('leaderboard') ? { banner } : {}) };
+    };
+    const placementText = (p: Placement) => {
+      const names: Record<string, string> = { portada: 'Portada', notas: 'todas las noticias', secciones: 'páginas de sección', otras: 'otras páginas' };
+      const list = (p.pages ?? []).map((x) => x.startsWith('seccion:') ? `sección ${x.slice(8)}` : names[x] ?? x);
+      return `${list.length ? list.join(', ') : 'Todas las páginas'}${p.banner ? ` · banner ${p.banner === 'top' ? 'de arriba' : 'de abajo'}` : ''}`;
+    };
     $<HTMLInputElement>('[data-ds-com-photo]').addEventListener('change', async (e) => {
       const f = (e.target as HTMLInputElement).files?.[0]; comPhoto = ''; if (!f) return;
       if (f.size > 5 * 1024 * 1024) { (e.target as HTMLInputElement).value = ''; void tell('La foto pesa más de 5 MB.'); return; }
@@ -280,7 +371,7 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
     // A salesperson's ad waits for the administrator or the Gerente to approve it in Anuncios (user, 2026-11-02:
     // nothing a salesperson types goes on the site unchecked); theirs goes up on the date as before.
     const needsApproval = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || '{}').role === 'ads'; } catch { return false; } };
-    const saveLabel = () => (isCom() ? 'Guardar' : needsApproval() ? 'Revisar y enviar a aprobación' : 'Revisar y publicar');
+    const saveLabel = () => (editing ? 'Revisar y guardar cambios' : isCom() ? 'Guardar' : needsApproval() ? 'Revisar y enviar a aprobación' : 'Revisar y publicar');
     /** The link people go to when they tap the ad: adds https:// when it's missing; '' = none, null = not a web address. */
     function cleanLink(v: string): string | null {
       if (!v) return '';
@@ -329,46 +420,71 @@ const money = (n: number) => `$${n.toLocaleString('en-US')}`;
       const err = $('[data-ds-err]'); const fail = (m: string) => { err.textContent = m; err.hidden = false; };
       const byViews = s('mode') === 'views', sz = sizes(), takeover = !!d.get('takeover');
       if (s('business').length < 2) return fail('Escribe el nombre del negocio.');
-      if (isCom()) return void saveComunicado(s, fail);
+      if (isCom() && !editing) return void saveComunicado(s, fail);
       if (!sz.length) return fail('Escoge al menos un espacio.');
       if (!imgs.length) return fail('Sube la imagen del anuncio.');
-      if (!sz.some((x) => imgs.some((m) => fits(m.w, m.h, x)))) return fail('Ninguna imagen le queda a los espacios escogidos. Revisa los tamaños.');
+      if (imgs.some((m) => !(m.sw >= 10 && m.sh >= 10 && m.sw <= 4000 && m.sh <= 4000))) return fail('Revisa el ancho y el alto de cada imagen (de 10 a 4000 píxeles).');
+      if (!sz.some((x) => imgs.some((m) => fitsImg(m, x)))) return fail('Ninguna imagen le queda a los espacios escogidos. Revisa los tamaños.');
       if (!s('start')) return fail('Escoge la fecha en que empieza.');
       if (!byViews && (!s('end') || s('end') < s('start'))) return fail('La fecha final tiene que ser después de la de inicio.');
       const views = byViews ? Math.max(1000, Number(s('views')) || 0) : undefined;
-      if (s('start') < today) return fail('La fecha de inicio no puede ser antes de hoy.');
+      if (s('start') < today && !(editing && s('start') === editing.start)) return fail('La fecha de inicio no puede ser antes de hoy.');
       const pr = pricing();
-      if (!pr.price && s('method') !== 'Cortesía') return fail('Escribe el precio del anuncio (o escoge «Cortesía» si es gratis).');
+      if (!editing && !pr.price && s('method') !== 'Cortesía') return fail('Escribe el precio del anuncio (o escoge «Cortesía» si es gratis).');
+      // A salesperson may change dates, pages, link and price of a running ad, but new images go through approval
+      const imgsChanged = !!editing && JSON.stringify(imgs.map((m) => [m.data, m.sw, m.sh])) !== editImgs;
+      if (editing && imgsChanged && needsApproval()) return fail('Solo el administrador o el Gerente pueden cambiar las imágenes de un anuncio que ya está en el sitio. Pídeselo, o crea un anuncio nuevo con «+ Anuncio vendido».');
       const cleanL = cleanLink(s('link'));
       if (cleanL === null) return fail('El enlace no es una dirección de internet. Ejemplo: https://minegocio.com');
       if (s('email') && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s('email'))) return fail('El correo del cliente no se ve bien. Revísalo.');
       err.hidden = true;
       // Check before saving: what goes up, where, when, and for how much
-      const wait = needsApproval();
-      const used = imgs.filter((m) => sz.some((x) => fits(m.w, m.h, x)));
-      const left = sz.filter((x) => !imgs.some((m) => fits(m.w, m.h, x)));
+      const wait = needsApproval() && !editing;
+      const used = imgs.filter((m) => sz.some((x) => fitsImg(m, x)));
+      const left = sz.filter((x) => !imgs.some((m) => fitsImg(m, x)));
+      const place = placementOf();
       const row = (k: string, v: string, warn = false) => `<li${warn ? ' class="warn"' : ''}><span>${k}</span><b>${v}</b></li>`;
       const sum = `<div class="ds-rev-imgs">${used.map((m) => `<img src="${m.data}" alt="" />`).join('')}</div><ul class="ds-rev">${[
         row('Cliente', esc(s('business'))),
         row('Espacios', esc(takeover ? 'Toma de portada (todos)' : sz.map((x) => NAME[x]).join(', '))),
         ...(left.length && !takeover ? [row('Sin imagen', `${esc(left.map((x) => NAME[x]).join(', '))}: no saldrá ahí`, true)] : []),
         row('Cuándo', byViews ? `${(Math.max(1000, Number(s('views')) || 0)).toLocaleString('es-PR')} vistas desde el ${s('start')}` : `del ${s('start')} al ${s('end')}`),
+        row('Tamaños', esc(used.map((m) => `${m.sw} × ${m.sh}`).join(', '))),
         row('Dónde', esc(({ all: 'Puerto Rico y la diáspora', island: 'Solo Puerto Rico', diaspora: 'Solo la diáspora' } as Record<string, string>)[s('regions')] ?? '')),
+        row('Páginas', esc(placementText(place))),
         row('Al tocarlo', cleanL ? esc(cleanL) : 'no lleva a ningún sitio (sin enlace)', !cleanL),
+        ...(editing ? [row('Precio acordado', pr.price ? `$${pr.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'sin precio')] : [
         row('Total', `$${pr.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${pr.paidState ? `pagado (${esc(s('method'))})` : 'por cobrar'}`),
-        row('Correo del cliente', s('email') ? esc(s('email')) : 'ninguno: no recibirá la confirmación', !s('email')),
+        row('Correo del cliente', s('email') ? esc(s('email')) : 'ninguno: no recibirá la confirmación', !s('email'))]),
       ].join('')}</ul>${wait ? '<p class="pnl-muted pnl-small">Va a <b>Anuncios → Por revisar</b>. Sale en el sitio cuando el administrador o el Gerente lo apruebe.</p>' : ''}`;
-      if (!(await ask('Revisa antes de guardar', { html: sum, ok: wait ? 'Enviar a aprobación' : 'Confirmar y publicar', cancel: 'Corregir' }))) return;
+      if (!(await ask(editing ? 'Revisa los cambios' : 'Revisa antes de guardar', { html: sum, ok: editing ? 'Guardar cambios' : wait ? 'Enviar a aprobación' : 'Confirmar y publicar', cancel: 'Corregir' }))) return;
       if (!hasBackend()) return fail('Para publicar hace falta la base de datos (no funciona en modo demostración).');
-      const id = `v-${Date.now().toString(36)}`;
+      const id = editing ? editing.id : `v-${Date.now().toString(36)}`;
       const link = cleanL || '#';
       const camp: Campaign = { id, client: s('business'), sizes: sz, start: s('start'), end: byViews ? addDays(s('start'), 365) : s('end'),
         regions: s('regions') as Campaign['regions'], takeover: takeover || undefined, views,
-        creatives: imgs.filter((m) => sz.some((x) => fits(m.w, m.h, x))).map((m) => ({ img: m.data, url: link, alt: s('business'), w: m.w, h: m.h })) };
+        creatives: used.map((m) => ({ img: m.data, url: link, alt: s('business'), w: m.sw, h: m.sh })),
+        width: used[0]?.sw, height: used[0]?.sh, placement: place };
+      let seller0 = ''; try { seller0 = JSON.parse(localStorage.getItem('nc-staff') || '{}').name ?? ''; } catch { /* storage blocked */ }
+      // The agreed price, private (ad_campaign_deals); the placement goes with it for a sale that waits for approval
+      const deal = { campaign_id: id, price: pr.price || null, total: editing ? (editDeal?.price === pr.price ? editDeal?.total ?? null : pr.price || null) : pr.total,
+        placement: { ...place, width: camp.width, height: camp.height }, notes: s('terms') || null, sold_by: editing ? editDeal?.sold_by ?? seller0 : seller0 };
+      if (editing) {
+        const btn = $<HTMLButtonElement>('[data-ds-save]'); btn.disabled = true; btn.textContent = 'Guardando…';
+        const ok = await publishCampaign(camp, editing.status === 'paused' ? 'paused' : 'active').catch(() => false);
+        const dealOk = ok ? await saveDeal(deal) : false;
+        btn.disabled = false; btn.textContent = 'Revisar y guardar cambios';
+        if (!ok) return fail('No se pudo guardar. Revisa tu sesión (sal y vuelve a entrar) e intenta otra vez.');
+        logActivity('Editó una campaña', `${s('business')} · ${id}`);
+        const name = s('business'); editing = null;
+        dispatchEvent(new Event('nc-campaigns')); dlg.close();
+        return void tell(`✓ Guardado: la campaña de ${name} ya sale con los cambios.${dealOk ? '' : ' (El precio no se pudo guardar: falta correr supabase/precios-anuncios.sql.)'}`, 'Perfecto');
+      }
       const btn = $<HTMLButtonElement>('[data-ds-save]'); btn.disabled = true; btn.textContent = wait ? 'Enviando…' : 'Publicando…';
       // Waiting for approval: the images are stored with the order, and approving it in Anuncios puts it up
       const files = wait ? await Promise.all(camp.creatives.map(async (c, i) => ({ name: `${c.w}x${c.h}.png`, w: c.w ?? 0, h: c.h ?? 0, data: (await uploadAdImage(`${id}-${c.w}x${c.h}-${i}.png`, c.img)) ?? '' }))) : [];
       const ok = wait ? files.every((f) => f.data) : await publishCampaign(camp).catch(() => false);
+      if (ok) void saveDeal(deal);
       btn.disabled = false; btn.textContent = saveLabel();
       if (!ok) return fail(wait ? 'No se pudieron subir las imágenes. Revisa tu sesión (sal y vuelve a entrar) e intenta otra vez.' : 'No se pudo publicar. Revisa tu sesión (sal y vuelve a entrar) e intenta otra vez.');
       // The client's record for the emails and the advertiser panel: saved as a request (the database only takes new

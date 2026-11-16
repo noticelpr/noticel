@@ -14,7 +14,10 @@ export const FORMATS = [
     about: 'Tu anuncio rota cada 8 segundos con hasta 3 marcas más. En celular se ve como cuadrado. La forma más barata de empezar.', art: [[728, 90], [300, 250]], popular: false },
   { id: 'rectangle', name: 'Rectángulo', size: '300 × 250', price: 0, cpm: 0, per: 'mes', slots: ['rectangle'] as AdSize[], where: 'Al lado de las noticias en computadora y entre el contenido en celular: portada, noticias, secciones, Deportes, juegos y foro.',
     about: 'Al lado de las noticias, Deportes y los juegos. Se ve igual en celular.', art: [[300, 250]], popular: true },
-  { id: 'cuadrado', name: 'Cuadrado', size: 'Como tus posts de Instagram o Facebook', price: 0, cpm: 0, per: 'mes', slots: ['rectangle'] as AdSize[], where: 'En los espacios de rectángulo: al lado de las noticias en computadora y entre el contenido en celular, donde se ve cuadrado.',
+  // The only self-serve ad (owner, 2026-11-16): one square creative rotates in EVERY space where a square fits
+  // (sidebar, between stories, inside stories, the tall sidebar space and every phone space). Only the wide top and bottom
+  // banners on computers stay for direct clients (SPACE_BOXES below).
+  { id: 'cuadrado', name: 'Cuadrado', size: 'Como tus posts de Instagram o Facebook', price: 0, cpm: 0, per: 'mes', slots: ['rectangle', 'infeed', 'halfpage'] as AdSize[], where: 'En todos los espacios donde cabe un cuadrado: al lado de las noticias, entre las noticias y dentro de cada noticia en computadora, y en todos los espacios del celular.',
     about: 'Sube el mismo post cuadrado de tus redes (1:1). En celular se ve completo y grande.', art: [[600, 600]], popular: false },
   { id: 'infeed', name: 'Entre noticias', size: '728 × 90', price: 0, cpm: 0, per: 'mes', slots: ['infeed'] as AdSize[], where: 'Entre las noticias de la portada y de las secciones, y al final de cada noticia; en celular se ve como cuadrado (300 × 250).',
     about: 'Entre las noticias de la portada y al final de cada noticia. En celular se ve como cuadrado.', art: [[728, 90], [300, 250]], popular: false },
@@ -102,7 +105,77 @@ export type Campaign = {
   id: string; client: string; sizes: AdSize[]; start: string; end: string;
   regions?: 'all' | 'island' | 'diaspora'; creatives: Creative[]; weight?: number; takeover?: boolean; skin?: string;
   views?: number; // paid views: the campaign stops by itself once this many views are delivered (counted in the backend)
+  width?: number; height?: number; // the size sold (any size, panel → Ventas); each creative also keeps its own w/h
+  placement?: Placement; // which pages (and, for the wide banner, top or bottom); empty = everywhere
 };
+
+// ---- Ad sizes and the spaces that hold them (owner, 2026-11-16) ----
+// Direct clients buy any size (panel → Ventas → "+ Anuncio vendido": a standard size or a custom width × height).
+// Each ad space lists the boxes it can hold, on computers and on phones, in order of preference.
+//
+// THE FIT RULE (used by the site, AdSlot.astro, and by the panel to warn before saving):
+//   An ad of W × H shows in a space when its shape (W ÷ H) is within SHAPE_TOLERANCE (15%) of one of the space's boxes.
+//   It's then shown scaled DOWN to fit inside that box (and inside the space's real width on small screens), keeping its
+//   shape, never enlarged and never cropped. Example: a 970 × 250 billboard fits the 970 × 250 box of the top banner
+//   and the "between stories" space; a 1080 × 1080 square fits the 300 × 300 square box (shown at 300 × 300); a custom
+//   1000 × 300 banner (shape 3.3) fits the 970 × 250 box (3.9, 14% off) and shows at 833 × 250.
+//   An ad that fits no box of a space never shows there (it isn't stretched or cut).
+// Phones: the top banner keeps phone banners (320 × 100, 320 × 50); every other space turns into a phone square space
+// (squares first, then rectangles, then phone banners), so a self-serve square shows in all of them.
+export type Box = readonly [number, number];
+export const SHAPE_TOLERANCE = 0.15;
+const SQUARE: Box[] = [[300, 300]];
+const MREC: Box[] = [[300, 250], [336, 280]];
+const PHONE: Box[] = [...SQUARE, ...MREC, [320, 100], [320, 50]];
+export const SPACE_BOXES: Record<AdSize, { desktop: Box[]; phone: Box[] }> = {
+  leaderboard: { desktop: [[728, 90], [970, 90], [970, 250], [468, 60]], phone: [[320, 100], [320, 50]] }, // top and bottom banners: no squares on computers
+  infeed: { desktop: [[728, 90], [970, 250], [468, 60], ...MREC, ...SQUARE], phone: PHONE }, // between stories and inside stories
+  rectangle: { desktop: [...MREC, ...SQUARE], phone: PHONE }, // beside the news
+  halfpage: { desktop: [[300, 600], [160, 600], ...MREC, ...SQUARE], phone: PHONE }, // tall sidebar space (computers)
+};
+/** Standard sizes offered in the panel (any other width × height can be typed). */
+export const STANDARD_SIZES: Array<{ w: number; h: number; name: string }> = [
+  { w: 728, h: 90, name: 'Leaderboard' }, { w: 970, h: 250, name: 'Billboard' }, { w: 970, h: 90, name: 'Leaderboard grande' },
+  { w: 468, h: 60, name: 'Banner' }, { w: 300, h: 250, name: 'Rectángulo' }, { w: 336, h: 280, name: 'Rectángulo grande' },
+  { w: 300, h: 600, name: 'Media página' }, { w: 160, h: 600, name: 'Rascacielos' }, { w: 320, h: 50, name: 'Banner de celular' },
+  { w: 320, h: 100, name: 'Banner grande de celular' }, { w: 1080, h: 1080, name: 'Cuadrado (como Instagram)' }, { w: 300, h: 300, name: 'Cuadrado' },
+];
+export const SPACE_NAMES: Record<AdSize, string> = { leaderboard: 'Banner de arriba y abajo', infeed: 'Entre noticias y dentro de la noticia', rectangle: 'Al lado de las noticias', halfpage: 'Media página (columna derecha)' };
+const sameShape = (w: number, h: number, b: Box) => Math.abs(w / h - b[0] / b[1]) / (b[0] / b[1]) < SHAPE_TOLERANCE;
+/** The box an ad of w × h shows in, in this space and screen (rank = preference, lower is better), or null. */
+export function boxFor(w: number, h: number, space: AdSize, phone: boolean): { box: Box; rank: number } | null {
+  if (!w || !h) return null;
+  const list = SPACE_BOXES[space][phone ? 'phone' : 'desktop'];
+  const rank = list.findIndex((b) => sameShape(w, h, b));
+  return rank < 0 ? null : { box: list[rank], rank };
+}
+/** The size an ad is shown at inside its box: scaled down to fit, never enlarged. */
+export const shownSize = (w: number, h: number, box: Box): [number, number] => { const s = Math.min(1, box[0] / w, box[1] / h); return [Math.round(w * s), Math.round(h * s)]; };
+
+// ---- Placement: which pages a campaign shows on ----
+export type Placement = { pages?: string[]; banner?: 'top' | 'bottom' };
+export const PAGE_CHOICES = [
+  { id: 'portada', name: 'Portada' }, { id: 'notas', name: 'Todas las noticias' }, { id: 'secciones', name: 'Páginas de sección' },
+  { id: 'otras', name: 'Otras páginas (juegos, foro, ligas, columnistas…)' },
+];
+export type PageKind = { kind: 'portada' | 'notas' | 'secciones' | 'otras'; section?: string };
+/** True when a campaign's placement includes this page (and this banner position, for the wide banner). */
+export function placementFits(p: Placement | null | undefined, page: PageKind, banner?: 'top' | 'bottom'): boolean {
+  if (p?.banner && banner && p.banner !== banner) return false;
+  const pages = p?.pages ?? [];
+  if (!pages.length) return true;
+  return pages.includes(page.kind) || (!!page.section && pages.includes(`seccion:${page.section}`));
+}
+
+// ---- Self-serve plans (Anúnciate). Prices are NOT here: they live in Supabase (supabase/precios-anuncios.sql, table
+// ad_prices), set by the administrator in panel → Ajustes, and the "pagos" function reads them again before charging. ----
+export const SELF_PLANS = [
+  { id: 'cuadrado_mensual', days: 30, recurring: true }, { id: 'cuadrado_7', days: 7 }, { id: 'cuadrado_30', days: 30 },
+  { id: 'cuadrado_90', days: 90 }, { id: 'cuadrado_180', days: 180 },
+] as const;
+export type AdPrices = Record<string, number | null>;
+/** The plan id for a length picked on Anúnciate ('sub' = monthly subscription, else days). */
+export const planId = (months: string) => (months === 'sub' ? 'cuadrado_mensual' : `cuadrado_${months}`);
 
 // ---- Fair share (user, 2026-11-06). While we sell by the month and traffic grows, we don't promise a number of views. ----
 // Fairness comes from: (1) at most MAX_PER_SPACE ads rotate in each space, so each one gets at least 1 of every

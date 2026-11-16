@@ -4,6 +4,11 @@
 // Supabase Edge Function "pagos": card payments with Stripe for the Anúnciate page (/publicidad/ and /en/advertise/).
 //   checkout → the page sends the request's id; this reads the request from the database (never the price the page
 //              sends) and opens a Stripe payment page for that exact amount: card, Apple Pay, Google Pay.
+//              Self-serve orders (owner, 2026-11-16): the amount is worked out HERE from the price table ad_prices
+//              (supabase/precios-anuncios.sql; set in panel → Ajustes): the square plan picked (monthly, 7, 30, 90 or
+//              180 days) + the design fee when "Créenlo por mí", or the press release price. If the order's total says
+//              something else, the table wins and the order is corrected. A price not set yet → it can't be paid online.
+//              Orders the team already approved (status "aprobada", e.g. a salesperson's payment link) keep their total.
 //   Stripe   → when the payment goes through, Stripe calls this same function (a "webhook", signed by Stripe); only
 //              then the request is marked paid, with the payment written in its lines. Coming back to the page
 //              doesn't mark anything paid.
@@ -28,7 +33,25 @@ const MAX_AGE_DAYS = 45; // a request older than this needs a new quote from the
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const out = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-type Req = { id: string; created_at: string; paid: boolean; status: string; total: number; duration: string | null; client: { name?: string; business?: string; email?: string; lang?: string }; lines: string[] | null };
+type Req = { id: string; created_at: string; paid: boolean; status: string; total: number; duration: string | null; client: { name?: string; business?: string; email?: string; lang?: string }; lines: string[] | null;
+  formats?: string[] | null; mode?: string | null };
+
+/** The ad_prices row an online order is charged from (the self-serve square plans and the press release), or an
+ *  error when the order isn't something sold on Anúnciate. */
+function priceKeys(r: Req): { keys: string[] } | { error: string } {
+  const f = r.formats ?? [], d = r.duration ?? '';
+  if (f.length === 1 && f[0] === 'comunicado') return { keys: [/lo escribimos/i.test(d) ? 'comunicado_escrito' : 'comunicado_listo'] };
+  if (f.length !== 1 || f[0] !== 'cuadrado') return { error: 'Este pedido necesita una cotización de Ventas.' };
+  let plan = '';
+  if (/se renueva cada mes|renews every month/i.test(d)) plan = 'cuadrado_mensual';
+  else {
+    const w = d.match(/(\d+)\s*(semana|week)/i), m = d.match(/(\d+)\s*(mes|month)/i);
+    const days = w ? Number(w[1]) * 7 : m ? Number(m[1]) * 30 : 0;
+    if ([7, 30, 90, 180].includes(days)) plan = `cuadrado_${days}`;
+  }
+  if (!plan) return { error: 'No reconocemos el tiempo de este anuncio. Escríbenos y te ayudamos.' };
+  return { keys: r.mode === 'design' ? [plan, 'diseno'] : [plan] };
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -37,7 +60,7 @@ Deno.serve(async (req) => {
   const base = Deno.env.get('SUPABASE_URL')!, service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const db = { apikey: service, Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' };
   const getReq = async (id: string): Promise<Req | undefined> =>
-    (await (await fetch(`${base}/rest/v1/ad_requests?id=eq.${encodeURIComponent(id)}&select=id,created_at,paid,status,total,duration,client,lines`, { headers: db })).json())[0];
+    (await (await fetch(`${base}/rest/v1/ad_requests?id=eq.${encodeURIComponent(id)}&select=id,created_at,paid,status,total,duration,client,lines,formats,mode:art->>mode`, { headers: db })).json())[0];
 
   const raw = await req.text();
 
@@ -146,6 +169,20 @@ Deno.serve(async (req) => {
     if (r.paid) return out({ error: en ? 'This request is already paid.' : 'Esta solicitud ya está pagada.' }, 409);
     if (r.status === 'rechazada') return out({ error: en ? 'This request was not approved.' : 'Esta solicitud no fue aprobada.' }, 409);
     if (Date.now() - Date.parse(r.created_at) > MAX_AGE_DAYS * 864e5) return out({ error: en ? 'This request is too old to pay online. Write to us and we will send you a new quote.' : 'Esta solicitud es muy vieja para pagarla en línea. Escríbenos y te enviamos una cotización nueva.' }, 409);
+    // The price: from the price table for an order made on Anúnciate; the order's own total once the team approved it
+    if (r.status !== 'aprobada') {
+      const k = priceKeys(r);
+      if ('error' in k) return out({ error: en ? 'This order needs a quote from our sales team. Write to us.' : k.error }, 409);
+      const rows: Array<{ id: string; amount: number | null }> = await (await fetch(`${base}/rest/v1/ad_prices?id=in.(${k.keys.join(',')})&select=id,amount`, { headers: db })).json().catch(() => []);
+      const amounts = k.keys.map((key) => rows.find((x) => x.id === key)?.amount);
+      if (amounts.some((a) => a == null || !(Number(a) >= 0))) return out({ error: en ? 'This price is not confirmed yet. Write to us and we will help you.' : 'Este precio todavía está por confirmar. Escríbenos y te ayudamos.' }, 409);
+      const price = Math.round(amounts.reduce((a: number, x) => a + Number(x), 0) * 100) / 100;
+      if (Math.abs(price - Number(r.total)) > 0.005) {
+        await fetch(`${base}/rest/v1/ad_requests?id=eq.${encodeURIComponent(r.id)}`, { method: 'PATCH', headers: db,
+          body: JSON.stringify({ total: price, lines: [...(r.lines ?? []), `Precio de la tabla de precios: $${price.toFixed(2)} (el pedido decía $${Number(r.total).toFixed(2)})`] }) });
+        r.total = price;
+      }
+    }
     const cents = Math.round(Number(r.total) * 100);
     if (!(cents >= 50)) return out({ error: en ? 'The amount is not valid.' : 'La cantidad no es válida.' }, 400);
     const page = en ? `${SITE}/en/advertise/` : `${SITE}/publicidad/`;

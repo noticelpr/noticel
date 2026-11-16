@@ -49,7 +49,7 @@ const games = box === 'deportes' ? scores(undefined, 8) : [];
 const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 ---
 <Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`} topAd={slug !== 'opiniones'}>
-  <main class="wrap ncs-page" id="main">
+  <main class="wrap ncs-page" id="main" data-ad-section={slug}>
     {slug !== 'opiniones' && <header class="ncs-head">
       {parent && <p class="ncs-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
       <div class="ncs-titlerow">

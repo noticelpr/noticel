@@ -6,6 +6,9 @@
 //   2. Google AdSense, only when there is no direct campaign for this space and GOOGLE is filled in.
 //   3. Otherwise the "Anúnciate aquí" placeholder below.
 // leaderboard: 728×90 on computers, 320×100 on phones · rectangle: 300×250 · halfpage: 300×600 · infeed: 728×90
+// Which ad sizes each space holds and how they're scaled (the fit rule): SPACE_BOXES and boxFor in src/lib/ads.ts.
+// Placement: a campaign may be limited to some pages (Portada, noticias, secciones, a section…) and, for the wide
+// banner, to the top or the bottom one (placementFits in src/lib/ads.ts).
 import { SITE, url } from '../lib/site';
 import type { AdSize } from '../lib/ads';
 interface Props { size: AdSize; sticky?: boolean; class?: string; quiet?: boolean } // quiet: hidden unless an ad fills it (no "Anúnciate aquí" box)
@@ -23,7 +26,7 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
   </div>
 )}
 <script>
-  import { CAMPAIGNS, DEMO_CAMPAIGNS, GOOGLE, ROTATE_SECONDS, FORMATS, MAX_PER_SPACE, type AdSize, type Campaign, type Creative } from '../lib/ads';
+  import { CAMPAIGNS, DEMO_CAMPAIGNS, GOOGLE, ROTATE_SECONDS, FORMATS, MAX_PER_SPACE, boxFor, shownSize, placementFits, type AdSize, type Campaign, type Creative, type PageKind } from '../lib/ads';
   import { isDemo } from '../lib/demo';
   import { hasBackend, liveCampaigns, countView, countClick } from '../lib/backend';
   const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
@@ -55,10 +58,22 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
   const testSite = !!document.querySelector('[data-ad-size][data-test-site]');
   const demoAds = isDemo() || testSite ? DEMO_CAMPAIGNS.map((c) => ({ ...c, demo: true })) : [];
   const live = [...CAMPAIGNS, ...demoAds, ...remote, ...approvedHere()].filter((c) => c.start <= today && today <= c.end && c.creatives.length && notDone(c) && (!c.regions || c.regions === 'all' || c.regions === where));
-  // Each space only shows images of its shape (wide banners, 300×250, 300×600); if a campaign has none, it skips the space
-  const RATIO: Record<AdSize, number[]> = { leaderboard: [728 / 90, 320 / 100], infeed: [728 / 90, 320 / 100], rectangle: [300 / 250, 1] /* a square post (Cuadrado) also goes in the rectangle spaces */, halfpage: [300 / 600] };
+  // Each space only shows ads whose shape fits one of its boxes (src/lib/ads.ts, boxFor); if a campaign has none, it
+  // skips the space. An image without a known size is trusted to be the space's first box.
   const sizeOf = (cr: Creative) => (cr.w && cr.h ? [cr.w, cr.h] : (cr.img.match(/(\d+)x(\d+)\.\w+$/) ?? []).slice(1).map(Number));
-  const fits = (cr: Creative, size: AdSize) => { const [w, h] = sizeOf(cr); return !w || !h || RATIO[size].some((r) => Math.abs(w / h - r) / r < 0.15); };
+  const narrow = matchMedia('(max-width:760px)').matches;
+  const rankOf = (cr: Creative, size: AdSize) => { const [w, h] = sizeOf(cr); return !w || !h ? 0 : boxFor(w, h, size, narrow)?.rank ?? -1; };
+  const fits = (cr: Creative, size: AdSize) => rankOf(cr, size) >= 0;
+  // This page, for campaigns limited to some pages (Ventas → placement)
+  const BASE_PATH = BASE.replace(/\/$/, '');
+  const page: PageKind = (() => {
+    const p = location.pathname.replace(/\/$/, '');
+    const sec = document.querySelector<HTMLElement>('[data-ad-section]')?.dataset.adSection || undefined;
+    if (p === BASE_PATH || p === `${BASE_PATH}/index.html`) return { kind: 'portada' };
+    if (document.querySelector('article.art[data-read-url]')) return { kind: 'notas', section: sec };
+    if (p.startsWith(`${BASE_PATH}/category/`)) return { kind: 'secciones', section: sec ?? p.split('/').pop() };
+    return { kind: 'otras' };
+  })();
   const takeover = live.find((c) => c.takeover);
   const track = (name: string, c: Campaign & { preview?: boolean; demo?: boolean }, size: string) => {
     if (c.demo) return; // sample ads are never counted
@@ -95,14 +110,21 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
   const esc = (t: string) => t.replace(/"/g, '&quot;');
   const file = (p: string) => (/^data:/.test(p) ? p : src(p));
   // A still or animated image, or a video (muted, plays only while on screen; `img` is its first picture)
-  const media = (cr: Creative) => cr.video
-    ? `<video src="${file(cr.video)}" poster="${file(cr.img)}" muted playsinline preload="none" aria-label="${esc(cr.alt)}"></video>`
-    : `<img src="${file(cr.img)}" alt="${esc(cr.alt)}" loading="lazy" />`;
+  // Shown at the size the fit rule gives (scaled down inside its box, never enlarged or cropped)
+  const look = (cr: Creative, size: AdSize) => {
+    const [w, h] = sizeOf(cr); const fit = w && h ? boxFor(w, h, size, narrow) : null;
+    if (!fit) return '';
+    const [sw] = shownSize(w, h, fit.box);
+    return ` style="width:${sw}px;max-width:100%;height:auto;aspect-ratio:${w}/${h};object-fit:contain;max-height:none"`;
+  };
+  const media = (cr: Creative, size: AdSize) => cr.video
+    ? `<video src="${file(cr.video)}" poster="${file(cr.img)}" muted playsinline preload="none" aria-label="${esc(cr.alt)}"${look(cr, size)}></video>`
+    : `<img src="${file(cr.img)}" alt="${esc(cr.alt)}" loading="lazy"${look(cr, size)} />`;
 
   function direct(slot: HTMLElement, size: AdSize, pool: Array<{ c: Campaign; cr: Creative }>) {
     const box = document.createElement('div');
     box.className = 'ad-rot';
-    box.innerHTML = pool.map(({ c, cr }, i) => `<a href="${cr.url}" target="_blank" rel="sponsored noopener" data-k="${i}"${i ? ' hidden' : ''}>${(c as any).demo ? '' /* the image itself says "ANUNCIO DE EJEMPLO" */ : (c as any).preview ? '<span class="ad-prev">Vista previa · solo en este dispositivo</span>' : ''}${media(cr)}</a>`).join('')
+    box.innerHTML = pool.map(({ c, cr }, i) => `<a href="${cr.url}" target="_blank" rel="sponsored noopener" data-k="${i}"${i ? ' hidden' : ''}>${(c as any).demo ? '' /* the image itself says "ANUNCIO DE EJEMPLO" */ : (c as any).preview ? '<span class="ad-prev">Vista previa · solo en este dispositivo</span>' : ''}${media(cr, size)}</a>`).join('')
       + (pool.some(({ cr }) => cr.video) ? '<button type="button" class="ad-snd" aria-label="Activar sonido" aria-pressed="false" hidden>🔇</button>' : '')
       + (pool.length > 1 ? `<span class="ad-dots" aria-hidden="true">${pool.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</span>` : '');
     slot.querySelector('.ad-box')?.replaceWith(box);
@@ -159,14 +181,12 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
     return 0;
   }
 
-  // Wide spaces accept both banner shapes; pick the one for this screen (728×90 on computers, 320×100 on phones)
-  const narrow = matchMedia('(max-width:760px)').matches;
+  // A campaign with several sizes shows the one this space and screen prefer (e.g. 728×90 on computers, 320×100 on
+  // phones in the top banner; the square first in a phone space); versions of the same size rotate
   const artFor = (c: Campaign, size: AdSize) => {
     const ok = c.creatives.filter((cr) => fits(cr, size));
-    if (size !== 'leaderboard' && size !== 'infeed') return ok;
-    const want = narrow ? 320 / 100 : 728 / 90;
-    const best = ok.filter((cr) => { const [w, h] = sizeOf(cr); return !w || !h || Math.abs(w / h - want) / want < 0.15; });
-    return best.length ? best : ok; // a campaign with only one shape still shows
+    const best = Math.min(...ok.map((cr) => rankOf(cr, size)));
+    return ok.filter((cr) => rankOf(cr, size) === best);
   };
 
   // Spaces the layout hides on this screen (phone-only, computer-only, too narrow) get no ad at all
@@ -194,16 +214,18 @@ const label: Record<AdSize, string> = { leaderboard: '728 × 90', rectangle: '30
     if (slot.classList.contains('ad-bottom') && crowded(slot)) { slot.remove(); return; }
     if (!slot.hidden && tooClose(slot)) { slot.remove(); return; }
     const booked = slot.dataset.adSize as AdSize;
+    const banner = slot.classList.contains('ad-bottom') ? 'bottom' : booked === 'leaderboard' ? 'top' : undefined;
     // Phones: banners and tall ads become squares (campaigns sold only as banners still show their banner)
     const size: AdSize = narrow && booked !== 'rectangle' && !slot.classList.contains('ad-top') ? 'rectangle' : booked;
     if (size !== booked) { slot.classList.add('ad-as-square'); slot.classList.remove('ad-sticky'); }
     // A phone square takes square campaigns and the campaigns sold for this space (banners show their square image)
     // At most MAX_PER_SPACE ads share a space (first booked first), so each gets a fair share (src/lib/ads.ts)
     const capped = (list: typeof live) => [...list].sort((a, b) => a.start.localeCompare(b.start)).slice(0, MAX_PER_SPACE);
-    const camps = takeover ? [takeover] : [...new Set([...capped(live.filter((c) => c.sizes.includes(size))), ...(size !== booked ? capped(live.filter((c) => c.sizes.includes(booked))) : [])])];
+    const here = live.filter((c) => placementFits(c.placement, page, banner));
+    const camps = takeover ? [takeover] : [...new Set([...capped(here.filter((c) => c.sizes.includes(size))), ...(size !== booked ? capped(here.filter((c) => c.sizes.includes(booked))) : [])])];
     // Each campaign appears `weight` times per round, interleaved; start at a random spot so every client gets first view
     const rounds = Math.max(1, ...camps.map((c) => c.weight ?? 1));
-    const pool = Array.from({ length: rounds }, (_, r) => camps.filter((c) => r < (c.weight ?? 1)).flatMap((c) => (c.sizes.includes(size) ? artFor(c, size) : size !== booked && c.creatives.some((cr) => fits(cr, size)) ? c.creatives.filter((cr) => fits(cr, size)) : artFor(c, booked)).map((cr) => ({ c, cr })))).flat(); // a banner campaign shows its square image on phones
+    const pool = Array.from({ length: rounds }, (_, r) => camps.filter((c) => r < (c.weight ?? 1)).flatMap((c) => artFor(c, size).map((cr) => ({ c, cr })))).flat(); // only creatives that fit this space on this screen (a banner campaign shows its square or phone banner on phones)
     const quiet = slot.hasAttribute('data-quiet');
     if (pool.length) {
       const start = fairStart(pool);

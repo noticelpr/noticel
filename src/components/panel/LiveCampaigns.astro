@@ -40,12 +40,23 @@
     const today = new Date().toISOString().slice(0, 10);
     const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' });
     const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00`) - Date.parse(`${a}T12:00:00`)) / 864e5);
-    const SIZE: Record<string, string> = { leaderboard: 'Banner superior', rectangle: 'Rectángulo', halfpage: 'Media página', infeed: 'Entre noticias' };
+    const SIZE: Record<string, string> = { leaderboard: 'Banner de arriba y abajo', rectangle: 'Al lado de las noticias', halfpage: 'Media página', infeed: 'Entre noticias' };
     const WHERE: Record<string, string> = { all: 'Puerto Rico y la diáspora', island: 'Solo Puerto Rico', diaspora: 'Solo la diáspora' };
     const demo = isDemo();
     let rows: CampaignRow[] = [], filter = 'live';
 
     const isAdmin = () => { try { return ['admin', 'manager'].includes(JSON.parse(localStorage.getItem('nc-staff') || 'null')?.role); } catch { return false; } }; // the Gerente too (supabase/gerente-todo.sql)
+    // Editar (owner, 2026-11-16): the administrator, the Gerente and Ventas change a running or scheduled campaign
+    // (size, images, link, dates, pages, agreed price) in the "+ Anuncio vendido" form (DirectSale.astro)
+    const canEdit = () => { try { return ['admin', 'manager', 'ads'].includes(JSON.parse(localStorage.getItem('nc-staff') || 'null')?.role); } catch { return false; } };
+    // The size sold and the pages it shows on (supabase/precios-anuncios.sql)
+    const PAGE: Record<string, string> = { portada: 'Portada', notas: 'noticias', secciones: 'secciones', otras: 'otras páginas' };
+    const extraMeta = (c: CampaignRow) => {
+      const dims = [...new Set((c.creatives ?? []).filter((x) => x.w && x.h).map((x) => `${x.w} × ${x.h}`))];
+      const pages = (c.placement?.pages ?? []).map((x) => (x.startsWith('seccion:') ? x.slice(8) : PAGE[x] ?? x));
+      const parts = [dims.length ? `Tamaño: ${dims.join(', ')}` : '', pages.length ? `Solo en: ${pages.join(', ')}` : '', c.placement?.banner ? `banner ${c.placement.banner === 'top' ? 'de arriba' : 'de abajo'}` : ''].filter(Boolean);
+      return parts.length ? `<p class="lc-meta">${esc(parts.join(' · '))}</p>` : '';
+    };
     // Direct sales entered with "+ Anuncio vendido": what was paid, from the team's client list (Ventas)
     const paidOf = (id: string) => {
       try {
@@ -87,12 +98,13 @@
         <header><b>${esc(c.client)}</b>${c.takeover ? '<span class="lc-tag tk">Toma de portada</span>' : ''}<span class="lc-st">${label}</span><button type="button" class="lc-stats-btn" data-lca-stats title="Ver estadísticas" aria-label="Estadísticas de ${esc(c.client)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button></header>
         ${preview(c)}
         <p class="lc-meta">${c.takeover ? 'Todos los espacios del sitio' : esc(c.sizes.map((s) => SIZE[s] ?? s).join(', '))} · ${esc(WHERE[c.regions] ?? c.regions)} · ${byViews ? `desde el ${day(c.start)}` : `${day(c.start)} al ${day(c.end)}`}</p>
+        ${extraMeta(c)}
         <div class="lc-prog"><p><span>${byViews ? `${num(c.delivered)} de ${num(c.views!)} vistas` : `Día ${num(done)} de ${num(total)} · ${num(c.delivered)} vistas`}</span><b>${pct}%</b></p><i><em style="width:${pct}%"></em></i></div>
         ${paidOf(c.id)}
         ${lowViews(c, st, ran)}
         <p class="lc-meta">Clics: ${num(c.clicks)} (${ctr}%)${pace ? ` · al ritmo actual termina en unos ${pace} día${pace > 1 ? 's' : ''}` : ''}${!byViews && st === 'live' ? ` · termina el ${day(c.end)}` : ''}</p>
         ${st === 'done' && !demo && isAdmin() ? '<div class="lc-acts"><button type="button" class="pnl-link danger" data-lca-del>Borrar</button></div>' : ''}
-        ${st !== 'done' && !demo ? `<div class="lc-acts">${st === 'next' ? '<button type="button" class="pnl-link" data-lca-now>Empezar hoy</button>' : ''}${c.status === 'paused' ? '<button type="button" class="pnl-link" data-lca="active">Reanudar</button>' : '<button type="button" class="pnl-link" data-lca="paused">Pausar</button>'}<button type="button" class="pnl-link danger" data-lca="ended">Terminar ya</button></div>` : ''}
+        ${st !== 'done' && !demo ? `<div class="lc-acts">${canEdit() ? '<button type="button" class="pnl-link" data-lca-edit>Editar</button>' : ''}${st === 'next' ? '<button type="button" class="pnl-link" data-lca-now>Empezar hoy</button>' : ''}${c.status === 'paused' ? '<button type="button" class="pnl-link" data-lca="active">Reanudar</button>' : '<button type="button" class="pnl-link" data-lca="paused">Pausar</button>'}<button type="button" class="pnl-link danger" data-lca="ended">Terminar ya</button></div>` : ''}
       </article>`;
     }
     function paint() {
@@ -171,6 +183,8 @@
       const f = t.closest<HTMLElement>('[data-lf]'); if (f) { filter = f.dataset.lf!; paint(); return; }
       const sb = t.closest<HTMLElement>('[data-lca-stats]');
       if (sb) { const c = rows.find((x) => x.id === sb.closest<HTMLElement>('[data-cid]')!.dataset.cid); if (c) void showStats(c); return; }
+      const ed = t.closest<HTMLElement>('[data-lca-edit]');
+      if (ed) { const c = rows.find((x) => x.id === ed.closest<HTMLElement>('[data-cid]')!.dataset.cid); if (c) dispatchEvent(new CustomEvent('nc-campaign-edit', { detail: c })); return; }
       const del = t.closest<HTMLElement>('[data-lca-del]');
       if (del) {
         const id = del.closest<HTMLElement>('[data-cid]')!.dataset.cid!, c = rows.find((x) => x.id === id)!;

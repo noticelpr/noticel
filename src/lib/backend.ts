@@ -110,26 +110,65 @@ export async function uploadAdImage(name: string, dataUrl: string): Promise<stri
   try { return await uploadImage(name, dataUrl, token); } catch { return null; }
 }
 /** Automatic publishing: approving an ad puts it live for every reader (no code, no rebuild). */
-export async function publishCampaign(c: Campaign): Promise<boolean> {
+export async function publishCampaign(c: Campaign, status: 'active' | 'paused' = 'active'): Promise<boolean> {
   const token = await freshToken(); if (!hasBackend() || !token) return false;
-  const creatives = await Promise.all(c.creatives.map(async (cr, i) => (/^data:/.test(cr.img) ? { ...cr, img: await uploadImage(`${c.id.toLowerCase()}-${cr.w}x${cr.h}-${i}.png`, cr.img, token) } : cr)));
+  const creatives = await Promise.all(c.creatives.map(async (cr, i) => (/^data:/.test(cr.img) ? { ...cr, img: await uploadImage(`${c.id.toLowerCase()}-${cr.w}x${cr.h}-${Date.now().toString(36)}${i}.png`, cr.img, token) } : cr)));
   const row = { id: c.id, client: c.client, sizes: c.sizes, start_date: c.start, end_date: c.end, regions: c.regions ?? 'all', takeover: !!c.takeover, skin: c.skin ?? null,
-    creatives, views: c.views ?? null, weight: c.weight ?? 1, status: 'active' };
-  const r = await fetch(rest('ad_campaigns'), { method: 'POST', headers: { ...head(token), Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(row) });
+    creatives, views: c.views ?? null, weight: c.weight ?? 1, status };
+  // Size and placement (supabase/precios-anuncios.sql). Before that file is run the columns don't exist: saved without them.
+  const extra = { width: c.width ?? null, height: c.height ?? null, placement: c.placement ?? {} };
+  const send = (body: object) => fetch(rest('ad_campaigns'), { method: 'POST', headers: { ...head(token), Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(body) });
+  const r = await send({ ...row, ...extra });
+  return r.ok || (r.status === 400 && (await send(row)).ok);
+}
+
+// ---- Prices of the self-serve ads (supabase/precios-anuncios.sql, table ad_prices). Never in the code. ----
+export type AdPriceRow = { id: string; label: string; amount: number | null; sort: number; updated_at?: string; updated_by?: string | null };
+/** Every price row (anyone may read them). null = couldn't read (no database, or the SQL file wasn't run yet). */
+export async function adPriceRows(): Promise<AdPriceRow[] | null> {
+  if (!hasBackend()) return null;
+  try {
+    const r = await fetch(rest('ad_prices?select=*&order=sort'), { headers: head() });
+    if (!r.ok) return null;
+    return (await r.json()).map((x: any) => ({ ...x, amount: x.amount == null ? null : Number(x.amount) }));
+  } catch { return null; }
+}
+/** Prices by id ({} when they can't be read: Anúnciate then says "Precio por confirmar"). */
+export async function adPrices(): Promise<Record<string, number | null>> {
+  return Object.fromEntries((await adPriceRows() ?? []).map((x) => [x.id, x.amount]));
+}
+/** Administrator only (the database refuses anyone else): saves the prices. */
+export async function saveAdPrices(rows: Array<{ id: string; label: string; sort: number; amount: number | null }>): Promise<boolean> {
+  const token = await freshToken(); if (!hasBackend() || !token) return false;
+  const r = await fetch(rest('ad_prices'), { method: 'POST', headers: { ...head(token), Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) });
   return r.ok;
+}
+
+// ---- The price agreed with a direct client (private: Ventas, the Gerente and the administrator) ----
+export type Deal = { campaign_id: string; price: number | null; total: number | null; placement?: Record<string, unknown>; notes?: string | null; sold_by?: string | null };
+export async function getDeal(id: string): Promise<Deal | null> {
+  const r = await staffApi(`ad_campaign_deals?campaign_id=eq.${encodeURIComponent(id)}&select=*`);
+  if (!r?.ok) return null;
+  return (await r.json())[0] ?? null;
+}
+export async function saveDeal(d: Deal): Promise<boolean> {
+  const r = await staffApi('ad_campaign_deals', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ ...d, updated_at: new Date().toISOString() }) });
+  return !!r?.ok;
 }
 /** Every campaign (live, scheduled, paused or ended) with its views and clicks so far, for Ventas → Campañas. */
 export type CampaignRow = { id: string; client: string; sizes: string[]; start: string; end: string; regions: string; takeover: boolean; views: number | null;
   status: 'active' | 'paused' | 'ended'; delivered: number; clicks: number; created: string;
-  creatives?: Array<{ img: string; w?: number; h?: number; video?: string }> }; // the ad's images, for the preview in Campañas en el aire
+  creatives?: Array<{ img: string; w?: number; h?: number; video?: string; url?: string; alt?: string }>; // the ad's images, for the preview in Campañas en el aire
+  width?: number | null; height?: number | null; placement?: { pages?: string[]; banner?: 'top' | 'bottom' } }; // supabase/precios-anuncios.sql
 export async function allCampaigns(): Promise<CampaignRow[] | null> {
   if (!hasBackend()) return null;
   try {
-    const [c, s] = await Promise.all([fetch(rest('ad_campaigns?select=id,client,sizes,start_date,end_date,regions,takeover,views,status,created_at,creatives&order=start_date.desc'), { headers: head() }), fetch(rest('ad_stats?select=*'), { headers: head() })]);
+    const [c, s] = await Promise.all([fetch(rest('ad_campaigns?select=*&order=start_date.desc'), { headers: head() }), fetch(rest('ad_stats?select=*'), { headers: head() })]);
     if (!c.ok) return null;
     const stats = new Map<string, { views: number; clicks: number }>((s.ok ? await s.json() : []).map((x: any) => [x.campaign_id, x]));
     return (await c.json()).map((x: any) => ({ id: x.id, client: x.client, sizes: x.sizes ?? [], start: x.start_date, end: x.end_date, regions: x.regions, takeover: !!x.takeover,
-      views: x.views ?? null, status: x.status, delivered: stats.get(x.id)?.views ?? 0, clicks: stats.get(x.id)?.clicks ?? 0, created: x.created_at, creatives: x.creatives ?? [] }));
+      views: x.views ?? null, status: x.status, delivered: stats.get(x.id)?.views ?? 0, clicks: stats.get(x.id)?.clicks ?? 0, created: x.created_at, creatives: x.creatives ?? [],
+      width: x.width ?? null, height: x.height ?? null, placement: x.placement ?? {} }));
   } catch { return null; }
 }
 /** Pause or end a campaign early (staff). */

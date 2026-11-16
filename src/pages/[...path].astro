@@ -85,7 +85,7 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
   <main class="wrap" id="main">
     <div class="art-grid">
       <div class="read-progress" aria-hidden="true"><span data-progress></span></div>
-      <article class="art" data-read-section={s.name} data-read-url={storyUrl(story)}
+      <article class="art" data-read-section={s.name} data-ad-section={isTpl ? undefined : s.id} data-read-url={storyUrl(story)}
         data-title={d.title} data-date={d.date.toISOString()} data-image={url(d.image ?? fallback.src)}>
         <div class="crumbs"><a href={url()}>Portada</a> / <a href={isTpl ? 'ARCHSECURL0' : sectionUrl(s.id)}>{s.name}</a></div>
         {isTpl ? <span class="badge">ARCHSECNAME0</span> : <Label story={story} />}
