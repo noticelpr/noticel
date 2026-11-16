@@ -38,7 +38,7 @@ const listEn = [
 const sets = [{ id: 'es', list }, { id: 'en', list: listEn }];
 ---
 <Base title="Correos a los anunciantes" description="Vista previa interna de los correos automáticos." noindex staff>
-  <main class="wrap page cr-page" id="main">
+  <main class="wrap page cr-page" id="main" hidden data-cr-gate>
     <p><a href={url('redaccion')}>← Volver al panel</a></p>
     <h1>Correos automáticos <span class="sp-demo">EJEMPLO</span></h1>
     <p>Así los recibe cada persona. Los datos son de ejemplo (Panadería La Esquina). Se envían solos, una sola vez cada uno; las respuestas llegan al correo de ventas de NotiCel (el que se ponga en Supabase como TEAM_EMAIL).</p>
@@ -60,6 +60,13 @@ const sets = [{ id: 'es', list }, { id: 'en', list: listEn }];
     ))}
   </main>
   <script>
+    // Newsroom only (owner, 2026-11-16): the page shows only to someone signed in to the panel and on the team;
+    // everyone else goes to the panel's sign-in. Not a lock on the file itself: it holds only sample emails.
+    import { hasBackend, onTeam, staffToken } from '../../lib/backend';
+    const gate = document.querySelector<HTMLElement>('[data-cr-gate]')!;
+    const away = () => location.replace(`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}redaccion/`);
+    if (!hasBackend() || !staffToken()) away();
+    else onTeam().then((ok) => { if (ok) { gate.hidden = false; gate.querySelectorAll<HTMLIFrameElement>('.cr-frame').forEach(fit); } else away(); }).catch(away);
     // Each preview grows to its email's full height
     const fit = (f: HTMLIFrameElement) => { const h = f.contentDocument?.body?.scrollHeight; if (h) f.style.height = `${h + 8}px`; };
     document.querySelectorAll<HTMLIFrameElement>('.cr-frame').forEach((f) => f.addEventListener('load', () => fit(f)));
