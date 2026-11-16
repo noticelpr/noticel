@@ -314,7 +314,7 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
 
   // ---------- Real comments (Supabase): everyone sees the same ones ----------
   type Row = { id: string; parent: string | null; body: string; media: Mine['media'] | null; status: 'visible' | 'review' | 'removed'; likes: number; dislikes?: number; deleted?: boolean;
-    created_at: string; user_id: string; author: { username: string; photo: string | null } | null };
+    created_at: string; user_id: string; legacy_author?: string | null; author: { username: string; photo: string | null } | null }; // legacy_author: an old comment from noticel.com (supabase/comentarios-noticel.sql)
 
   function live(root: HTMLElement) {
     const sid = root.dataset.comments!;
@@ -357,7 +357,7 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
     // Columns from supabase/reddit.sql (▼ votes, "[eliminado]"); until it runs, the older columns still work
     let extra = 'dislikes,deleted,';
     const fetchRows = async (filter: string) => {
-      const q = () => api(`comments?story=eq.${encodeURIComponent(sid)}${filter}&select=id,parent,body,media,status,likes,${extra}created_at,user_id,author:profiles!comments_user_id_fkey(username,photo)&order=created_at.asc&limit=600`, {}, filter.includes('user_id'));
+      const q = () => api(`comments?story=eq.${encodeURIComponent(sid)}${filter}&select=id,parent,body,media,status,likes,${extra}created_at,user_id,legacy_author,author:profiles!comments_user_id_fkey(username,photo)&order=created_at.asc&limit=600`, {}, filter.includes('user_id'));
       let r = await q();
       if (r && !r.ok && extra) { extra = ''; r = await q(); }
       return r;
@@ -394,7 +394,7 @@ const STICKER_IMGS = [['wepa', '¡Wepa!'], ['coqui', 'Coquí'], ['bandera', 'Ban
       list.replaceChildren(...ordered.map(({ item: c, depth, kids }) => {
         const lv = reps[c.user_id] ? levelOf(reps[c.user_id]) : null;
         return commentItem({
-          id: c.id, name: c.author?.username ?? 'lector', photo: c.author?.photo, badge: lv && lv.index > 0 ? { id: lv.id, name: lv.name } : null, team: team[c.user_id] ?? null,
+          id: c.id, name: c.author?.username ?? c.legacy_author ?? 'lector', photo: c.author?.photo, badge: lv && lv.index > 0 ? { id: lv.id, name: lv.name } : null, team: team[c.user_id] ?? null,
           text: c.body, media: c.media, when: ago(Date.parse(c.created_at)), score: c.likes - (c.dislikes ?? 0), likes: c.likes, vote: myVote(c.id),
           mine: c.user_id === myId(), deleted: c.deleted, report: reported.has(c.id) ? 'Reportado' : 'Reportar', depth, kids,
           note: c.status === 'review' ? 'Solo tú ves este comentario mientras la redacción lo revisa.' : c.status === 'removed' ? 'La redacción quitó este comentario por incumplir las reglas. Solo tú lo ves.' : '',
