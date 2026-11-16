@@ -12,6 +12,8 @@ export function getStaticPaths() {
 }
 const { c } = Astro.props as { c: Columnist };
 const cols = columnsBy(await getStories(), c);
+// The names this columnist has signed with (with and without a title), to find their older columns in the archive
+const names = [...new Set([c.name, c.name.replace(/^(Lcdo|Lcda|Lic|Dr|Dra)\.?\s+/i, '')])];
 const others = COLUMNISTS.filter((o) => o.slug !== c.slug);
 // Contact and social links from the profile (panel → Columnistas); only the ones filled in show
 const handle = (v: string, site: string) => (/^https?:\/\//.test(v) ? v : `https://${site}/${v.replace(/^@/, '')}`);
@@ -44,7 +46,7 @@ const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', mo
             <h1>{c.name}{c.demo && <span class="sp-demo">EJEMPLO</span>}</h1>
             {c.bio && <p class="cp-bio">{c.bio}</p>}
             <ul class="cp-stats">
-              <li><b>{cols.length}</b> {cols.length === 1 ? 'columna' : 'columnas'}</li>
+              <li><b data-cp-count>{cols.length}</b> <span data-cp-word>{cols.length === 1 ? 'columna' : 'columnas'}</span></li>
               {last && <li>Última: <b>{last}</b></li>}
             </ul>
             {links.length > 0 && <ul class="cp-links">{links.map((l) => <li><a href={l.href} rel="noopener me" target={l.href.startsWith('mailto:') ? undefined : '_blank'}>{l.label}</a></li>)}</ul>}
@@ -52,7 +54,7 @@ const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', mo
           </div>
         </section>
 
-        <section>
+        <section data-cp-cols data-names={JSON.stringify(names)} data-built={cols.length}>
           <div class="sec-h"><h2>Columnas de {c.name}</h2></div>
           {cols.length > 0 ? (
             <div class="cp-list">{cols.map((s) => <StoryCard story={s} variant="item" />)}</div>
@@ -88,4 +90,33 @@ const last = cols[0]?.data.date.toLocaleDateString('es-PR', { day: 'numeric', mo
       <Sidebar />
     </div>
   </main>
+  <script>
+    // Older columns live only in the archive (not built pages): when the archive search finds more than the page
+    // shows, the list and the count come from it (functions/api/buscar.js), newest first, 30 at a time.
+    const box = document.querySelector<HTMLElement>('[data-cp-cols]');
+    if (box) {
+      const names: string[] = JSON.parse(box.dataset.names || '[]'), built = Number(box.dataset.built) || 0;
+      const esc = (t = '') => t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+      const day = (d: string) => new Date(d).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+      const item = (r: any) => `<article class="item"><a href="${esc(r.path)}" tabindex="-1" aria-hidden="true"><div class="ph" style="--c:#1F1F1F" aria-hidden="true">${r.img ? `<img src="${esc(r.img)}" alt loading="lazy" decoding="async">` : ''}</div></a><div><span class="badge">Opiniones</span><a href="${esc(r.path)}"><h3 class="hl">${esc(r.title)}</h3></a><time class="time" datetime="${esc(r.date)}">${day(r.date)}</time></div></article>`;
+      let page = 0, list: HTMLElement | null = null, more: HTMLButtonElement | null = null;
+      const load = async () => {
+        const q = new URLSearchParams([...names.map((n) => ['autor', n]), ['seccion', 'opiniones'], ['por', '30'], ['pagina', String(page + 1)]]);
+        const d = await fetch(`/api/buscar?${q}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (!d?.results || (page === 0 && d.total <= built)) return; // the built list is already complete
+        page++;
+        if (!list) {
+          box.querySelector('.empty')?.remove(); box.querySelector('.cp-list')?.remove();
+          list = Object.assign(document.createElement('div'), { className: 'cp-list' }); box.append(list);
+          const n = document.querySelector('[data-cp-count]'), w = document.querySelector('[data-cp-word]');
+          if (n) n.textContent = d.total.toLocaleString('es-PR'); if (w) w.textContent = d.total === 1 ? 'columna' : 'columnas';
+        }
+        list.insertAdjacentHTML('beforeend', d.results.map(item).join(''));
+        if (page * 30 < d.total) {
+          if (!more) { more = Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: 'Ver más columnas' }); more.addEventListener('click', load); box.append(more); }
+        } else more?.remove();
+      };
+      void load();
+    }
+  </script>
 </Base>

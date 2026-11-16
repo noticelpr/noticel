@@ -3,6 +3,8 @@
 /feed/ /rss.xml 301
 /feed/rss /rss.xml 301
 /feed/rss/ /rss.xml 301
+/opinion /category/opiniones/ 301
+/opinion/ /category/opiniones/ 301
 /rss /rss.xml 301
 /rss/ /rss.xml 301
 # Old WordPress tag pages open a search for that topic; old home page numbers open the home page

@@ -37,7 +37,9 @@ export async function onRequestGet({ request, env }) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(p('desde'))) { where.push('s.date >= ?'); binds.push(`${p('desde')}T00:00:00`); }
     if (/^\d{4}-\d{2}-\d{2}$/.test(p('hasta'))) { where.push('s.date <= ?'); binds.push(`${p('hasta')}T23:59:59`); }
     if (p('seccion')) { const slugs = withChildren(p('seccion')); where.push(`(${slugs.map(() => 's.cats LIKE ?').join(' OR ')})`); binds.push(...slugs.map((s) => `% ${s} %`)); }
-    if (p('autor')) { where.push('s.author = ?'); binds.push(p('autor')); }
+    // One or more authors (?autor=A&autor=B): a columnist signs with or without a title ("Lcdo. Walter Pérez" / "Walter Pérez")
+    const autores = [...new Set(u.searchParams.getAll('autor').map((a) => a.trim()).filter(Boolean))].slice(0, 4);
+    if (autores.length) { where.push(`s.author IN (${autores.map(() => '?').join(',')})`); binds.push(...autores); }
     const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const order = p('orden') === 'vistas' ? 's.views DESC, s.date DESC' : 's.date DESC';
     const per = Math.min(100, Math.max(1, Number(p('por')) || 20)), page = Math.max(1, Number(p('pagina')) || 1);
