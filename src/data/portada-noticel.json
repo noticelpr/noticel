@@ -1,28 +1,28 @@
 {
  "home": [
-  "/noticias/20261115/trump-urge-al-congreso-aprobar-mas-fondos-para-modernizar-el-sistema-aereo-de-ee-uu/",
   "/noticias/20261115/gobernadora-pone-en-agenda-reunion-con-la-secretaria-del-departamento-de-la-familia/",
   "/entretenimiento/20261115/wisin-convierte-el-coliseo-en-una-gigantesca-pista-de-perreo-y-anuncia-tercera-funcion/",
   "/noticias/20261115/el-papa-leon-xiv-llega-a-cusco-en-el-quinto-dia-de-su-visita-a-peru/",
-  "/noticias/20261115/hombre-muere-luego-de-sufrir-percance-de-salud-mientras-se-ejercitaba-en-canovanas/",
+  "/noticias/20261115/trump-urge-al-congreso-aprobar-mas-fondos-para-modernizar-el-sistema-aereo-de-ee-uu/",
   "/noticias/20261115/reportan-27-vuelos-cancelados-y-cuatro-retrasados-en-el-aeropuerto-luis-munoz-marin/",
   "/ultima-hora/20261113/hacienda-transfiere-9-8-millones-a-asg-para-compra-de-combustible-de-la-flota-del-gobierno/",
   "/ultima-hora/20261113/pasa-el-crisol-legislativo-proyecto-que-establece-plazos-fijos-para-saldar-deudas-con-maestros/",
   "/noticias/20261113/gobernadora-deja-sin-efecto-orden-de-congelacion-de-precios-por-sequia/",
   "/ultima-hora/20261113/disputa-entre-asg-y-hacienda-por-fondos-para-compra-de-combustible-para-diciembre/",
   "/ultima-hora/20261113/asg-reitera-que-el-erp-presentaba-errores-desde-el-2020/",
-  "/noticias/20261113/prits-falla-en-fiscalizar-contrato-de-ciberseguridad/"
+  "/noticias/20261113/prits-falla-en-fiscalizar-contrato-de-ciberseguridad/",
+  "/noticias/20261115/netanyahu-propone-un-gobierno-de-unidad-en-israel-y-eisenkot-califica-la-oferta-de-farol/"
  ],
  "sections": {
   "noticias": [
+   "/noticias/20261115/gobernadora-pone-en-agenda-reunion-con-la-secretaria-del-departamento-de-la-familia/",
+   "/noticias/20261115/el-papa-leon-xiv-llega-a-cusco-en-el-quinto-dia-de-su-visita-a-peru/",
    "/noticias/20261115/trump-urge-al-congreso-aprobar-mas-fondos-para-modernizar-el-sistema-aereo-de-ee-uu/",
    "/noticias/20261115/netanyahu-propone-un-gobierno-de-unidad-en-israel-y-eisenkot-califica-la-oferta-de-farol/",
    "/noticias/20261115/doble-asesinato-y-varios-heridos-de-bala-en-la-perla-san-juan/",
    "/noticias/20261115/hombre-muere-luego-de-sufrir-percance-de-salud-mientras-se-ejercitaba-en-canovanas/",
    "/noticias/20261115/reportan-27-vuelos-cancelados-y-cuatro-retrasados-en-el-aeropuerto-luis-munoz-marin/",
-   "/noticias/20261115/la-esperanza-de-miles-de-haitianos-de-tener-una-mejor-vida-acaba-en-la-frontera-dominicana/",
-   "/noticias/20261115/el-estudio-de-adn-reescribe-la-historia-de-varias-lenguas-europeas-y-el-origen-vikingo/",
-   "/noticias/20261115/investigan-posible-feminicidio-y-suicidio-en-coamo/"
+   "/noticias/20261115/la-esperanza-de-miles-de-haitianos-de-tener-una-mejor-vida-acaba-en-la-frontera-dominicana/"
   ],
   "gobierno": [
    "/noticias/20261115/gobernadora-pone-en-agenda-reunion-con-la-secretaria-del-departamento-de-la-familia/",
@@ -55,14 +55,14 @@
    "/noticias/20261103/nfe-no-dice-cuando-vuelve-a-suplir-gas-pero-que-su-muelle-esta-listo-para-otro-suplidor/"
   ],
   "policiacas": [
-   "/noticias/20261115/hombre-muere-luego-de-sufrir-percance-de-salud-mientras-se-ejercitaba-en-canovanas/",
-   "/noticias/20261115/investigan-posible-feminicidio-y-suicidio-en-coamo/",
    "/noticias/20261114/hombre-muere-atropellado-en-lares/",
    "/noticias/20261114/motorista-muere-en-accidente-de-transito-en-corozal/",
    "/ultima-hora/20261113/muere-mujer-al-caerle-una-palma-encima-en-pinones/",
    "/noticias/20261113/policia-investiga-asesinato-en-guanica-2/",
    "/noticias/20261113/ocupan-maquinas-de-juego-y-rifle-ak-47-en-canovanas-y-carolina/",
-   "/noticias/20261113/asesinan-hombre-a-tiros-en-naranjito/"
+   "/noticias/20261113/asesinan-hombre-a-tiros-en-naranjito/",
+   "/noticias/20261113/motorista-muere-en-accidente-en-canovanas/",
+   "/noticias/20261112/en-humacao-un-hombre-muere-aplastado-por-un-caballo/"
   ],
   "politica": [
    "/ultima-hora/20261111/trump-nomina-a-julia-diaz-rex-para-que-sea-la-proxima-jefa-de-fiscalia-federal/",
@@ -85,24 +85,24 @@
    "/noticias/20261110/aerostar-construira-nuevo-estacionamiento-multipisos-en-el-aeropuerto-luis-munoz-marin/"
   ],
   "deportes": [
-   "/deportes/20261115/criollos-leones-e-indios-suman-triunfos-en-el-beisbol-invernal/",
    "/deportes/20261114/bsnf-cangrejeras-fuerzan-un-juego-decisivo-ante-las-gigantes/",
    "/deportes/20261114/leones-apabullan-a-los-senadores-criollos-dominan-a-los-indios-y-gigantes-blanquean/",
    "/deportes/20261114/puerto-rico-cae-ante-el-invicto-venezuela-en-el-mundial-sub-23/",
    "/deportes/20261114/spurs-arrollan-pacers-ganan-por-la-minima-y-antetokoumpo-y-adebayo-embolsan-74-a-miami/",
    "/noticias/20261114/las-apuestas-deportivas-en-ee-uu-un-aumento-vertiginoso-que-es-cosa-de-hombres-jovenes/",
    "/deportes/20261113/los-criollos-adquieren-a-danny-ortiz-en-cambio/",
-   "/deportes/20261113/puerto-rico-pierde-por-nocaut-ante-japon-en-la-super-ronda-del-mundial-sub-23/"
+   "/deportes/20261113/puerto-rico-pierde-por-nocaut-ante-japon-en-la-super-ronda-del-mundial-sub-23/",
+   "/deportes/20261113/el-bsnf-tendra-nuevas-campeonas-adelantan-caguas-isabela-y-manati/"
   ],
   "entretenimiento": [
+   "/entretenimiento/20261115/wisin-convierte-el-coliseo-en-una-gigantesca-pista-de-perreo-y-anuncia-tercera-funcion/",
    "/entretenimiento/20261115/la-banda-el-laberinto-del-coco-llevara-por-primera-vez-la-bomba-puertorriquena-a-oceania/",
    "/entretenimiento/20261114/wisin-cumple-y-convierte-el-coliseo-de-puerto-rico-en-la-pista-de-perreo-mas-grande/",
    "/noticias/20261114/miss-universe-afirma-que-el-evento-beauty-at-the-beach-no-fue-organizado-por-ellos/",
    "/entretenimiento/20261114/ca7riel-y-paco-amoroso-convierten-el-choliseo-en-un-ritual-para-liberar-el-alma/",
    "/entretenimiento/20261114/llega-el-primer-cargamento-de-musica-navidena-del-2026/",
    "/noticias/20261114/beauty-on-the-beach-glamour-y-belleza-en-el-desfile-de-trajes-de-bano-de-miss-universe/",
-   "/entretenimiento/20261113/rosalia-entra-de-lleno-entre-los-artistas-mas-premiados-en-la-historia-de-los-latin-grammy/",
-   "/entretenimiento/20261113/ivy-queen-lleva-el-ritmo-del-regueton-a-distrito-t-mobile/"
+   "/entretenimiento/20261113/rosalia-entra-de-lleno-entre-los-artistas-mas-premiados-en-la-historia-de-los-latin-grammy/"
   ],
   "opiniones": [
    "/opiniones/20261112/el-trabajo-esta-afectando-tu-salud-emocional/",
@@ -135,14 +135,14 @@
    "/noticias/20261107/nueva-advertencia-de-inundaciones-para-nueve-muncipios/"
   ],
   "mundo": [
+   "/noticias/20261115/el-papa-leon-xiv-llega-a-cusco-en-el-quinto-dia-de-su-visita-a-peru/",
+   "/noticias/20261115/netanyahu-propone-un-gobierno-de-unidad-en-israel-y-eisenkot-califica-la-oferta-de-farol/",
    "/noticias/20261115/la-esperanza-de-miles-de-haitianos-de-tener-una-mejor-vida-acaba-en-la-frontera-dominicana/",
    "/noticias/20261114/ee-uu-preve-5000-vuelos-cancelados-este-sabado-antes-de-volver-a-la-normalidad-el-domingo/",
    "/noticias/20261114/el-papa-lamenta-en-la-coronacion-de-la-virgen-en-chiclayo-la-violencia-que-se-generaliza/",
    "/noticias/20261114/zelenski-afirma-que-ee-uu-planteo-por-primera-vez-la-entrada-de-ucrania-a-la-otan-a-cambio-de-retirarse-del-donbas/",
    "/noticias/20261113/espana-presenta-diez-compromisos-para-proteger-a-la-ninez-frente-a-los-riesgos-de-la-inteligencia-artificial/",
-   "/ultima-hora/20261113/bukele-anuncia-la-instalacion-de-una-base-operativa-en-el-principal-estadio-de-haiti/",
-   "/noticias/20261113/microsoft-sigue-con-fallos-en-una-veintena-de-servicios-mientras-trata-de-restablecerlos/",
-   "/noticias/20261112/ee-uu-supera-las-483-000-deportaciones-en-2026-la-cifra-mas-alta-en-la-historia-de-ice/"
+   "/ultima-hora/20261113/bukele-anuncia-la-instalacion-de-una-base-operativa-en-el-principal-estadio-de-haiti/"
   ],
   "estados-unidos": [
    "/noticias/20261115/trump-urge-al-congreso-aprobar-mas-fondos-para-modernizar-el-sistema-aereo-de-ee-uu/",
@@ -155,5 +155,5 @@
    "/noticias/20261112/renuncia-el-ceo-de-nvidia-en-medio-de-escandalo-por-infidelidades/"
   ]
  },
- "updated": "2026-11-16T02:05:20.634Z"
+ "updated": "2026-11-16T02:20:24.225Z"
 }
