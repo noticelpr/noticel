@@ -67,6 +67,8 @@ while (queue.length) {
   <div class="wrap home-grid nx-home" id="main">
     <main class="home-main">
       <h1 class="sr">NotiCel: las noticias principales de hoy</h1>
+      {/* Fast publishing: stories published since the last build appear here within seconds (script in Base.astro) */}
+      <section class="live-list" data-live-list="" hidden aria-label="Recién publicado"></section>
       {!lead && <div class="empty"><p>Muy pronto publicaremos las primeras noticias.</p></div>}
       {lead && (
         <div class="home-hero">

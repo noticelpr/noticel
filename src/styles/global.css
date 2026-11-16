@@ -5149,3 +5149,17 @@ html.cm-open .mlv{opacity:0;pointer-events:none}
 .nc-ask-ok.danger:hover{background:#B71C30}
 .nc-ask-btns button:focus-visible{outline:3px solid #92D000;outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.nc-ask[open]{animation:none}}
+
+/* Fast publishing (2026-11-16): stories published since the last build, at the top of the home page and sections */
+.live-list{margin:0 0 22px;padding:14px 16px 16px;border-top:4px solid var(--blue, #009DE9);background:var(--card, #fff)}
+.live-h{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-family:var(--head);font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.02em}
+.live-dot{width:9px;height:9px;border-radius:50%;background:#92D000;box-shadow:0 0 0 0 rgba(146,208,0,.6);animation:live-pulse 1.6s infinite}
+@keyframes live-pulse{70%{box-shadow:0 0 0 8px rgba(146,208,0,0)}100%{box-shadow:0 0 0 0 rgba(146,208,0,0)}}
+.live-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.live-card a{display:block;color:inherit;text-decoration:none}
+.live-card img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;margin-bottom:8px}
+.live-sec{display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--blue, #009DE9);margin-bottom:4px}
+.live-card h3{margin:0;font-family:var(--head);font-size:15px;line-height:1.3}
+.live-card a:hover h3{text-decoration:underline}
+@media (max-width:760px){.live-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){.live-dot{animation:none}}

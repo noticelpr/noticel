@@ -12,6 +12,8 @@
 // OPEN since 2026-10-28 (the owner's choice): anyone with the address sees the site, still hidden from Google.
 // To lock it again with the passwords above, add LOCKED (Text) = 1 in the same Cloudflare settings and redeploy.
 
+import { livePage } from './_lib/live.js';
+
 const COOKIE = 'nc_clave';
 const DOOR = '/entrar';
 const DAYS = 30;
@@ -31,13 +33,14 @@ const json = (body, status = 200, cookies = []) => {
 /** The guest password's deadline (ms), or 0 when there is no guest access. */
 const guestUntil = (env) => (env.GUEST_PASSWORD && env.GUEST_UNTIL ? Date.parse(env.GUEST_UNTIL) || 0 : 0);
 
-export async function onRequest({ request: req, env, next }) {
+export async function onRequest(context) {
+  const { request: req, env, next } = context;
   const url = new URL(req.url);
   const h = new Headers({ 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow', 'Cache-Control': 'no-store' });
   if (env.LOCKED !== '1') { // open site: no password page; old /entrar links go to the home page
     if (url.pathname === '/robots.txt') return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain' } }); // search engines: stay out of the test copy
     if (url.pathname.replace(/\/$/, '') === DOOR) return new Response(null, { status: 302, headers: { Location: '/' } });
-    const res = await next();
+    const res = (await livePage(context)) ?? (await next()); // fast publishing first (functions/_lib/live.js)
     const out = new Response(res.body, res); out.headers.set('X-Robots-Tag', 'noindex, nofollow'); // a test copy: never in Google
     return out;
   }
@@ -60,7 +63,7 @@ export async function onRequest({ request: req, env, next }) {
   }
   const c = cookieOf(req);
   if (c === good || (guestOpen && c === guest) || OPEN.some((r) => r.test(url.pathname))) {
-    const res = await next();
+    const res = (await livePage(context)) ?? (await next());
     const out = new Response(res.body, res); out.headers.set('X-Robots-Tag', 'noindex, nofollow'); // a test copy: never in Google
     return out;
   }

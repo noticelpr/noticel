@@ -4,6 +4,10 @@
 // Periodistas never publish: they send stories to review, also with a future time, and an editor approves them (user, 2026-11-02).
 // It saves the story file in GitHub (src/content/noticias/<slug>.md); that push rebuilds the site in about 2 minutes
 // and keeps the story's full history. Then it marks the article as published (or scheduled) in the `articles` table.
+// Fast publishing (owner, 2026-11-16): each published story is also saved in table live_stories (supabase/rapido.sql),
+// and the site shows it from there within seconds (functions/_lib/live.js). When the CF_DEPLOY_HOOK secret is set
+// (Cloudflare Pages → Settings → Builds → Deploy hooks), stories don't rebuild the site one by one: the commit says
+// "[skip ci]" and the "reconstruir" function rebuilds in a batch; Última hora stories still rebuild at once.
 // Deploy: Supabase → Edge Functions → Deploy a new function → Via Editor → name "publicar" → paste this file.
 // Secret: GITHUB_TOKEN (Edge Functions → Secrets): a fine-grained GitHub token for this repository only,
 // with "Contents: Read and write". SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are built in.
@@ -19,6 +23,31 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+
+
+// ---- fast publishing: a copy of the story in live_stories (supabase/rapido.sql) ----
+/** A top-level value from the story's front matter (the panel writes them as JSON). */
+function front(file: string, key: string): unknown {
+  const head = /^---\n([\s\S]*?)\n---/.exec(file)?.[1] ?? '';
+  const line = new RegExp(`^${key}:\\s*(.+)$`, 'm').exec(head)?.[1];
+  if (line === undefined) return undefined;
+  try { return JSON.parse(line); } catch { return line.trim(); }
+}
+async function saveLive(base: string, db: Record<string, string>, slug: string, file: string, deleted = false) {
+  const path = String(front(file, 'path') ?? '').replace(/\/?$/, '/');
+  if (!path.startsWith('/')) return;
+  const img = String(front(file, 'image') ?? '');
+  const cats = front(file, 'categories');
+  await fetch(`${base}/rest/v1/live_stories?on_conflict=path`, {
+    method: 'POST', headers: { ...db, Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({
+      path, slug, file, title: String(front(file, 'title') ?? slug), section: Array.isArray(cats) ? cats[0] ?? null : null,
+      image: img ? (/^https?:\/\//.test(img) ? img : `/${img.replace(/^\//, '')}`) : null,
+      breaking: front(file, 'breaking') === true, publish_at: (front(file, 'date') ? new Date(String(front(file, 'date'))) : new Date()).toISOString(),
+      deleted, updated_at: new Date().toISOString(),
+    }),
+  }).catch(() => null); // the story is safe in GitHub either way; only the fast copy would be missing
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -38,6 +67,8 @@ Deno.serve(async (req) => {
     if (!staff || !['admin', 'editor', 'desk'].includes(staff.role)) return json({ error: staff?.role === 'reporter' ? 'Un editor aprueba y publica tus noticias: envíala a revisión.' : 'Solo los editores y el administrador pueden publicar.' }, 403);
 
     const body = await req.json();
+    // With a batch rebuild set up, single stories don't rebuild the whole site (Cloudflare skips "[skip ci]" commits)
+    const batch = !!Deno.env.get('CF_DEPLOY_HOOK');
     const gh = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'noticel-publicar' };
     const url = (s: string) => `https://api.github.com/repos/${REPO}/contents/${DIR}/${s}.md`;
 
@@ -50,7 +81,10 @@ Deno.serve(async (req) => {
       const found = await fetch(`${url(name)}?ref=${BRANCH}`, { headers: gh });
       if (found.status === 401 || found.status === 403) return json({ error: 'GitHub rechazó el permiso. Revisa el GITHUB_TOKEN.' }, 502);
       if (found.ok) {
-        const del = await fetch(url(name), { method: 'DELETE', headers: gh, body: JSON.stringify({ message: `Borra: ${name} (${staff.name}, panel de la redacción)`, sha: (await found.json()).sha, branch: BRANCH }) });
+        const old = await found.json();
+        const oldFile = new TextDecoder().decode(Uint8Array.from(atob(String(old.content ?? '').replace(/\n/g, '')), (ch) => ch.charCodeAt(0)));
+        const del = await fetch(url(name), { method: 'DELETE', headers: gh, body: JSON.stringify({ message: `Borra: ${name} (${staff.name}, panel de la redacción)${batch ? ' [skip ci]' : ''}`, sha: old.sha, branch: BRANCH }) });
+        if (del.ok) await saveLive(base, db, name, oldFile, true); // its address answers "not found" at once
         if (!del.ok) return json({ error: `GitHub no pudo borrarla (${del.status}). Intenta otra vez en un minuto.` }, 502);
       } else if (found.status !== 404) return json({ error: `GitHub no respondió (${found.status}). Intenta otra vez.` }, 502);
       await fetch(`${base}/rest/v1/articles?slug=eq.${encodeURIComponent(name)}`, { method: 'DELETE', headers: db });
@@ -93,13 +127,14 @@ Deno.serve(async (req) => {
       method: 'PUT',
       headers: gh,
       body: JSON.stringify({
-        message: `${sha ? 'Actualiza' : 'Publica'}: ${String(title || name).slice(0, 120)} (${staff.name}, panel de la redacción)`,
+        message: `${sha ? 'Actualiza' : 'Publica'}: ${String(title || name).slice(0, 120)} (${staff.name}, panel de la redacción)${batch && front(file, 'breaking') !== true ? ' [skip ci]' : ''}`,
         content: encodeBase64(new TextEncoder().encode(file)),
         branch: BRANCH,
         ...(sha ? { sha } : {}),
       }),
     });
     if (!put.ok) return json({ error: `GitHub no aceptó la noticia (${put.status}). Intenta otra vez en un minuto.` }, 502);
+    await saveLive(base, db, name, file); // live on the site within seconds (scheduled stories wait for their time)
 
     const now = new Date().toISOString();
     await fetch(`${base}/rest/v1/articles?id=eq.${encodeURIComponent(id)}`, {

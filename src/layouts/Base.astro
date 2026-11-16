@@ -267,9 +267,43 @@ const TABS = [
     </script>
 
     {breaking && !staff && (
-      <div class="breaking">
+      <div class="breaking" data-live-bar>
         <div class="wrap"><b>{breaking.label}</b><a href={breaking.href}>{breaking.text}</a></div>
       </div>
+    )}
+    {/* Fast publishing: an Última hora story published since the last build shows here within seconds */}
+    {!breaking && !staff && <div class="breaking" data-live-bar hidden><div class="wrap"><b>Última hora</b><a href="#"></a></div></div>}
+    {!staff && (
+      <script is:inline>
+        // Fast publishing (functions/api/recientes.js): stories published since this copy was built. The Última hora
+        // bar shows the newest breaking one; the home page and each section list the new ones at the top; links to
+        // deleted stories disappear. Nothing happens when the list is empty (right after a build).
+        (function () {
+          var esc = function (t) { return String(t || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+          var go = function () {
+            fetch('/api/recientes').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+              if (!d) return;
+              (d.gone || []).forEach(function (p) { document.querySelectorAll('a[href="' + p + '"]').forEach(function (a) { var box = a.closest('article, li'); (box || a).remove(); }); });
+              var list = d.stories || [];
+              if (!list.length) return;
+              var brk = list.filter(function (s) { return s.breaking; })[0];
+              var bar = document.querySelector('[data-live-bar]');
+              if (brk && bar) { var a = bar.querySelector('a'); bar.querySelector('b').textContent = 'Última hora'; a.textContent = brk.title; a.href = brk.path; bar.hidden = false; }
+              document.querySelectorAll('[data-live-list]').forEach(function (box) {
+                var only = box.getAttribute('data-live-list'), brkOnly = box.hasAttribute('data-live-breaking');
+                var mine = list.filter(function (s) { return !only || (brkOnly ? s.breaking : (s.sectionPath || '').indexOf(only) === 0); }).slice(0, 4);
+                if (!mine.length) return;
+                box.innerHTML = '<h2 class="live-h"><span class="live-dot" aria-hidden="true"></span>Recién publicado</h2><div class="live-row">' + mine.map(function (s) {
+                  return '<article class="live-card"><a href="' + esc(s.path) + '">' + (s.image ? '<img src="' + esc(s.image) + '" alt="" loading="lazy" decoding="async">' : '') +
+                    '<span class="live-sec">' + (s.breaking ? 'Última hora' : esc(s.sectionName)) + '</span><h3>' + esc(s.title) + '</h3></a></article>';
+                }).join('') + '</div>';
+                box.hidden = false;
+              });
+            }).catch(function () {});
+          };
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+        })();
+      </script>
     )}
     {/* Top banner (Valla digital / Banner exclusivo): appears only when an ad fills it */}
     {!staff && topAd && <div class="wrap"><AdSlot size="leaderboard" class="ad-top" quiet /></div>}

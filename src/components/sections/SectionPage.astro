@@ -50,6 +50,8 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
 ---
 <Base title={page > 1 ? `${name} (página ${page})` : name} active={active} description={`Noticias de ${name} en ${SITE.name}.`} topAd={slug !== 'opiniones'}>
   <main class="wrap ncs-page" id="main">
+    {/* Fast publishing: this section's stories published since the last build (script in Base.astro) */}
+    <section class="live-list" data-live-list={categoryUrl(slug).replace(/\/?$/, '/')} data-live-breaking={slug === 'ultima-hora' ? '1' : undefined} hidden aria-label="Recién publicado"></section>
     {slug !== 'opiniones' && <header class="ncs-head">
       {parent && <p class="ncs-crumb"><a href={categoryUrl(parent)}>{CATEGORIES[parent]}</a> <span aria-hidden="true">›</span></p>}
       <div class="ncs-titlerow">
