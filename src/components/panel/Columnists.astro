@@ -32,6 +32,13 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
     <ul class="cl-req-list" data-cl-req-list></ul>
     <details class="cl-req-old"><summary>Solicitudes respondidas</summary><ul class="cl-req-list" data-cl-req-old></ul></details>
   </section>
+  {/* Columnist accounts (user, 2026-11-17): remove one (no more panel, profile off, columns stay) or bring one back.
+      The administrator and the Editor en jefe; Editors see the list. supabase/columnistas-baja.sql */}
+  <section class="cl-req" data-cl-acc hidden>
+    <h2 class="pnl-h2">Cuentas de columnistas</h2>
+    <ul class="cl-acc-list" data-cl-acc-list></ul>
+    <details class="cl-req-old" data-cl-before-box hidden><summary>Columnistas anteriores</summary><ul class="cl-acc-list" data-cl-before></ul></details>
+  </section>
   <section class="cl-req" data-cl-down hidden>
     <h2 class="pnl-h2">Pedidos para quitar columnas <span class="pnl-n" data-cl-down-n></span></h2>
     <ul class="cl-req-list" data-cl-down-list></ul>
@@ -230,10 +237,69 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       x.status = 'pedida';
       void loadDowns();
     });
+    // ---------- Columnist accounts: remove and bring back (user, 2026-11-17; supabase/columnistas-baja.sql) ----------
+    const canRemove = () => ['admin', 'editor'].includes(role()); // administrator and Editor en jefe; Editors see the list
+    type Acc = { id: string; name: string; email: string; accepted: boolean; lastSignIn: string | null };
+    type Gone = { user_id: string; name: string; email: string; removed_at: string; note?: string | null };
+    let accs: Acc[] = [], gone: Gone[] = [];
+    function paintAccounts() {
+      $('[data-cl-acc]').hidden = !canReview() || (!accs.length && !gone.length);
+      $('[data-cl-acc-list]').innerHTML = accs.map((a) => `<li class="cl-acc"><span class="cl-acc-who"><b>${esc(a.name)}</b><small>${esc(a.email)} · ${a.accepted ? `última entrada ${a.lastSignIn ? when(a.lastSignIn) : '—'}` : 'invitación sin aceptar'}</small></span>${canRemove() ? `<button type="button" class="pnl-link danger" data-acc-off="${esc(a.id)}">Quitar acceso</button>` : ''}</li>`).join('')
+        || '<li class="cl-empty">Ahora mismo no hay cuentas de columnista.</li>';
+      $('[data-cl-before-box]').hidden = !gone.length;
+      $('[data-cl-before]').innerHTML = gone.map((g) => `<li class="cl-acc"><span class="cl-acc-who"><b>${esc(g.name)}</b><small>${esc(g.email)} · sin acceso desde ${when(g.removed_at)}${g.note ? ` · ${esc(g.note)}` : ''}</small></span>${canRemove() ? `<button type="button" class="adp-btn ghost-dark" data-acc-back="${esc(g.user_id)}">Traer de vuelta</button>` : ''}</li>`).join('');
+    }
+    async function loadAccounts() {
+      if (!canReview()) return;
+      if (!live()) {
+        if (!accs.length && !gone.length) {
+          accs = [{ id: 'ejemplo', name: 'Columnista (EJEMPLO)', email: 'ejemplo@correo.com', accepted: true, lastSignIn: new Date().toISOString() }];
+          gone = [{ user_id: 'ejemplo2', name: 'Columnista anterior (EJEMPLO)', email: 'ejemplo2@correo.com', removed_at: new Date(Date.now() - 20 * 864e5).toISOString(), note: 'EJEMPLO: dejó de escribir' }];
+        }
+      } else {
+        const r = await teamAdmin('columnists');
+        if (!r || r.error) return; // the "equipo" function isn't updated yet
+        accs = r.list ?? []; gone = r.before ?? [];
+      }
+      paintAccounts();
+    }
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const off = t.closest<HTMLButtonElement>('[data-acc-off]'), back = t.closest<HTMLButtonElement>('[data-acc-back]');
+      if (off) {
+        const a = accs.find((x) => x.id === off.dataset.accOff); if (!a) return;
+        if (!(await ask(`¿Quitar el acceso de columnista a ${a.name}? Ya no podrá entrar al panel y su perfil deja de salir en Opiniones. Sus columnas publicadas siguen en el sitio. Podrás traerlo de vuelta cuando quieras.`, { ok: 'Quitar acceso', danger: true }))) return;
+        const notify = await ask(`¿Le enviamos un correo a ${a.email} avisándole que su cuenta fue desactivada? El correo le agradece su tiempo y le dice que sus columnas siguen publicadas.`, { ok: 'Sí, avisarle', cancel: 'No avisar' });
+        const note = await askText('Nota interna (opcional): por qué se quitó el acceso. Solo la ve la redacción.', { ok: 'Guardar', placeholder: 'Ej.: dejó de escribir' });
+        if (!live()) {
+          accs = accs.filter((x) => x !== a); gone = [{ user_id: a.id, name: a.name, email: a.email, removed_at: new Date().toISOString(), note: note?.trim() || null }, ...gone]; paintAccounts();
+          return toast(`${notLive()}: no se quita nada de verdad${notify ? ' ni se envía el correo' : ''}.`);
+        }
+        off.disabled = true; off.textContent = 'Quitando…';
+        const r = await teamAdmin('columnist_off', { id: a.id, notify, note: note ?? '' });
+        if (!r?.ok) { off.disabled = false; off.textContent = 'Quitar acceso'; return toast(r?.error ?? 'No se pudo quitar el acceso.'); }
+        toast(`${a.name} ya no tiene acceso${notify ? ' y recibirá el correo' : ''}. Sus columnas siguen publicadas.`);
+        await loadAccounts(); await load();
+      }
+      if (back) {
+        const g = gone.find((x) => x.user_id === back.dataset.accBack); if (!g) return;
+        if (!(await ask(`¿Traer de vuelta a ${g.name}? Le llegará un correo de bienvenida a ${g.email} para crear su contraseña otra vez, y su perfil vuelve a salir en Opiniones.`, { ok: 'Traer de vuelta' }))) return;
+        if (!live()) {
+          gone = gone.filter((x) => x !== g); accs = [...accs, { id: g.user_id, name: g.name, email: g.email, accepted: false, lastSignIn: null }]; paintAccounts();
+          return toast(`${notLive()}: no se envía ningún correo.`);
+        }
+        back.disabled = true; back.textContent = 'Enviando…';
+        const r = await teamAdmin('invite', { email: g.email, name: g.name.slice(0, 40), role: 'columnist', reason: 'regreso' });
+        if (!r?.ok) { back.disabled = false; back.textContent = 'Traer de vuelta'; return toast(r?.error ?? 'No se pudo enviar.'); }
+        toast(`Listo. ${g.name} recibirá el correo de bienvenida.`);
+        await loadAccounts(); await load();
+      }
+    });
+
     async function loadReqs() {
       if (!canReview()) return;
       asked = true;
-      void loadDowns();
+      void loadDowns(); void loadAccounts();
       if (!live()) { if (!reqs.length) reqs = [SAMPLE_REQ]; paintReqs(); badge(); return; }
       const r = await staffApi('columnist_requests?select=*&order=created_at.desc&limit=200');
       if (!r?.ok) return; // supabase/columnistas-solicitudes.sql not run yet
@@ -325,7 +391,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
     // The menu's count shows from the start (administrator, Editor en jefe, Editor)
     if (canReview()) void loadReqs();
     let lastRole = role();
-    addEventListener('nc-staff-change', () => { const r = role(); if (r !== lastRole) { lastRole = r; reqs = []; downs = []; asked = false; } if (canReview() && !asked) void loadReqs(); });
+    addEventListener('nc-staff-change', () => { const r = role(); if (r !== lastRole) { lastRole = r; reqs = []; downs = []; accs = []; gone = []; asked = false; } if (canReview() && !asked) void loadReqs(); });
 
     // Load the first time the tab opens
     const pane = root.closest<HTMLElement>('[data-pane]');

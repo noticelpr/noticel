@@ -520,6 +520,15 @@ const TABS = [
           <h2 class="pnl-h2 mc-h">Tus columnas</h2>
           <ul class="mc-cols" data-mc-list></ul>
           <div class="pnl-card"><h2 class="pnl-h3">Lo que comentan tus lectores</h2><ul class="mc-comments" data-mc-comments></ul></div>
+          {/* Comments of one column, read and answered without leaving the page (user, 2026-11-17) */}
+          <dialog class="mc-drawer" data-mc-drawer aria-labelledby="mc-dr-h">
+            <div class="mc-dr-in">
+              <header class="mc-dr-head"><div><small class="pnl-muted">Comentarios de tu columna <span class="sp-demo" data-mc-dr-demo hidden>EJEMPLO</span></small><h2 id="mc-dr-h" data-mc-dr-title></h2></div><button type="button" class="mc-dr-x" data-mc-dr-close aria-label="Cerrar">×</button></header>
+              <ul class="mc-thread" data-mc-thread></ul>
+              <form class="mc-dr-form" data-mc-dr-form><label class="sr" for="mc-dr-new">Escribe un comentario</label><textarea id="mc-dr-new" rows="2" maxlength="500" placeholder="Escribe un comentario para tus lectores" data-mc-dr-text></textarea><button type="submit" class="adp-btn">Publicar</button></form>
+              <p class="pnl-muted pnl-small">Tus respuestas salen en la columna con tu nombre y la etiqueta Columnista. Máximo 500 letras, sin enlaces.</p>
+            </div>
+          </dialog>
           <p class="pnl-muted pnl-small" data-mc-foot>Las lecturas cuentan a quien se queda al menos unos segundos en la columna; las de cada día se guardan 30 días. Los comentarios los modera la redacción. Una columna publicada no se puede borrar: si necesitas quitarla, toca «Pedir que se quite» y la redacción decide.</p>
         </section>
 
@@ -1317,6 +1326,68 @@ const TABS = [
       const c = t.closest<HTMLElement>('[data-mc-copy]'); if (c) { void navigator.clipboard?.writeText(c.dataset.mcCopy!).then(() => toast('Enlace copiado.'), () => toast(c.dataset.mcCopy!)); return; }
       if (t.closest('[data-mc-new]')) { showTab('escribir'); scrollTo({ top: 0 }); document.querySelector<HTMLButtonElement>('[data-wr-new]')?.click(); }
     });
+    // Mis columnas → one column's comments in a side drawer: read them all, answer a reader, or write a new comment, with
+    // the columnist's own account (NotiCel's comments table: story = the story id; user, 2026-11-17)
+    type TC = { id: string; parent: string | null; body: string; created_at: string; likes?: number; user_id?: string | null; legacy_author?: string | null; author?: { username?: string } | null; mine?: boolean; demo?: boolean };
+    let drId = '', drPath = '', drItems: TC[] = [];
+    const drDemo = () => isDemo() || !hasBackend();
+    async function drLoad() {
+      const box = $('[data-mc-thread]'); box.innerHTML = '<li class="pnl-muted">Cargando…</li>';
+      $('[data-mc-dr-demo]').hidden = !drDemo();
+      if (drDemo()) {
+        if (!drItems.length || drItems[0]?.id.split(':')[0] !== drId) {
+          const now = Date.now();
+          drItems = [
+            { id: `${drId}:1`, parent: null, body: 'EJEMPLO: excelente columna, muy necesaria.', created_at: new Date(now - 5 * 36e5).toISOString(), likes: 14, author: { username: 'lector_ejemplo1' }, demo: true },
+            { id: `${drId}:2`, parent: `${drId}:1`, body: 'EJEMPLO: gracias por leerla. Seguiré con el tema la próxima semana.', created_at: new Date(now - 4 * 36e5).toISOString(), mine: true, demo: true },
+            { id: `${drId}:3`, parent: null, body: 'EJEMPLO: no coincido del todo, pero está muy bien argumentado.', created_at: new Date(now - 3 * 36e5).toISOString(), likes: 6, author: { username: 'lector_ejemplo2' }, demo: true },
+            { id: `${drId}:4`, parent: null, body: 'EJEMPLO: ¿cuándo sale la próxima?', created_at: new Date(now - 36e5).toISOString(), likes: 3, author: { username: 'lector_ejemplo3' }, demo: true },
+          ];
+        }
+      } else {
+        const r = await staffApi(`comments?story=eq.${encodeURIComponent(drId)}&status=eq.visible&select=id,parent,body,created_at,likes,user_id,legacy_author,author:profiles!comments_user_id_fkey(username)&order=created_at.asc&limit=600`);
+        const meId = tokenInfo().id;
+        drItems = r?.ok ? ((await r.json()) as TC[]).map((c) => ({ ...c, mine: !!c.user_id && c.user_id === meId })) : [];
+      }
+      drPaint();
+    }
+    function drPaint() {
+      // Replies to replies are shown under the reply's top comment
+      const byId = new Map(drItems.map((c) => [c.id, c])), rootOf = (c: TC): string => { let x = c; for (let i = 0; i < 20 && x.parent && byId.get(x.parent); i++) x = byId.get(x.parent)!; return x.id; };
+      const top = drItems.filter((c) => !c.parent || !byId.has(c.parent)), kids = (id: string) => drItems.filter((c) => c.parent && byId.has(c.parent) && rootOf(c) === id && c.id !== id);
+      const one = (c: TC, reply = false) => { const u = c.mine ? (me()?.name ?? 'Tú') : c.author?.username ? `@${c.author.username}` : c.legacy_author || 'Lector';
+        return `<li class="mc-tc${reply ? ' reply' : ''}${c.mine ? ' me' : ''}"><span class="mc-cav" aria-hidden="true">${esc(u.replace('@', '')[0]?.toUpperCase() ?? 'L')}</span><div class="mc-tc-b"><small><b>${esc(u)}</b>${c.mine ? ' <span class="mc-tag">Columnista</span>' : ''} · ${ago(Date.parse(c.created_at))}${c.likes ? ` · ${num(c.likes)} me gusta` : ''}${c.demo ? ' · DEMO' : ''}</small><p>${esc(c.body)}</p>${!c.mine ? `<button type="button" class="pnl-link mc-rp" data-mc-rp="${esc(c.id)}">Responder</button><form class="mc-rp-form" data-mc-rp-form="${esc(c.id)}" hidden><textarea rows="2" maxlength="500" placeholder="Tu respuesta a ${esc(u)}" aria-label="Tu respuesta a ${esc(u)}"></textarea><div><button type="submit" class="adp-btn">Responder</button><button type="button" class="pnl-link" data-mc-rp-cancel>Cancelar</button></div></form>` : ''}</div></li>`; };
+      $('[data-mc-thread]').innerHTML = top.length ? top.map((c) => one(c) + kids(c.id).map((k) => one(k, true)).join('')).join('')
+        : '<li class="pnl-muted">Todavía nadie ha comentado esta columna. Puedes empezar tú la conversación.</li>';
+    }
+    async function drPost(text: string, parent: string | null): Promise<boolean> {
+      text = text.trim();
+      if (text.length < 2) { toast('Escribe tu comentario.'); return false; }
+      if (text.length > 500) { toast('Máximo 500 letras.'); return false; }
+      if (/https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|pr|io|info|biz|shop|store|online|site|app|xyz)\b/i.test(text)) { toast('Los comentarios no pueden llevar enlaces.'); return false; }
+      if (drDemo()) { drItems.push({ id: `${drId}:${Date.now()}`, parent, body: text, created_at: new Date().toISOString(), mine: true, demo: true }); drPaint(); toast('DEMO: el comentario no se publica.'); return true; }
+      const r = await staffApi('comments', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ story: drId, url: `${drPath}#comentarios`, parent, body: text, status: 'visible' }) });
+      if (!r?.ok) { toast(r?.status === 403 ? 'Tu cuenta no puede comentar ahora mismo.' : 'No se pudo publicar. Intenta otra vez.'); return false; }
+      toast('Publicado en tu columna.'); await drLoad(); return true;
+    }
+    const openDrawer = (el: HTMLElement) => {
+      drId = el.dataset.mcCm!; drPath = el.dataset.mcPath ?? ''; $('[data-mc-dr-title]').textContent = el.dataset.mcTitle ?? '';
+      ($('[data-mc-dr-text]') as HTMLTextAreaElement).value = '';
+      const d = $<HTMLDialogElement>('[data-mc-drawer]'); if (!d.open) d.showModal(); void drLoad();
+    };
+    root.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const op = t.closest<HTMLElement>('[data-mc-cm]'); if (op) { openDrawer(op); return; }
+      if (t.closest('[data-mc-dr-close]') || t.matches('[data-mc-drawer]')) { $<HTMLDialogElement>('[data-mc-drawer]').close(); if (!drDemo()) void paint['mis-columnas'](); return; }
+      const rp = t.closest<HTMLElement>('[data-mc-rp]'); if (rp) { const f = $(`[data-mc-rp-form="${CSS.escape(rp.dataset.mcRp!)}"]`); f.hidden = false; rp.hidden = true; f.querySelector('textarea')?.focus(); return; }
+      const cc = t.closest<HTMLElement>('[data-mc-rp-cancel]'); if (cc) { const f = cc.closest<HTMLElement>('[data-mc-rp-form]')!; f.hidden = true; (f.previousElementSibling as HTMLElement).hidden = false; }
+    });
+    root.addEventListener('keydown', (e) => { const op = (e.target as HTMLElement).closest<HTMLElement>('li[data-mc-cm]'); if (op && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDrawer(op); } });
+    root.addEventListener('submit', async (e) => {
+      const f = e.target as HTMLFormElement;
+      if (f.matches('[data-mc-dr-form]')) { e.preventDefault(); const ta = f.querySelector('textarea')!; if (await drPost(ta.value, null)) ta.value = ''; }
+      if (f.matches('[data-mc-rp-form]')) { e.preventDefault(); const ta = f.querySelector('textarea')!; await drPost(ta.value, f.dataset.mcRpForm!); }
+    });
     // Ask the newsroom to take a column down (a columnist can't do it; supabase/columnas-quitar.sql)
     root.addEventListener('click', async (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-mc-down]'); if (!b) return;
@@ -1345,9 +1416,40 @@ const TABS = [
         // Their published columns: Opiniones stories signed with their name (story ids are the comments' and reads' key)
         const opinion = PUBLISHED.filter((p) => p.section === SEC_NAME.opiniones && !isGone(p.id));
         let mine = opinion.filter((p) => p.author === s.name).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
-        // Demo: a guest has no columns of their own, so recent Opiniones columns stand in, only to show the layout
-        const borrowed = demo && !mine.length;
-        if (borrowed) mine = [...opinion].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 6);
+        // Demo mode (user, 2026-11-17): a made-up columnist who has written for about five months, so the page can be seen
+        // full. Sample columns only (fake titles, no real people), labeled EJEMPLO; never in the real panel.
+        const borrowed = demo && mine.length < 3;
+        const demoInfo: Record<string, { d: string; w: number }> = {};
+        if (borrowed) {
+          const T: Array<[string, string]> = [
+            ['El costo de la luz y la mesa de la familia', 'Cada aumento en la factura se siente primero en la compra del supermercado.'],
+            ['La escuela que queremos para nuestros hijos', 'Menos burocracia y más maestros en el salón: por ahí empieza la reforma.'],
+            ['El valor del trabajo honrado', 'Una economía sana premia al que madruga, no al que se acomoda.'],
+            ['Lo que aprendimos tras el último huracán', 'La preparación no es miedo: es responsabilidad con los nuestros.'],
+            ['Cuidar el dinero del pueblo', 'Cada dólar público tiene dueño: el contribuyente que lo trabajó.'],
+            ['La solidaridad en tiempos difíciles', 'En las crisis, los vecinos son los primeros en llegar.'],
+            ['El pequeño comerciante, columna de la isla', 'Sin el colmado y el negocio de la esquina, el pueblo se apaga.'],
+            ['Seguridad: lo primero es la calle', 'Ninguna familia debería tener miedo de salir de noche.'],
+            ['Nuestros jóvenes no deberían irse', 'Retener talento empieza con empleos y vivienda al alcance.'],
+            ['El deporte que une a la isla', 'En las gradas todos somos un solo equipo.'],
+            ['Las carreteras que pagamos y no tenemos', 'Los hoyos también son una factura que paga el ciudadano.'],
+            ['Respeto a nuestros mayores', 'Una sociedad se mide por cómo trata a sus abuelos.'],
+            ['La permisología que ahoga al emprendedor', 'Abrir un negocio no debería tomar más que levantarlo.'],
+            ['El campo también es futuro', 'La agricultura local es seguridad alimentaria y empleo.'],
+            ['Transparencia: abrir los libros', 'Lo que se esconde al pueblo suele ser lo que más le cuesta.'],
+            ['La familia, primera escuela', 'Los valores se aprenden en la mesa antes que en el salón.'],
+            ['Turismo con orgullo boricua', 'Mostrar lo nuestro también es cuidarlo.'],
+            ['Navidad: la fiesta más larga del mundo', 'Tradición y familia: lo que nos hace distintos.'],
+          ];
+          // One a week for 20 weeks with two weeks missed (a 6-week streak now, a best of 9)
+          const skip = new Set([6, 16]), home = `${root.dataset.base!.replace(/\/$/, '')}/category/opiniones/`;
+          let k = 0;
+          mine = Array.from({ length: 20 }, (_, w) => w).filter((w) => !skip.has(w)).slice(0, T.length).map((w) => {
+            const [title, d] = T[k++]; const id = `ejemplo-columna-${k}`;
+            demoInfo[id] = { d, w: 520 + ((k * 37) % 260) + (k === 3 ? 420 : 0) };
+            return { id, title: `${title} (EJEMPLO)`, section: SEC_NAME.opiniones, author: s.name, date: new Date(Date.now() - (w * 7 + 1) * 864e5).toISOString(), url: home, views: 0 };
+          });
+        }
         const ids = mine.map((p) => p.id);
         const day = (t: number) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
         const days30 = Array.from({ length: 30 }, (_, i) => day(Date.now() - (29 - i) * 864e5));
@@ -1360,7 +1462,8 @@ const TABS = [
           perDay = ids.slice(0, 12).flatMap((id, k) => days30.map((d, i) => ({ s: id, d, total: Math.max(0, Math.round((40 - k * 3) * Math.exp(-((29 - i) % 9) / 3) + (seed(id + d) % 9))) })));
           week = Object.fromEntries(opinion.map((p) => [p.id, seed(p.id) % 300]));
           ids.slice(0, 3).forEach((id, i) => (week[id] = 400 - i * 60));
-          comments = ids.slice(0, 3).map((id, i) => ({ story: id, body: ['EJEMPLO: excelente columna, muy necesaria.', 'EJEMPLO: estoy de acuerdo en casi todo. Gracias por escribir.', 'EJEMPLO: ¿cuándo sale la próxima?'][i], created_at: new Date(Date.now() - (i + 1) * 5e6).toISOString(), likes: 12 - i * 4, author: { username: `lector_ejemplo${i + 1}` } }));
+          const CM = ['Excelente columna, muy necesaria.', 'Estoy de acuerdo en casi todo. Gracias por escribir.', '¿Cuándo sale la próxima?', 'Esto hay que leerlo en voz alta.', 'Mi abuela decía lo mismo. Gran columna.', 'No coincido del todo, pero está muy bien argumentado.', 'Compartida con toda la familia.', 'Por fin alguien lo dice claro.'];
+          comments = ids.slice(0, borrowed ? 8 : 3).map((id, i) => ({ story: id, body: CM[i], created_at: new Date(Date.now() - (i * 3 + 1) * 36e5 * (i + 1)).toISOString(), likes: 14 - i, author: { username: `lector_ejemplo${i + 1}` } }));
           arts = [{ status: 'review', doc: { title: 'EJEMPLO: columna en revisión' } }, { status: 'draft', doc: { title: 'EJEMPLO: columna devuelta', note: 'Acorta el segundo párrafo.' } }];
         } else {
           const anon = { apikey: BACKEND.anonKey, Authorization: `Bearer ${BACKEND.anonKey}`, 'Content-Type': 'application/json' };
@@ -1381,7 +1484,7 @@ const TABS = [
         const daily = perDay.length > 0;
         const note = $('[data-mc-datanote]');
         note.hidden = !(borrowed || (SHOW_READS && !daily));
-        note.textContent = borrowed ? `DEMO: como esta cuenta de ejemplo no tiene columnas, se muestran columnas recientes de Opiniones solo para enseñar cómo se ve.${SHOW_READS ? ' Todos los números son de ejemplo.' : ''}`
+        note.textContent = borrowed ? 'DEMO: columnas de EJEMPLO de un columnista ficticio que lleva unos cinco meses escribiendo, solo para enseñar cómo se ve esta página. Títulos, comentarios y números son de ejemplo.'
           : 'Todavía no hay lecturas por día: el contador del sitio empieza a guardarlas ahora. Mientras tanto, el total de cada columna es el de noticel.com.';
         const reads30 = (id: string) => perDay.filter((x) => x.s === id).reduce((t, x) => t + x.total, 0);
         const total1 = (id: string) => (daily ? reads30(id) : Number(mine.find((p) => p.id === id)?.views ?? 0));
@@ -1407,7 +1510,7 @@ const TABS = [
         const ex = demo ? 'DEMO · ' : '';
         const tile = (label: string, value: string, sub = '', tone = '') => `<div class="mc-kpi ${tone}"><span class="mc-kl">${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
         // Without reader numbers: what they wrote and how steadily (built from the published columns only)
-        const INFO: Record<string, { d: string; w: number }> = JSON.parse(root.dataset.opinion || '{}');
+        const INFO: Record<string, { d: string; w: number }> = { ...JSON.parse(root.dataset.opinion || '{}'), ...demoInfo };
         const allWords = ids.reduce((t, id) => t + (INFO[id]?.w ?? 0), 0);
         let bestRun = 0; { const ws = [...weeks].sort((a, b) => a - b); let run = 0; ws.forEach((w, i) => { run = i && w === ws[i - 1] + 1 ? run + 1 : 1; bestRun = Math.max(bestRun, run); }); }
         const lastAt = mine[0] ? Date.parse(mine[0].date) : 0, sinceDays = lastAt ? Math.round((Date.parse(day(Date.now())) - Date.parse(day(lastAt))) / 864e5) : -1; // calendar days, Puerto Rico time
@@ -1442,25 +1545,53 @@ const TABS = [
           const STEPS = [1, 5, 10, 25, 50, 100];
           const next = STEPS.find((n) => n > mine.length) ?? mine.length + 50, prevStep = [...STEPS].reverse().find((n) => n <= mine.length) ?? 0;
           const pct = Math.round(((mine.length - prevStep) / Math.max(1, next - prevStep)) * 100);
+          // Milestones (user, 2026-11-17): no reader numbers, only what the columnist does
+          const byMonth = new Map<string, number>(); mine.forEach((p) => { const m = day(Date.parse(p.date)).slice(0, 7); byMonth.set(m, (byMonth.get(m) ?? 0) + 1); });
+          const bestMonth = Math.max(0, ...byMonth.values());
+          const longest = Math.max(0, ...ids.map((id) => INFO[id]?.w ?? 0));
+          const firstAt = mine.length ? Math.min(...mine.map((p) => Date.parse(p.date))) : Date.now();
+          const daysWriting = Math.floor((Date.now() - firstAt) / 864e5);
           const MILES: Array<[boolean, string, string]> = [
             [mine.length >= 1, 'Primera columna', 'Publicaste tu primera columna en NotiCel.'],
             [mine.length >= 5, '5 columnas', 'Ya eres una voz conocida en Opiniones.'],
             [mine.length >= 10, '10 columnas', 'Diez columnas: constancia de verdad.'],
             [mine.length >= 25, '25 columnas', 'Una columna fija de la casa.'],
+            [mine.length >= 50, '50 columnas', 'Medio centenar de columnas publicadas.'],
+            [mine.length >= 100, '100 columnas', 'Cien columnas: una voz histórica de Opiniones.'],
             [bestRun >= 4, 'Un mes seguido', 'Cuatro semanas seguidas publicando.'],
+            [bestRun >= 8, 'Dos meses seguidos', 'Ocho semanas seguidas publicando.'],
             [bestRun >= 12, 'Tres meses seguidos', 'Doce semanas seguidas sin fallar.'],
+            [bestRun >= 26, 'Medio año seguido', 'Veintiséis semanas seguidas publicando.'],
+            [bestMonth >= 4, 'Un mes completo', 'Cuatro columnas en un mismo mes.'],
+            [allWords >= 10000, '10,000 palabras', 'Diez mil palabras escritas para tus lectores.'],
+            [allWords >= 25000, '25,000 palabras', 'Veinticinco mil palabras: casi un libro.'],
+            [allWords >= 50000, '50,000 palabras', 'Cincuenta mil palabras: un libro entero.'],
+            [longest >= 900, 'Columna a fondo', 'Una columna de más de 900 palabras.'],
+            [daysWriting >= 90 && mine.length > 0, 'Tres meses en Opiniones', 'Tres meses desde tu primera columna.'],
+            [daysWriting >= 365 && mine.length > 0, 'Un año en Opiniones', 'Un año desde tu primera columna.'],
             [comments.length >= 1, 'Primer comentario', 'Un lector comentó tu columna.'],
+            [comments.length >= 10, 'Conversación', 'Diez comentarios en tus columnas.'],
+            [comments.length >= 50, 'Voz que provoca', 'Cincuenta comentarios en tus columnas.'],
           ];
+          const earned = MILES.filter(([ok]) => ok).length;
+          // "Tu ritmo": the streak and the last 12 weeks as a timeline, consecutive weeks joined
           const wkNow = wk0(Date.now());
-          const cal = Array.from({ length: 12 }, (_, i) => wkNow - 11 + i).map((w) => `<i class="${weeks.has(w) ? 'on' : ''}${w === wkNow ? ' now' : ''}" title="${weeks.has(w) ? 'Publicaste esta semana' : 'Sin columna'}"></i>`).join('');
+          const wkStart = (w: number) => new Date(w * 7 * 864e5 + 4 * 864e5); // Monday of that week (UTC)
+          const weeks12 = Array.from({ length: 12 }, (_, i) => wkNow - 11 + i);
+          const cal = weeks12.map((w, i) => { const on = weeks.has(w), prevOn = i > 0 && weeks.has(weeks12[i - 1]), now = w === wkNow;
+            return `<li class="${on ? 'on' : ''}${on && prevOn ? ' joined' : ''}${now ? ' now' : ''}"><span class="mc-rt-dot" title="${on ? 'Publicaste esta semana' : now ? 'Esta semana: todavía puedes publicar' : 'Sin columna'}"></span><small>${now ? 'Hoy' : wkStart(w).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', timeZone: 'UTC' })}</small></li>`; }).join('');
           $('[data-mc-goal]').innerHTML = `<h2 class="pnl-h3">Tu próxima meta${borrowed ? ' <span class="sp-demo">DEMO</span>' : ''}</h2>
             <p class="mc-goal-t">${mine.length ? `${next - mine.length === 1 ? 'Te falta 1 columna' : `Te faltan ${next - mine.length} columnas`} para llegar a <b>${next}</b>.` : 'Publica tu <b>primera columna</b>.'}</p>
             <div class="mc-bar" role="progressbar" aria-label="Avance hacia tu próxima meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${Math.max(4, pct)}%"></span></div>
-            <h3 class="mc-sub">Tu ritmo: las últimas 12 semanas</h3>
-            <div class="mc-cal" role="img" aria-label="Semanas en que publicaste: ${Array.from({ length: 12 }, (_, i) => wkNow - 11 + i).filter((w) => weeks.has(w)).length} de las últimas 12">${cal}</div>
-            <p class="pnl-muted pnl-small">Cada cuadro es una semana; los llenos son las semanas en que publicaste. Una columna por semana mantiene viva tu racha.</p>
+            <div class="mc-rt">
+              <div class="mc-rt-head"><span class="mc-rt-n">${streak}</span><span><b>${streak === 1 ? 'semana seguida' : 'semanas seguidas'}</b><small>${weeks.has(wkNow) ? 'Ya publicaste esta semana. ¡Sigue así!' : streak ? 'Publica esta semana para mantener tu racha.' : 'Publica esta semana y empieza tu racha.'}</small></span></div>
+              <h3 class="mc-sub">Tu ritmo: las últimas 12 semanas</h3>
+              <ol class="mc-rt-line" aria-label="Las últimas 12 semanas: publicaste en ${weeks12.filter((w) => weeks.has(w)).length}">${cal}</ol>
+            </div>
             <button type="button" class="adp-btn" data-mc-new>+ Nueva columna</button>`;
-          $('[data-mc-miles]').innerHTML = `<h2 class="pnl-h3">Tus logros</h2><ul>${MILES.map(([ok, t, d]) => `<li class="${ok ? 'ok' : ''}"><span class="mc-dot" aria-hidden="true">${ok ? '✓' : ''}</span><span><b>${t}</b><small>${d}${ok ? '' : ' (pendiente)'}</small></span></li>`).join('')}</ul>`;
+          $('[data-mc-miles]').innerHTML = `<h2 class="pnl-h3">Tus logros <small class="pnl-muted">${earned} de ${MILES.length}</small></h2>
+            <div class="mc-bar mc-bar-s" role="progressbar" aria-label="Logros alcanzados" aria-valuemin="0" aria-valuemax="${MILES.length}" aria-valuenow="${earned}"><span style="width:${Math.max(3, Math.round((earned / MILES.length) * 100))}%"></span></div>
+            <ul>${[...MILES].sort((a, b) => Number(b[0]) - Number(a[0])).map(([ok, t, d]) => `<li class="${ok ? 'ok' : ''}"><span class="mc-dot" aria-hidden="true">${ok ? '✓' : ''}</span><span><b>${t}</b><small>${d}${ok ? '' : ' (pendiente)'}</small></span></li>`).join('')}</ul>`;
         }
         // Chart (only with daily numbers)
         const chart = $('[data-mc-chart]');
@@ -1500,12 +1631,13 @@ const TABS = [
             ${info?.d ? `<p class="mc-desc">${esc(info.d)}</p>` : ''}
             <small class="pnl-muted">${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' })}${info?.w ? ` · ${num(info.w)} palabras · ${Math.max(1, Math.round(info.w / 200))} min de lectura` : ''}${demo && SHOW_READS ? ' · números DEMO' : ''}</small>
             ${!SHOW_READS ? '' : `<div class="mc-col-nums"><span><b>${num(total1(p.id))}</b> ${daily ? 'lecturas (30 días)' : 'lecturas en total'}</span>${daily ? `<span><b>${num(week[p.id] ?? 0)}</b> esta semana</span>` : ''}<span><b>${num(nc)}</b> comentarios</span>${spark(p.id)}</div>`}
-            <div class="mc-col-foot">${share(p)}${asked[p.id] === 'pedida' ? '<span class="pnl-chip warn">Pediste quitarla</span>' : asked[p.id] === 'mantenida' ? '<span class="pnl-chip">La redacción la mantuvo</span>' : `<button type="button" class="pnl-link mc-down" data-mc-down="${esc(p.id)}" data-mc-url="${esc(new URL(p.url, location.origin).pathname)}" data-mc-title="${esc(p.title)}">Pedir que se quite</button>`}</div>
+            <div class="mc-col-foot">${share(p)}<button type="button" class="mc-cm-btn" data-mc-cm="${esc(p.id)}" data-mc-path="${esc(new URL(p.url, location.origin).pathname)}" data-mc-title="${esc(p.title)}">Comentarios${nc ? ` <b>${num(nc)}</b>` : ''}</button>${asked[p.id] === 'pedida' ? '<span class="pnl-chip warn">Pediste quitarla</span>' : asked[p.id] === 'mantenida' ? '<span class="pnl-chip">La redacción la mantuvo</span>' : `<button type="button" class="pnl-link mc-down" data-mc-down="${esc(p.id)}" data-mc-url="${esc(new URL(p.url, location.origin).pathname)}" data-mc-title="${esc(p.title)}">Pedir que se quite</button>`}</div>
           </li>`; }).join('')
           : '<li class="mc-empty"><b>Todavía no tienes columnas publicadas.</b><span>Escribe la primera: la redacción la revisa y te avisa.</span><button type="button" class="adp-btn" data-mc-new>+ Nueva columna</button></li>';
         const titleOf = (id: string) => mine.find((p) => p.id === id)?.title ?? '';
         $('[data-mc-comments]').innerHTML = comments.slice(0, 30).map((c) => { const u = c.author?.username ? `@${c.author.username}` : c.legacy_author || 'Lector';
-          return `<li><span class="mc-cav" aria-hidden="true">${esc(u.replace('@', '')[0]?.toUpperCase() ?? 'L')}</span><div><small><b>${esc(u)}</b> · ${ago(Date.parse(c.created_at))} · en «${esc(titleOf(c.story))}»${c.likes ? ` · ${num(c.likes)} me gusta` : ''}${demo ? ' · DEMO' : ''}</small><p>${esc(c.body)}</p></div></li>`; }).join('')
+          const pu = mine.find((p) => p.id === c.story)?.url ?? '';
+          return `<li class="mc-cm-item" data-mc-cm="${esc(c.story)}" data-mc-path="${esc(pu ? new URL(pu, location.origin).pathname : '')}" data-mc-title="${esc(titleOf(c.story))}" tabindex="0" role="button" aria-label="Abrir los comentarios de «${esc(titleOf(c.story))}»"><span class="mc-cav" aria-hidden="true">${esc(u.replace('@', '')[0]?.toUpperCase() ?? 'L')}</span><div><small><b>${esc(u)}</b> · ${ago(Date.parse(c.created_at))} · en «${esc(titleOf(c.story))}»${c.likes ? ` · ${num(c.likes)} me gusta` : ''}${demo ? ' · DEMO' : ''}</small><p>${esc(c.body)}</p></div></li>`; }).join('')
           || '<li class="pnl-muted">Todavía no hay comentarios en tus columnas.</li>';
       },
       inicio() {

@@ -74,7 +74,12 @@ Deno.serve(async (req) => {
     const peek = await req.clone().json().catch(() => ({}));
     // The Editor en jefe and the Editors approve columnists (panel → Columnistas → Solicitudes): they may invite that role only (user, 2026-11-17)
     const newsroomColumnist = ['editor', 'desk'].includes(row?.role) && peek.action === 'invite' && peek.role === 'columnist';
-    if (row?.role !== 'admin' && !manager && !(chief && peek.action === 'status') && !newsroomColumnist) return out({ error: 'Solo el administrador puede hacer esto.' }, 403);
+    // Columnist accounts (user, 2026-11-17): the newsroom sees them; the administrator and the Editor en jefe remove them
+    // and bring them back (supabase/columnistas-baja.sql)
+    const newsroomList = ['editor', 'desk'].includes(row?.role) && peek.action === 'columnists';
+    const chiefRemoves = chief && peek.action === 'columnist_off';
+    if (peek.action === 'invite' && peek.reason === 'regreso' && !['admin', 'editor'].includes(row?.role)) return out({ error: 'Solo el administrador o el Editor en jefe pueden traer de vuelta a un columnista.' }, 403);
+    if (row?.role !== 'admin' && !manager && !(chief && peek.action === 'status') && !newsroomColumnist && !newsroomList && !chiefRemoves) return out({ error: 'Solo el administrador puede hacer esto.' }, 403);
     const roleOf = async (id: string) => (await (await fetch(`${base}/rest/v1/staff?user_id=eq.${id}&select=role`, { headers: admin })).json())[0]?.role as string | undefined;
     const iAmOwner = !!row?.is_owner; // supabase/dueno.sql
     const owners = new Set(((await (await fetch(`${base}/rest/v1/staff?is_owner=eq.true&select=user_id`, { headers: admin })).json()) ?? []).map((x: { user_id: string }) => x.user_id));
@@ -83,6 +88,12 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const userOf = async (id: string) => { const r = await fetch(`${base}/auth/v1/admin/users/${id}`, { headers: admin }); return r.ok ? r.json() : null; };
+    /** Turns a columnist's Opiniones profile on or off: the one tied to their account (owner) or with their name. */
+    const profilesOf = async (id: string, name: string, active: boolean) => {
+      const n = name.replace(/[,()*"\\]/g, '').trim();
+      const filter = n ? `or=(owner.eq.${id},name.ilike.${encodeURIComponent(`"${n}"`)})` : `owner=eq.${id}`;
+      await fetch(`${base}/rest/v1/columnists?${filter}&kind=eq.columnista`, { method: 'PATCH', headers: admin, body: JSON.stringify({ active, updated_at: new Date().toISOString() }) }).catch(() => null);
+    };
 
     /** The Cloudflare lock's list = the team's emails, exactly. Never writes an empty or partial list: if anything
      *  can't be read, it leaves Cloudflare as it is. */
@@ -148,11 +159,40 @@ Deno.serve(async (req) => {
       if (!add.ok) return out({ error: 'Se invitó, pero no se pudo dar el rol. Intenta otra vez.' }, 500);
       link ??= await makeLink('recovery', email);
       if (!link) return out({ error: 'Se dio el rol, pero no se pudo crear el enlace. Envía la invitación otra vez.' }, 500);
-      if (role === 'columnist' && body.reason === 'invitacion') await mail(email, 'Te invitamos a escribir en NotiCel', `Hola ${name}:`, COLUMNIST_INVITE, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
+      if (role === 'columnist' && body.reason === 'regreso') {
+        await mail(email, '¡Bienvenido de vuelta a NotiCel!', `Hola ${name}:`, COLUMNIST_BACK, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
+        await fetch(`${base}/rest/v1/columnist_removed?user_id=eq.${uid}`, { method: 'DELETE', headers: admin });
+        await profilesOf(uid, name, true);
+      } else if (role === 'columnist' && body.reason === 'invitacion') await mail(email, 'Te invitamos a escribir en NotiCel', `Hola ${name}:`, COLUMNIST_INVITE, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
       else if (role === 'columnist') await mail(email, '¡Tu solicitud para ser columnista fue aprobada!', `Hola ${name}:`, COLUMNIST_OK, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
       else await mail(email, 'Te invitaron al equipo de NotiCel', `Hola ${name}:`, invited(role), 'Crear mi contraseña', `${link.href}&bienvenida=1`);
       const access = await syncAccess().catch(() => 'error'); // the new person can open the panel right away
       return out({ ok: true, existing, access, id: uid }); // id: Columnistas links the new profile to this account (owner)
+    }
+
+    // Columnist accounts: who has one now, and who had one before (supabase/columnistas-baja.sql)
+    if (body.action === 'columnists') {
+      const now = (await (await fetch(`${base}/rest/v1/staff?role=eq.columnist&select=user_id,name`, { headers: admin })).json().catch(() => [])) as Array<{ user_id: string; name: string }>;
+      const list = await Promise.all((Array.isArray(now) ? now : []).filter((m) => iAmOwner || !secret.has(m.user_id)).map(async (m) => { const u = await userOf(m.user_id); return { id: m.user_id, name: m.name, email: u?.email ?? '', accepted: !!u?.last_sign_in_at, lastSignIn: u?.last_sign_in_at ?? null }; }));
+      const before = await (await fetch(`${base}/rest/v1/columnist_removed?select=user_id,name,email,removed_at,note&order=removed_at.desc`, { headers: admin })).json().catch(() => []);
+      return out({ list, before: Array.isArray(before) ? before : [] });
+    }
+    // Remove a columnist: no more panel (and out of the Cloudflare lock's list, when it's set up), their Opiniones profile
+    // turned off, their columns stay published. Optional email. The administrator and the Editor en jefe only.
+    if (body.action === 'columnist_off') {
+      const id = String(body.id ?? ''), had = await roleOf(id);
+      if (had !== 'columnist') return out({ error: 'Esa cuenta no es de columnista.' }, 400);
+      if ((owners.has(id) || secret.has(id)) && !iAmOwner) return out({ error: 'Solo el dueño puede cambiar esa cuenta.' }, 403);
+      const u = await userOf(id); if (!u) return out({ error: 'No encontramos esa cuenta.' }, 404);
+      const name = ((await (await fetch(`${base}/rest/v1/staff?user_id=eq.${id}&select=name`, { headers: admin })).json())[0]?.name as string) ?? '';
+      const del = await fetch(`${base}/rest/v1/staff?user_id=eq.${id}`, { method: 'DELETE', headers: admin });
+      if (!del.ok) return out({ error: 'No se pudo quitar el acceso. Intenta otra vez.' }, 500);
+      const kept = await fetch(`${base}/rest/v1/columnist_removed?on_conflict=user_id`, { method: 'POST', headers: { ...admin, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: id, name, email: u.email, removed_at: new Date().toISOString(), removed_by: me.id, note: String(body.note ?? '').trim().slice(0, 300) || null }) });
+      if (!kept.ok) console.error('columnist_removed', kept.status, await kept.text()); // supabase/columnistas-baja.sql not run yet: the access is still removed
+      await profilesOf(id, name, false);
+      if (body.notify === true) await mail(u.email, 'Tu cuenta de columnista de NotiCel', `Hola ${name}:`, COLUMNIST_OFF, 'Visitar NotiCel', SITE);
+      const access = await syncAccess().catch(() => 'error'); // 'skip' when the Cloudflare lock isn't set up
+      return out({ ok: true, access });
     }
 
     if (body.action === 'reset_password') {
@@ -186,6 +226,9 @@ const GATE = 'Primero se abrirá una página de Cloudflare: escribe este mismo c
 const COLUMNIST_OK = '¡Felicidades! La redacción de NotiCel aprobó tu solicitud para ser <b>columnista</b> de la sección de Opiniones. Toca el botón para crear tu cuenta y tu contraseña. Desde tu cuenta podrás enviar tus columnas (la redacción las revisa antes de publicarlas) y ver cuántas personas las leen y sus comentarios. ' + GATE;
 // Invited by the newsroom without a request (panel → Columnistas → Invitar a un columnista)
 const COLUMNIST_INVITE = 'La redacción de NotiCel te invita a ser <b>columnista</b> de nuestra sección de Opiniones. Nos gustaría publicar tu voz y tu experiencia. Toca el botón para crear tu cuenta y tu contraseña. Desde tu cuenta podrás enviar tus columnas (la redacción las revisa antes de publicarlas) y ver cuántas personas las leen y sus comentarios. ' + GATE;
+// A columnist removed (columnist_off) and brought back (invite, reason 'regreso'); user, 2026-11-17
+const COLUMNIST_OFF = 'Te escribimos para informarte que tu cuenta de columnista de NotiCel fue desactivada y ya no tienes acceso al panel de la redacción. Tus columnas publicadas siguen en el sitio con tu firma. Gracias por tu voz y por el tiempo que escribiste con nosotros. Si tienes alguna pregunta, comunícate con la redacción de NotiCel.';
+const COLUMNIST_BACK = '¡Nos alegra tenerte de vuelta! La redacción de NotiCel reactivó tu cuenta de <b>columnista</b> de la sección de Opiniones. Toca el botón para crear tu contraseña otra vez. Desde tu cuenta podrás enviar tus columnas (la redacción las revisa antes de publicarlas). ' + GATE;
 const invited = (role: string) => `Te invitaron a ser parte del equipo de NotiCel como <b>${ROLES[role]}</b>. Toca el botón para crear tu contraseña. ${GATE}`;
 
 /** Every NotiCel email has the same look (user, 2026-11-03): a white card on a light gray page, the logo (with

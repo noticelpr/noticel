@@ -549,7 +549,7 @@ export async function sessionFromLink(): Promise<'invite' | 'recovery' | 'expire
   return type === 'recovery' && !q.get('bienvenida') ? 'recovery' : 'invite'; // bienvenida: an invitation sent as a password link
 }
 /** Admin tools for the team (Edge Function "equipo"): invite, password link, status. */
-export async function teamAdmin(action: 'invite' | 'reset_password' | 'status' | 'sync_access', data: Record<string, unknown> = {}): Promise<any> {
+export async function teamAdmin(action: 'invite' | 'reset_password' | 'status' | 'sync_access' | 'columnists' | 'columnist_off', data: Record<string, unknown> = {}): Promise<any> {
   const token = await freshToken(); if (!token) return { error: 'Tu sesión venció. Sal y vuelve a entrar al panel.' };
   const r = await fetch(`${BACKEND.url.replace(/\/$/, '')}/functions/v1/equipo`, { method: 'POST', headers: head(token), body: JSON.stringify({ action, ...data }) }).catch(() => null);
   if (!r) return { error: 'No hay conexión.' };
