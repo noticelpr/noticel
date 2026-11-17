@@ -32,6 +32,18 @@ export function adoptPanel(): boolean {
   return true;
 }
 export const accountsOn = hasBackend;
+/** Is the account signed in on the site on the newsroom team? (user, 2026-11-17: one sign-in for the site and the panel)
+ *  Asked to the database (soy_equipo, supabase/dos-pasos.sql) and remembered on this device for 6 hours, per account. */
+export async function onTeamSite(): Promise<boolean> {
+  const id = userId(); if (!id || !hasBackend()) return false;
+  const c = read<{ id: string; yes: boolean; at: number } | null>('nc-team-member', null);
+  if (c?.id === id && Date.now() - c.at < 6 * 36e5) return c.yes;
+  const r = await api('rpc/soy_equipo', { method: 'POST', body: '{}' });
+  if (!r?.ok) return c?.id === id ? c.yes : false;
+  const yes = (await r.json().catch(() => false)) === true;
+  write('nc-team-member', { id, yes, at: Date.now() });
+  return yes;
+}
 export const loggedIn = () => !!read<any>(SESSION, null)?.access_token;
 const changed = () => dispatchEvent(new Event('nc-account'));
 

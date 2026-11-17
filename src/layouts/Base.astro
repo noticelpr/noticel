@@ -394,7 +394,7 @@ const TABS = [
 
     <script>
       import { seedExamples, unreadCount, getNotifs, markRead, syncNotifs, type Notif } from '../lib/notifications';
-      import { accountsOn, loggedIn, signOut, askLogin } from '../lib/account';
+      import { accountsOn, loggedIn, signOut, askLogin, onTeamSite } from '../lib/account';
       import { startSavedSync } from '../lib/saved-sync';
       startSavedSync(); // saved stories follow the reader's account to any device
       import { startPointsSync } from '../lib/points-sync';
@@ -584,10 +584,13 @@ const TABS = [
         let staff = false, n = 0;
         try { staff = !!localStorage.getItem('nc-staff'); n = Number(localStorage.getItem('nc-staff-pending') || 0); } catch { /* storage blocked */ }
         document.querySelectorAll<HTMLElement>('[data-staff-link]').forEach((a) => (a.hidden = !staff));
+        // Signed in at the top of the site with a team account: the panel link shows too (one sign-in; user, 2026-11-17)
+        if (!staff && loggedIn()) void onTeamSite().then((yes) => { if (yes) document.querySelectorAll<HTMLElement>('[data-staff-link]').forEach((a) => (a.hidden = false)); });
         document.querySelectorAll<HTMLElement>('[data-staff-count]').forEach((b) => { b.textContent = String(n); b.hidden = !staff || !n; });
       };
       showStaff();
       addEventListener('nc-staff-change', showStaff);
+      addEventListener('nc-account', showStaff); // signing in or out at the top of the site
       addEventListener('storage', (e) => (e.key === 'nc-staff' || e.key === 'nc-staff-pending') && showStaff());
       // Notifications: count on the profile icon, latest five in the profile menu, a toast when a new one arrives
       const nfPanel = document.querySelector<HTMLElement>('[data-nf-panel]');

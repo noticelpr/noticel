@@ -95,6 +95,20 @@ export async function staffProfile(): Promise<{ name: string; role: string; canP
   } catch { return null; }
 }
 export const staffLogout = () => { try { localStorage.removeItem(SESSION); } catch { /* storage blocked */ } };
+/** One sign-in for the site and the panel (user, 2026-11-17): the panel uses the site's sign-in ('nc-session') when it
+ *  has none of its own, unless the person left the panel on purpose with that same sign-in ('nc-panel-out'). The email
+ *  code (second step) is still asked before the panel opens. True when it took the site's sign-in. */
+export function adoptSiteSession(): boolean {
+  try {
+    if (localStorage.getItem(SESSION)) return false;
+    const site = JSON.parse(localStorage.getItem('nc-session') || 'null');
+    if (!site?.access_token || !site?.refresh_token) return false;
+    const sid = JSON.parse(atob(String(site.access_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).session_id ?? '';
+    if (sid && JSON.parse(localStorage.getItem('nc-panel-out') || '""') === sid) return false;
+    localStorage.setItem(SESSION, JSON.stringify(site));
+    return true;
+  } catch { return false; }
+}
 
 /** Uploads an ad image (data URL) to the public "anuncios" bucket and returns its public address. */
 async function uploadImage(name: string, dataUrl: string, token: string) {

@@ -576,7 +576,7 @@ const TABS = [
     import { REPO } from '../../lib/repo';
     import { myProfile, saveColumnist, uploadColumnistPhoto } from '../../lib/backend';
     import { allCampaigns } from '../../lib/backend';
-    import { logActivity, deleteStoryForever, BACKEND, listArticles, repoRead, getAnalytics, hasBackend, staffApi, staffLogin, staffLogout, staffProfile, syncTeam, addToTeam, removeFromTeam, setTeamPhotos, staffToken, tokenInfo, onTeam, codeOk, codeCheck, codeSend, codeVerify, codeTrust, codeForget, setPassword, sendPasswordReset, sessionFromLink, teamAdmin } from '../../lib/backend';
+    import { logActivity, deleteStoryForever, BACKEND, listArticles, repoRead, getAnalytics, hasBackend, staffApi, staffLogin, staffLogout, staffProfile, syncTeam, addToTeam, removeFromTeam, setTeamPhotos, staffToken, tokenInfo, onTeam, codeOk, codeCheck, codeSend, codeVerify, codeTrust, codeForget, setPassword, sendPasswordReset, sessionFromLink, teamAdmin, adoptSiteSession } from '../../lib/backend';
     const root = document.querySelector<HTMLElement>('[data-pnl]')!;
     const RECENT: Array<{ id: string; title: string; section: string; url: string; date: string; author: string }> = JSON.parse(root.dataset.recent!);
     const PROBLEMS: Array<{ id: string; title: string; date: string; p: string[] }> = JSON.parse(root.dataset.problems || '[]');
@@ -2162,14 +2162,18 @@ const TABS = [
       box.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-mob]'); if (b) $(`[${b.dataset.mob}]`).click(); });
       new MutationObserver(sync).observe($('.pnl-side'), { subtree: true, attributes: true, attributeFilter: ['hidden'] }); sync();
     }
-    $('[data-logout]').addEventListener('click', () => { staffLogout(); teamStatus = {}; set('nc-staff', null); set('nc-staff-pending', null); dispatchEvent(new Event('nc-staff-change')); start(); });
+    $('[data-logout]').addEventListener('click', () => { try { const sid = JSON.parse(atob(String(staffToken()).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).session_id; if (sid) set('nc-panel-out', sid); } catch { /* no sign-in */ } staffLogout(); /* the panel won't take the site's sign-in again (adoptSiteSession) */ teamStatus = {}; set('nc-staff', null); set('nc-staff-pending', null); dispatchEvent(new Event('nc-staff-change')); start(); });
     // The comment and ad queues change counts when used
     root.addEventListener('click', () => setTimeout(paintCounts, 50));
     // An invitation or "forgot password" link opened the panel: create the password (and the second step) first
     void (hasBackend() && !isDemo() ? sessionFromLink() : Promise.resolve('')).then((link) => {
       if (link === 'invite') askPassword('invite');
       else if (link === 'recovery') askPassword('recovery');
-      else {
+      else if (hasBackend() && !isDemo() && !staffToken() && adoptSiteSession()) {
+        // Signed in on the site (top of the page): if that account is on the team, the panel opens with it, after the
+        // email code as usual (start → gate); otherwise the adopted sign-in is forgotten (user, 2026-11-17)
+        void onTeam().then((team) => { if (team) set('nc-staff', { name: '', role: 'reporter' }); else staffLogout(); start(); });
+      } else {
         start();
         if (link === 'expired') void ask('Este enlace ya se usó o venció. Pide que te envíen otro desde Equipo, o entra con tu correo y contraseña.', { ok: 'Entendido', only: true });
       }
