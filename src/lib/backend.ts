@@ -290,6 +290,22 @@ export async function deleteArticle(id: string): Promise<boolean> {
   return !!r?.ok;
 }
 /** Uploads a photo or PDF (data URL or file) to the public "noticias" bucket and returns its address, or null. */
+/** Personnel files (supabase/expedientes.sql): the private "expedientes" folder, administrators only. */
+export async function hrFileUpload(path: string, file: Blob): Promise<boolean> {
+  const token = await freshToken(); if (!token) return false;
+  const r = await fetch(`${BACKEND.url.replace(/\/$/, '')}/storage/v1/object/expedientes/${path}`, { method: 'POST', headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${token}`, 'Content-Type': file.type || 'application/octet-stream' }, body: file }).catch(() => null);
+  return !!r?.ok;
+}
+export async function hrFileGet(path: string): Promise<Blob | null> {
+  const token = await freshToken(); if (!token) return null;
+  const r = await fetch(`${BACKEND.url.replace(/\/$/, '')}/storage/v1/object/authenticated/expedientes/${path}`, { headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${token}` } }).catch(() => null);
+  return r?.ok ? r.blob() : null;
+}
+export async function hrFileDelete(path: string): Promise<boolean> {
+  const token = await freshToken(); if (!token) return false;
+  const r = await fetch(`${BACKEND.url.replace(/\/$/, '')}/storage/v1/object/expedientes`, { method: 'DELETE', headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [path] }) }).catch(() => null);
+  return !!r?.ok;
+}
 export async function uploadStoryFile(name: string, data: string | Blob): Promise<string | null> {
   const token = await freshToken(); if (!token) return null;
   const blob = typeof data === 'string' ? await (await fetch(data)).blob() : data;

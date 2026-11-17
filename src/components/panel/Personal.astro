@@ -48,6 +48,18 @@
         <label>Días de vacaciones al año<input name="vacDays" type="number" min="0" max="60" /></label>
       </div>
       <label>Notas<textarea name="notes" rows="3" maxlength="800" placeholder="Lo que haga falta recordar (no pongas datos de salud ni números de seguro social)"></textarea></label>
+      {/* Personnel files (user, 2026-11-17): administrators only; periodistas, columnistas, Editors, Editor en jefe */}
+      <section class="hr-files" data-hr-files hidden>
+        <div class="hr-mine-h"><h3 class="pnl-h3">Archivos del expediente <small class="pnl-muted">solo administradores</small></h3>
+          <label class="adp-btn ghost-dark hr-up">Subir archivo<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.txt" data-hrf-file class="sr" /></label></div>
+        <div class="hr-up-f" data-hrf-form hidden>
+          <input data-hrf-title maxlength="120" placeholder="Nombre del archivo (ej. Contrato 2026)" aria-label="Nombre del archivo" />
+          <select data-hrf-kind aria-label="Tipo"><option>Contrato</option><option>Identificación</option><option>Formulario de empleo</option><option>Evaluación</option><option>Acuerdo de confidencialidad</option><option>Certificación</option><option>Otro</option></select>
+          <button type="button" class="adp-btn" data-hrf-save>Subir</button><button type="button" class="pnl-link" data-hrf-cancel>Cancelar</button>
+        </div>
+        <ul class="hr-mine-list" data-hrf-list></ul>
+        <p class="pnl-muted pnl-small">Se guardan en una carpeta privada: solo un administrador con su sesión puede abrirlos. Hasta 20 MB por archivo.</p>
+      </section>
       <p class="cm-err" data-hr-err hidden></p>
       <footer class="sd-dlg-f"><button type="button" class="adp-btn ghost-dark" data-hr-x>Cancelar</button><button type="submit" class="adp-btn">Guardar</button></footer>
     </form>
@@ -55,7 +67,7 @@
 </section>
 
 <script>
-  import { hasBackend, staffApi, logActivity } from '../../lib/backend';
+  import { hasBackend, staffApi, logActivity, hrFileUpload, hrFileGet, hrFileDelete } from '../../lib/backend';
   import { isDemo } from '../../lib/demo';
   import { ask } from '../../lib/dialogs';
 
@@ -180,10 +192,77 @@
       $('[data-hr-name]').textContent = `Expediente: ${editing.name}`;
       const r = (editing.id && recs[editing.id]) || {};
       (['title', 'kind', 'start', 'phone', 'ecName', 'ecPhone', 'vacDays', 'notes'] as const).forEach((k) => ((f.elements.namedItem(k) as HTMLInputElement).value = String(r[k] ?? '')));
+      void paintFiles();
       $<HTMLDialogElement>('[data-hr-dlg]').showModal(); return;
     }
+    // Personnel files
+    const del = t.closest<HTMLElement>('[data-hrf-del]');
+    if (del) { void removeFile(del.dataset.hrfDel!); return; }
+    const op = t.closest<HTMLElement>('[data-hrf-open]');
+    if (op) { void openFile(op.dataset.hrfOpen!); return; }
+    if (t.closest('[data-hrf-cancel]')) { pending = null; $('[data-hrf-form]').hidden = true; return; }
+    if (t.closest('[data-hrf-save]')) { void saveFile(); return; }
     if (t.closest('[data-hr-x]')) $<HTMLDialogElement>('[data-hr-dlg]').close();
   });
+  // ---------- Personnel files (user, 2026-11-17; supabase/expedientes.sql): administrators only ----------
+  type HrFile = { id: string; user_id: string; title: string; kind: string; path: string; size?: number; uploaded_by?: string; created_at: string };
+  const FILE_ROLES = ['reporter', 'columnist', 'desk', 'editor']; // periodista, columnista, Editor, Editor en jefe
+  let files: HrFile[] = [], pending: File | null = null;
+  const fesc = (x = '') => x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  async function paintFiles() {
+    const box = $('[data-hr-files]');
+    box.hidden = me()?.role !== 'admin' || !editing || !FILE_ROLES.includes(editing.role);
+    if (box.hidden) return;
+    $('[data-hrf-form]').hidden = true; pending = null;
+    const list = $('[data-hrf-list]');
+    if (isDemo() || !hasBackend()) {
+      files = [{ id: 'e1', user_id: '', title: 'Contrato 2026 (EJEMPLO)', kind: 'Contrato', path: '', size: 245000, uploaded_by: 'Invitado', created_at: new Date().toISOString() }];
+    } else {
+      list.innerHTML = '<li class="pnl-muted">Cargando…</li>';
+      const r = editing?.id ? await staffApi(`hr_files?user_id=eq.${editing.id}&select=*&order=created_at.desc`) : null;
+      if (r && r.status === 404) { list.innerHTML = '<li class="pnl-muted">Falta preparar la base de datos: corre supabase/expedientes.sql en Supabase → SQL Editor.</li>'; return; }
+      files = r?.ok ? await r.json() : [];
+    }
+    list.innerHTML = files.map((f) => `<li><span><b>${fesc(f.title)}</b><small>${fesc(f.kind)} · ${new Date(f.created_at).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}${f.size ? ` · ${Math.max(1, Math.round(f.size / 1024))} KB` : ''}${f.uploaded_by ? ` · subido por ${fesc(f.uploaded_by)}` : ''}</small></span><span class="hr-f-acts"><button type="button" class="pnl-link" data-hrf-open="${f.id}">Abrir</button><button type="button" class="pnl-link danger" data-hrf-del="${f.id}">Borrar</button></span></li>`).join('')
+      || '<li class="pnl-muted">Todavía no hay archivos en este expediente.</li>';
+  }
+  root.addEventListener('change', (e) => {
+    const inp = (e.target as HTMLElement).closest<HTMLInputElement>('[data-hrf-file]'); if (!inp?.files?.[0]) return;
+    const f = inp.files[0]; inp.value = '';
+    if (f.size > 20 * 1024 * 1024) { toast('El archivo pesa más de 20 MB.'); return; }
+    pending = f; $('[data-hrf-form]').hidden = false;
+    const title = $<HTMLInputElement>('[data-hrf-title]'); title.value = f.name.replace(/\.[^.]+$/, '').slice(0, 120); title.focus();
+  });
+  async function saveFile() {
+    if (!pending || !editing) return;
+    const title = $<HTMLInputElement>('[data-hrf-title]').value.trim(), kind = $<HTMLSelectElement>('[data-hrf-kind]').value;
+    if (!title) { toast('Escribe el nombre del archivo.'); return; }
+    if (isDemo() || !hasBackend() || !editing.id) { toast('Modo demo: no se sube nada.'); pending = null; $('[data-hrf-form]').hidden = true; return; }
+    const ext = (pending.name.match(/\.([a-z0-9]{1,5})$/i)?.[1] ?? 'bin').toLowerCase();
+    const path = `${editing.id}/${Date.now().toString(36)}.${ext}`;
+    toast('Subiendo…');
+    if (!(await hrFileUpload(path, pending))) { toast('No se pudo subir. ¿Ya corriste supabase/expedientes.sql?'); return; }
+    const r = await staffApi('hr_files', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: editing.id, title, kind, path, size: pending.size, uploaded_by: me()?.name ?? '' }) });
+    if (!r?.ok) { await hrFileDelete(path); toast('No se pudo guardar el archivo.'); return; }
+    logActivity('Subió un archivo al expediente', `${editing.name}: ${title}`);
+    toast('Archivo guardado en el expediente.'); await paintFiles();
+  }
+  async function openFile(id: string) {
+    const f = files.find((x) => x.id === id); if (!f) return;
+    if (!f.path) { toast('Modo demo: archivo de ejemplo.'); return; }
+    const b = await hrFileGet(f.path); if (!b) { toast('No se pudo abrir el archivo.'); return; }
+    const u = URL.createObjectURL(b); window.open(u, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(u), 60000);
+  }
+  async function removeFile(id: string) {
+    const f = files.find((x) => x.id === id); if (!f) return;
+    if (!(await ask(`¿Borrar «${f.title}» del expediente? No se puede recuperar.`, { ok: 'Borrar', danger: true }))) return;
+    if (!f.path) { toast('Modo demo: no se borra nada.'); return; }
+    await hrFileDelete(f.path);
+    const r = await staffApi(`hr_files?id=eq.${f.id}`, { method: 'DELETE' });
+    if (!r?.ok) { toast('No se pudo borrar.'); return; }
+    logActivity('Borró un archivo del expediente', `${editing?.name ?? ''}: ${f.title}`);
+    toast('Archivo borrado.'); await paintFiles();
+  }
   $<HTMLFormElement>('[data-hr-form]').addEventListener('submit', async (e) => {
     e.preventDefault(); if (!editing) return;
     const f = e.target as HTMLFormElement, v = (k: string) => String((f.elements.namedItem(k) as HTMLInputElement).value).trim();

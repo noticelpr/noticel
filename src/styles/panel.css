@@ -1651,3 +1651,12 @@ form.pnl-add.pnl-add-card > *{flex:none;width:auto;max-width:none}
 .pnl-add-card .pnl-hide-chk[hidden]{display:none}
 .cl-invite input,.cl-invite textarea{font:inherit;font-weight:400;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg,#fff);color:var(--ink);width:100%}
 .cl-invite textarea{resize:vertical}
+/* Personnel files in the Expediente (owner, 2026-11-17) */
+.hr-files{display:grid;gap:8px;margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+.hr-files[hidden]{display:none}
+.hr-files .pnl-h3{margin:0}
+.hr-files .hr-mine-list li{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.hr-f-acts{display:flex;gap:10px;flex:none}
+.hr-up{position:relative;overflow:hidden}
+.hr-up input.sr{position:absolute;width:1px!important;height:1px!important;padding:0!important;border:0!important;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
+.hr-files .hr-mine-list li > span:first-child{display:grid;gap:2px;min-width:0}
