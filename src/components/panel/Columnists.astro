@@ -254,7 +254,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
     let accs: Acc[] = [], gone: Gone[] = [];
     function paintAccounts() {
       $('[data-cl-acc]').hidden = !canReview() || (!accs.length && !gone.length);
-      $('[data-cl-acc-list]').innerHTML = accs.map((a) => `<li class="cl-acc"><span class="cl-acc-who"><b>${esc(a.name)}</b><small>${esc(a.email)} · ${a.accepted ? `última entrada ${a.lastSignIn ? when(a.lastSignIn) : '—'}` : 'invitación sin aceptar'}</small></span>${canRemove() ? `<button type="button" class="pnl-link danger" data-acc-off="${esc(a.id)}">Quitar acceso</button>` : ''}</li>`).join('')
+      $('[data-cl-acc-list]').innerHTML = accs.map((a) => `<li class="cl-acc"><span class="cl-acc-who"><b>${esc(a.name)}</b><small>${esc(a.email)} · ${a.accepted ? `última entrada ${a.lastSignIn ? when(a.lastSignIn) : '—'}` : 'invitación sin aceptar'}</small></span><span class="cl-acc-btns"><button type="button" class="pnl-link" data-person="${esc(JSON.stringify({ id: a.id, name: a.name, role: 'columnist', mail: a.email }))}">Ver ficha</button>${canRemove() ? `<button type="button" class="pnl-link danger" data-acc-off="${esc(a.id)}">Quitar acceso</button>` : ''}</span></li>`).join('')
         || '<li class="cl-empty">Ahora mismo no hay cuentas de columnista.</li>';
       $('[data-cl-before-box]').hidden = !gone.length;
       $('[data-cl-before]').innerHTML = gone.map((g) => `<li class="cl-acc"><span class="cl-acc-who"><b>${esc(g.name)}</b><small>${esc(g.email)} · sin acceso desde ${when(g.removed_at)}${g.note ? ` · ${esc(g.note)}` : ''}</small></span>${canRemove() ? `<button type="button" class="adp-btn ghost-dark" data-acc-back="${esc(g.user_id)}">Traer de vuelta</button>` : ''}</li>`).join('');

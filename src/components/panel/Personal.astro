@@ -16,7 +16,7 @@
   <div class="hr-list" data-hr-off></div>
 
   <h2 class="pnl-h3">Personas</h2>
-  <p class="pnl-muted pnl-small">Toca «Expediente» para ver o cambiar los datos de cada persona. Solo el administrador y el Gerente los ven.</p>
+  <p class="pnl-muted pnl-small">Toca «Ver ficha» para ver todo de cada persona: datos personales, días libres, documentos y notas. Solo la administración los ve.</p>
   <div class="hr-list" data-hr-people></div>
 
   <dialog class="sd-dlg pnl-acct" data-off-dlg aria-labelledby="off-h">
@@ -80,7 +80,7 @@
   const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
   const get = <T,>(k: string, d: T): T => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
   const me = () => get<{ name: string; role: string } | null>('nc-staff', null);
-  const ROLE: Record<string, string> = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente' };
+  const ROLE: Record<string, string> = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente', photo: 'Fotoperiodista', columnist: 'Columnista' };
   const KIND: Record<string, string> = { vacaciones: 'Vacaciones', enfermedad: 'Enfermedad', personal: 'Personal', otro: 'Otro' };
   const day = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'short', day: 'numeric', month: 'short' });
   const ymd = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
@@ -126,7 +126,7 @@
     const used = (id?: string) => offs.filter((o) => o.user_id === id && o.status === 'aprobado' && o.kind === 'vacaciones' && o.day_from.slice(0, 4) === today.slice(0, 4)).reduce((n, o) => n + days(o), 0);
     $('[data-hr-people]').innerHTML = people.map((p, i) => { const r = (p.id && recs[p.id]) || {};
       return `<div class="hr-row"><span><b>${esc(p.name)}</b><small>${esc(r.title || ROLE[p.role] || p.role)}${r.kind ? ` · ${esc(r.kind)}` : ''}${r.start ? ` · desde ${new Date(`${r.start}T12:00:00`).toLocaleDateString('es-PR', { month: 'short', year: 'numeric' })}` : ''}${r.vacDays ? ` · vacaciones: ${used(p.id)} de ${r.vacDays} días usados` : ''}</small></span>
-        <button type="button" class="adp-btn ghost-dark" data-hr-edit="${i}">Expediente</button></div>`; }).join('') || '<p class="pnl-muted">Abre Equipo para cargar la lista del equipo.</p>';
+        <button type="button" class="adp-btn ghost-dark" data-hr-edit="${i}">Ver ficha</button></div>`; }).join('') || '<p class="pnl-muted">Abre Equipo para cargar la lista del equipo.</p>';
   }
   async function decide(o: Off, status: 'aprobado' | 'negado') {
     if (status === 'negado' && !(await ask(`¿Negar los días libres de ${o.name} (${span(o)})?`, { ok: 'Negar', danger: true }))) return;
@@ -188,6 +188,9 @@
     const ed = t.closest<HTMLElement>('[data-hr-edit]');
     if (ed) {
       editing = people[Number(ed.dataset.hrEdit)]; if (!editing) return;
+      // Everything about the person is now in one place: the Ficha (PersonFile.astro; user, 2026-11-17)
+      { const team = get<Array<{ id?: string; mail?: string }>>('nc-staff-team', []);
+        dispatchEvent(new CustomEvent('nc-person', { detail: { id: editing.id, name: editing.name, role: editing.role, mail: team.find((x) => x.id === editing!.id)?.mail ?? '', tab: 'resumen' } })); return; }
       const f = $<HTMLFormElement>('[data-hr-form]'); f.reset(); $('[data-hr-err]').hidden = true;
       $('[data-hr-name]').textContent = `Expediente: ${editing.name}`;
       const r = (editing.id && recs[editing.id]) || {};
@@ -206,7 +209,7 @@
   });
   // ---------- Personnel files (user, 2026-11-17; supabase/expedientes.sql): administrators only ----------
   type HrFile = { id: string; user_id: string; title: string; kind: string; path: string; size?: number; uploaded_by?: string; created_at: string };
-  const FILE_ROLES = ['reporter', 'columnist', 'desk', 'editor']; // periodista, columnista, Editor, Editor en jefe
+  const FILE_ROLES = ['reporter', 'columnist', 'desk', 'editor', 'photo']; // periodista, columnista, Editor, Editor en jefe, Fotoperiodista (user, 2026-11-17)
   let files: HrFile[] = [], pending: File | null = null;
   const fesc = (x = '') => x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
   async function paintFiles() {
@@ -280,4 +283,5 @@
   $$<HTMLDialogElement>('[data-hr-dlg],[data-off-dlg]').forEach((dl) => dl.addEventListener('click', (e) => { if (e.target === dl) dl.close(); }));
   addEventListener('nc-tab', (e) => { if ((e as CustomEvent).detail === 'personal') void load(); });
   addEventListener('nc-timeoff', () => void load()); // someone asked for days off on this device
+  addEventListener('nc-hr-changed', () => void load()); // saved in the Ficha
 </script>

@@ -16,6 +16,10 @@ import Writer from '../../components/panel/Writer.astro';
 import Tasks from '../../components/panel/Tasks.astro';
 import TimeOff from '../../components/panel/TimeOff.astro';
 import Personal from '../../components/panel/Personal.astro';
+import PersonFile from '../../components/panel/PersonFile.astro';
+// Side menu groups (user, 2026-11-17): a heading before each group; a group with nothing visible hides its heading
+const GROUP: Record<string, string> = { inicio: 'General', memos: 'General', noticias: 'Redacción', escribir: 'Redacción', 'mis-columnas': 'Redacción', periodistas: 'Redacción', columnistas: 'Redacción', fotos: 'Redacción', comentarios: 'Redacción', referidos: 'Negocio', ventas: 'Negocio', anuncios: 'Negocio', analitica: 'Negocio', equipo: 'Equipo', personal: 'Equipo', salud: 'Sistema', ajustes: 'Sistema' };
+const GROUP_ORDER = ['General', 'Redacción', 'Negocio', 'Equipo', 'Sistema'];
 import Settings from '../../components/panel/Settings.astro';
 import Documents from '../../components/panel/Documents.astro';
 import Memos from '../../components/panel/Memos.astro';
@@ -177,12 +181,15 @@ const TABS = [
       <aside class="pnl-side">
         <div class="pnl-me"><span class="pnl-av" data-av></span><span><b data-me></b><small data-role></small><small class="pnl-mail" data-me-mail></small></span></div>
         <nav class="pnl-nav" aria-label="Secciones del panel">
-          {TABS.map(([id, name, d]) => (
-            <button type="button" data-tab={id} aria-current="false">
+          {GROUP_ORDER.map((g) => (<>
+            <p class="pnl-nav-g" data-nav-group={g}>{g}</p>
+            {TABS.filter(([id]) => (GROUP[id] ?? 'General') === g).map(([id, name, d]) => (
+            <button type="button" data-tab={id} data-group={g} aria-current="false">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><Fragment set:html={d} /></svg>
               <span>{name}</span><b class="pnl-n" data-count={id}></b>
             </button>
-          ))}
+            ))}
+          </>))}
         </nav>
         <button type="button" class="pnl-out" data-myprof-open hidden>Mi perfil público</button>
         <button type="button" class="pnl-out" data-myacct-open hidden>Mi cuenta</button>
@@ -539,6 +546,7 @@ const TABS = [
 
         <!-- Personal (HR): administrator and Gerente -->
         <section class="pnl-pane" data-pane="personal" hidden><Personal /><Documents manage /></section>
+        <PersonFile />
         <!-- Memos: everyone reads the ones for them; the administrator and the Editor en jefe write them -->
         <section class="pnl-pane" data-pane="memos" hidden><Memos /></section>
         <!-- Ajustes and the activity log: administrator -->
@@ -752,6 +760,7 @@ const TABS = [
       if (!allowed.includes(t)) t = allowed.includes('inicio') ? 'inicio' : allowed[0]; // a Columnista has no Inicio
       tab = t;
       $$('[data-tab]').forEach((b) => { b.hidden = !allowed.includes(b.dataset.tab!); b.setAttribute('aria-current', String(b.dataset.tab === t)); });
+      $$('[data-nav-group]').forEach((g) => (g.hidden = !$$(`[data-tab][data-group="${g.dataset.navGroup}"]`).some((b) => !b.hidden))); // a heading only when its group shows something
       $$('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== t));
       const nav = $('.pnl-nav'), cur = $(`[data-tab="${t}"]`); // phones: keep the current tab visible in the scrolling bar
       if (nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - nav.clientWidth / 2 + cur.offsetWidth / 2;
@@ -870,6 +879,8 @@ const TABS = [
 
     let anRange: 1 | 7 | 28 = 7;
     let anView: 'visitas' | 'ingresos' | 'espacios' = 'visitas';
+    // «Ver ficha» anywhere in the panel opens the person's file (src/components/panel/PersonFile.astro)
+    root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-person]'); if (!b) return; try { dispatchEvent(new CustomEvent('nc-person', { detail: JSON.parse(b.dataset.person!) })); } catch { /* bad data */ } });
     let teamFilter = 'all'; // Equipo: role bar (owner, 2026-11-17)
     root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-team-f]'); if (b) { teamFilter = b.dataset.teamF!; paint.equipo(); } });
     let trRange: 1 | 7 | 28 = 7, trPage = 'portada', trDev: 'todo' | 'm' | 'd' = 'todo';
@@ -1762,7 +1773,7 @@ const TABS = [
           const refs = refsOf(m);
           const row = (x: A, chip: string, tone: string) => `<li><span><b>${esc(x.title || 'Sin título')}</b><small>${ago(x.updated)}${x.note?.trim() && x.status === 'draft' ? ` · ${esc(x.note)}` : ''}</small></span><span class="pnl-chip ${tone}">${chip}</span></li>`;
           return `<article class="pnl-card pr-card">
-            <header class="pr-h"><span class="pnl-av">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span class="pr-who"><b>${esc(m.name)}</b><small>${esc(m.mail)}</small></span></header>
+            <header class="pr-h"><span class="pnl-av">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span class="pr-who"><b>${esc(m.name)}</b><small>${esc(m.mail)}</small></span><button type="button" class="adp-btn ghost-dark pr-ficha" data-person="${esc(JSON.stringify({ id: m.id, name: m.name, role: m.role, mail: m.mail }))}">Ver ficha</button></header>
             <div class="pr-stats">
               <button type="button" data-go="escribir" class="${rev.length ? 'warn' : ''}"><b>${rev.length}</b><span>por aprobar</span></button>
               <div class="${back.length ? 'bad' : ''}"><b>${back.length}</b><span>devueltas</span></div>
@@ -1850,7 +1861,7 @@ const TABS = [
             ${iAmOwner && m.role === 'admin' && x?.accepted ? `<button type="button" class="pnl-link" data-owner-set="${i}" data-owner-to="${x?.owner ? '0' : '1'}">${x?.owner ? 'Quitar dueño' : 'Hacer dueño'}</button>` : ''}
             ${iAmOwner && !x?.owner ? `<button type="button" class="pnl-link" data-hide-set="${i}" data-hide-to="${x?.invisible ? '0' : '1'}">${x?.invisible ? 'Mostrar al equipo' : 'Ocultar del equipo'}</button>` : ''}` : '';
           // Name with a badge for what they do; then their email, activity; the admin's tools on the right
-          return `<li data-team-role="${m.role}"><span class="pnl-av sm">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span class="pnl-who"><span class="pnl-who-top"><b>${esc(m.name)}</b>${self ? '<small>(tú)</small>' : ''}<span class="role-badge role-${m.role}">${ROLE_NAME[m.role]}</span>${m.role === 'reporter' && isAdm ? `<label class="adb-check pnl-canphotos"><input type="checkbox" data-canphotos="${i}" ${m.canPhotos ? 'checked' : ''} /> Puede subir fotos</label>` : ''}${x?.owner || x?.hidden ? '<span class="role-badge role-owner">Dueño</span>' : ''}${x?.invisible ? '<span class="role-badge role-hidden" title="Solo tú lo ves en el equipo">Oculto</span>' : ''}</span><small>${esc(x?.email || m.mail)}</small>${chips ? `<span class="pnl-chips">${chips}</span>` : ''}${isAdm ? activityLine(m.id, m.name, m.role) : ''}</span>${tools || (!self && !locked && (isAdm || mgrCan(m.role))) ? `<details class="pnl-team-edit"><summary aria-label="Editar a ${esc(m.name)}" title="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></summary><div class="pnl-team-pop">${tools}${!self && !locked && (isAdm || mgrCan(m.role)) ? `<button type="button" class="pnl-link danger" data-rm="${i}">Quitar del equipo</button>` : ''}</div></details>` : ''}</li>`;
+          return `<li data-team-role="${m.role}"><span class="pnl-av sm">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span class="pnl-who"><span class="pnl-who-top"><b>${esc(m.name)}</b>${self ? '<small>(tú)</small>' : ''}<span class="role-badge role-${m.role}">${ROLE_NAME[m.role]}</span>${m.role === 'reporter' && isAdm ? `<label class="adb-check pnl-canphotos"><input type="checkbox" data-canphotos="${i}" ${m.canPhotos ? 'checked' : ''} /> Puede subir fotos</label>` : ''}${x?.owner || x?.hidden ? '<span class="role-badge role-owner">Dueño</span>' : ''}${x?.invisible ? '<span class="role-badge role-hidden" title="Solo tú lo ves en el equipo">Oculto</span>' : ''}</span><small>${esc(x?.email || m.mail)}</small>${chips ? `<span class="pnl-chips">${chips}</span>` : ''}${isAdm ? activityLine(m.id, m.name, m.role) : ''}</span><button type="button" class="pnl-link team-ficha" data-person="${esc(JSON.stringify({ id: m.id, name: m.name, role: m.role, mail: x?.email || m.mail }))}">Ver ficha</button>${tools || (!self && !locked && (isAdm || mgrCan(m.role))) ? `<details class="pnl-team-edit"><summary aria-label="Editar a ${esc(m.name)}" title="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></summary><div class="pnl-team-pop">${tools}${!self && !locked && (isAdm || mgrCan(m.role)) ? `<button type="button" class="pnl-link danger" data-rm="${i}">Quitar del equipo</button>` : ''}</div></details>` : ''}</li>`;
         }).join('');
         // Role bar (owner, 2026-11-17): Todos, then each role that has someone, with its count
         {

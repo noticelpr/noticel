@@ -1,0 +1,319 @@
+---
+// Ficha de la persona (user, 2026-11-17): everything about one team member in one place, a drawer on the right opened
+// from Mis periodistas, Equipo, Personal and Columnistas (event 'nc-person' with { id, name, role, mail, tab? }).
+// Tabs by role:
+//   Resumen (everyone who can open it)
+//   Trabajo y números: periodistas, columnistas, Editors and the Editor en jefe (their stories and columns), and
+//     Fotoperiodistas (the photos they uploaded to the library)
+//   Datos personales and Días libres: administrator and Gerente (hr_people, hr_timeoff: supabase/panel-equipo.sql)
+//   Documentos and Notas de RR. HH.: administrators only (hr_files + private folder "expedientes", hr_notes:
+//     supabase/expedientes.sql). Documentos only for the roles that have files (same list as Personal).
+// Demo mode: sample data labeled EJEMPLO/DEMO, nothing is saved. Styles: .psn-* in src/styles/panel.css.
+---
+<dialog class="psn-dlg" data-psn aria-labelledby="psn-name">
+  <div class="psn-in">
+    <header class="psn-head">
+      <span class="psn-av" data-psn-av aria-hidden="true"></span>
+      <div class="psn-who"><h2 id="psn-name" data-psn-name></h2><p><span class="role-badge" data-psn-role></span> <span class="pnl-muted psn-mail" data-psn-mail></span> <span class="sp-demo" data-psn-demo hidden>DEMO</span></p></div>
+      <button type="button" class="psn-x" data-psn-close aria-label="Cerrar">×</button>
+    </header>
+    <nav class="psn-tabs" role="tablist" aria-label="Partes de la ficha" data-psn-tabs></nav>
+    <div class="psn-body" data-psn-body></div>
+  </div>
+</dialog>
+
+<script>
+  import { hasBackend, staffApi, logActivity, hrFileUpload, hrFileGet, hrFileDelete, BACKEND } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  import { ask, askText } from '../../lib/dialogs';
+
+  type P = { id?: string; name: string; role: string; mail?: string };
+  type Rec = { title?: string; kind?: string; start?: string; phone?: string; ecName?: string; ecPhone?: string; vacDays?: number; notes?: string };
+  type Off = { id: string; user_id: string; day_from: string; day_to: string; kind: string; note: string; status: string; decided_by?: string };
+  type HrFile = { id: string; title: string; kind: string; path: string; size?: number; uploaded_by?: string; created_at: string };
+  type Note = { id: string; kind: string; body: string; author?: string; created_at: string };
+  type Pub = { id: string; title: string; author: string; date: string; url: string; section: string };
+  type Photo = { id: string; caption: string; created_at: string };
+
+  const dlg = document.querySelector<HTMLDialogElement>('[data-psn]');
+  if (dlg) {
+    const $ = <T extends HTMLElement = HTMLElement>(s: string) => dlg.querySelector<T>(s)!;
+    const esc = (s = '') => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    // Toasts: the page's own box would sit under this open drawer, so the drawer shows its own
+    const toast = (m: string) => { const t = $('[data-psn-toast]'); if (!t) return; t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3800); };
+    const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
+    const ROLE: Record<string, string> = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente', columnist: 'Columnista', photo: 'Fotoperiodista' };
+    const KIND_OFF: Record<string, string> = { vacaciones: 'Vacaciones', enfermedad: 'Enfermedad', personal: 'Personal', otro: 'Otro' };
+    const STATUS: Record<string, string> = { pendiente: 'Por aprobar', aprobado: 'Aprobado', negado: 'Negado', cancelado: 'Cancelado' };
+    const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' });
+    const when = (d: string) => new Date(d).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+    const nDays = (o: Off) => Math.round((Date.parse(o.day_to) - Date.parse(o.day_from)) / 864e5) + 1;
+    const num = (n: number) => Math.round(n).toLocaleString('es-PR');
+    const live = () => hasBackend() && !isDemo();
+    const role = () => me()?.role ?? '';
+    const isAdmin = () => role() === 'admin', isHR = () => ['admin', 'manager'].includes(role());
+    const writes = (r: string) => ['reporter', 'columnist', 'desk', 'editor'].includes(r);
+    const FILE_ROLES = ['reporter', 'columnist', 'desk', 'editor', 'photo']; // same as Personal.astro (user, 2026-11-17)
+
+    let p: P | null = null, tab = 'resumen';
+    let rec: Rec = {}, offs: Off[] = [], files: HrFile[] = [], notes: Note[] = [], pendingFile: File | null = null;
+    // Their numbers: reads per story (30 days, the site's own counter; story ids as keys), comments, work in progress
+    let reads: Record<string, number> = {}, cmts: Record<string, number> = {}, wip = { review: 0, back: 0, drafts: 0, scheduled: 0 };
+    let photos: Photo[] = [];
+
+    const TABS = () => [
+      ['resumen', 'Resumen', true],
+      ['trabajo', 'Trabajo y números', !!p && (writes(p.role) || p.role === 'photo')],
+      ['datos', 'Datos personales', isHR()],
+      ['dias', 'Días libres', isHR()],
+      ['documentos', 'Documentos', isAdmin() && !!p && FILE_ROLES.includes(p.role)],
+      ['notas', 'Notas de RR. HH.', isAdmin()],
+    ].filter(([, , ok]) => ok) as Array<[string, string, boolean]>;
+
+    // Their published stories: the built list on the panel page, by byline
+    const published = (): Pub[] => { try { return (JSON.parse(document.querySelector<HTMLElement>('[data-pnl]')?.dataset.published || '[]') as Pub[]).filter((s) => s.author === p?.name).sort((a, b) => Date.parse(b.date) - Date.parse(a.date)); } catch { return []; } };
+
+    async function loadNumbers() {
+      if (!p) return;
+      const demo = isDemo() || !hasBackend();
+      if (p.role === 'photo') {
+        if (demo) { photos = Array.from({ length: 14 }, (_, i) => ({ id: `ej${i}`, caption: `Foto de ejemplo ${i + 1} (EJEMPLO)`, created_at: new Date(Date.now() - i * 2.3 * 864e5).toISOString() })); return; }
+        if (!p.id) return;
+        photos = await staffApi(`photos?uploaded_by=eq.${p.id}&select=id,caption,created_at&order=created_at.desc&limit=3000`).then((x) => (x?.ok ? x.json() : [])).catch(() => []);
+        return;
+      }
+      if (!writes(p.role)) return;
+      const ids = published().map((x) => x.id);
+      if (demo) {
+        const seed = (t: string) => [...t].reduce((a, c) => a + c.charCodeAt(0), 0);
+        ids.forEach((id) => { reads[id] = seed(id) % 900; cmts[id] = seed(id) % 7; });
+        wip = { review: 2, back: 1, drafts: 3, scheduled: 1 };
+        return;
+      }
+      const anon = { apikey: BACKEND.anonKey, Authorization: `Bearer ${BACKEND.anonKey}`, 'Content-Type': 'application/json' };
+      const recent = ids.slice(0, 300);
+      // Reads per story for the last 30 days: lecturas_por_dia (supabase/columnas-quitar.sql) counts every one of their
+      // stories; noticias_leidas only returns the site's 300 most read, so it is only the fallback
+      const perStory = recent.length ? await fetch(`${BACKEND.url}/rest/v1/rpc/lecturas_por_dia`, { method: 'POST', headers: anon, body: JSON.stringify({ slugs: recent, dias: 30 }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null) : [];
+      const [rd, cm, ar] = await Promise.all([
+        perStory ? Promise.resolve([]) : fetch(`${BACKEND.url}/rest/v1/rpc/noticias_leidas`, { method: 'POST', headers: anon, body: JSON.stringify({ horas: 720 }) }).then((x) => (x.ok ? x.json() : [])).catch(() => []),
+        recent.length ? staffApi(`comments?story=in.(${recent.slice(0, 120).map((x) => `"${x}"`).join(',')})&status=eq.visible&select=story&limit=5000`).then((x) => (x?.ok ? x.json() : [])).catch(() => []) : [],
+        p.id ? staffApi(`articles?owner=eq.${p.id}&select=status,doc`).then((x) => (x?.ok ? x.json() : [])).catch(() => []) : [],
+      ]);
+      const mine = new Set(ids);
+      if (perStory) (perStory as Array<{ s: string; total: number }>).forEach((x) => (reads[x.s] = (reads[x.s] ?? 0) + Number(x.total)));
+      else (rd as Array<{ slug: string; n: number }>).forEach((x) => { if (mine.has(x.slug)) reads[x.slug] = Number(x.n); });
+      (cm as Array<{ story: string }>).forEach((x) => (cmts[x.story] = (cmts[x.story] ?? 0) + 1));
+      (ar as Array<{ status: string; doc?: { note?: string } }>).forEach((a) => {
+        if (a.status === 'review') wip.review++; else if (a.status === 'scheduled') wip.scheduled++;
+        else if (a.status === 'draft') { if (a.doc?.note?.trim()) wip.back++; else wip.drafts++; }
+      });
+    }
+
+    async function load() {
+      rec = {}; offs = []; files = []; notes = []; photos = [];
+      reads = {}; cmts = {}; wip = { review: 0, back: 0, drafts: 0, scheduled: 0 };
+      await loadNumbers();
+      $('[data-psn-demo]').hidden = !isDemo();
+      if (!live() || !p?.id) {
+        if (isDemo()) {
+          rec = { title: `${ROLE[p!.role] ?? 'Equipo'} (EJEMPLO)`, kind: 'Empleado a tiempo completo', start: '2025-03-01', phone: '787-555-0101', ecName: 'Contacto de ejemplo (EJEMPLO)', ecPhone: '787-555-0199', vacDays: 15 };
+          const y = new Date().getFullYear();
+          offs = [{ id: 'o1', user_id: '', day_from: `${y}-07-07`, day_to: `${y}-07-11`, kind: 'vacaciones', note: 'EJEMPLO: viaje familiar', status: 'aprobado' }, { id: 'o2', user_id: '', day_from: `${y}-12-22`, day_to: `${y}-12-24`, kind: 'personal', note: '', status: 'pendiente' }];
+          files = [{ id: 'f1', title: 'Contrato (EJEMPLO)', kind: 'Contrato', path: '', size: 245000, uploaded_by: 'Admin', created_at: new Date().toISOString() }];
+          notes = [{ id: 'n1', kind: 'Reconocimiento', body: 'EJEMPLO: excelente cobertura durante la emergencia.', author: 'Admin', created_at: new Date(Date.now() - 20 * 864e5).toISOString() }];
+        }
+        return;
+      }
+      const get = (q: string) => staffApi(q).then((r) => (r?.ok ? r.json() : [])).catch(() => []);
+      const [hp, ho, hf, hn] = await Promise.all([
+        isHR() ? get(`hr_people?user_id=eq.${p.id}&select=data`) : [],
+        isHR() ? get(`hr_timeoff?user_id=eq.${p.id}&select=*&order=day_from.desc`) : [],
+        isAdmin() && FILE_ROLES.includes(p.role) ? get(`hr_files?user_id=eq.${p.id}&select=*&order=created_at.desc`) : [],
+        isAdmin() ? get(`hr_notes?user_id=eq.${p.id}&select=*&order=created_at.desc`) : [],
+      ]);
+      rec = (hp as any[])[0]?.data ?? {}; offs = ho as Off[]; files = hf as HrFile[]; notes = hn as Note[];
+    }
+
+    function paint() {
+      if (!p) return;
+      $('[data-psn-tabs]').innerHTML = TABS().map(([id, label]) => `<button type="button" role="tab" data-psn-tab="${id}" aria-selected="${id === tab}">${label}</button>`).join('');
+      const body = $('[data-psn-body]');
+      const demo = isDemo(), dm = demo ? ' · DEMO' : '';
+      const year = String(new Date().getFullYear());
+      const usedYear = offs.filter((o) => o.status === 'aprobado' && o.kind === 'vacaciones' && o.day_from.startsWith(year)).reduce((t, o) => t + nDays(o), 0);
+      const pub = published(), pub30 = pub.filter((s) => Date.now() - Date.parse(s.date) < 30 * 864e5).length;
+      const pub7 = pub.filter((s) => Date.now() - Date.parse(s.date) < 7 * 864e5).length;
+      const totalReads = Object.values(reads).reduce((a, b) => a + b, 0), totalCm = Object.values(cmts).reduce((a, b) => a + b, 0);
+      const withReads = pub.filter((s) => (reads[s.id] ?? 0) > 0 || Date.now() - Date.parse(s.date) < 30 * 864e5);
+      const avg = withReads.length ? Math.round(totalReads / withReads.length) : 0;
+      const ph30 = photos.filter((x) => Date.now() - Date.parse(x.created_at) < 30 * 864e5).length, ph7 = photos.filter((x) => Date.now() - Date.parse(x.created_at) < 7 * 864e5).length;
+      const k = (v: string | number, t: string, tone = '') => `<div class="${tone}"><b>${typeof v === 'number' ? num(v) : esc(v)}</b><span>${t}</span></div>`;
+      if (tab === 'resumen') {
+        const fact = (key: string, v: string) => (v ? `<div><dt>${key}</dt><dd>${esc(v)}</dd></div>` : '');
+        body.innerHTML = `
+          <div class="psn-kpis">
+            ${writes(p.role) ? k(pub.length, 'publicadas en total') + k(pub30, 'en los últimos 30 días') + k(totalReads, `lecturas en 30 días${dm}`) + k(totalCm, `comentarios en sus publicaciones${dm}`) : ''}
+            ${p.role === 'photo' ? k(photos.length, `fotos subidas a la biblioteca${dm}`) + k(ph30, `en los últimos 30 días${dm}`) : ''}
+            ${isHR() ? k(rec.vacDays ? `${Math.max(0, rec.vacDays - usedYear)}` : '—', `días de vacaciones disponibles${rec.vacDays ? ` (de ${rec.vacDays})` : ''}`) + k(offs.filter((o) => o.status === 'pendiente').length, 'días libres por aprobar') : ''}
+            ${isAdmin() && FILE_ROLES.includes(p.role) ? k(files.length, 'documentos') : ''}
+          </div>
+          <dl class="psn-facts">
+            ${fact('Rol en el panel', ROLE[p.role] ?? p.role)}${fact('Correo', p.mail ?? '')}
+            ${isHR() ? fact('Puesto', rec.title ?? '') + fact('Tipo', rec.kind ?? '') + fact('Desde', rec.start ? day(rec.start) : '') + fact('Teléfono', rec.phone ?? '') + fact('Contacto de emergencia', [rec.ecName, rec.ecPhone].filter(Boolean).join(' · ')) : ''}
+          </dl>
+          ${isHR() && !rec.title && !rec.start ? '<p class="pnl-muted pnl-small">Faltan sus datos personales: complétalos en la pestaña «Datos personales».</p>' : ''}
+          ${!isHR() ? '<p class="pnl-muted pnl-small">Los datos personales, los días libres y los documentos solo los ve la administración.</p>' : ''}`;
+      } else if (tab === 'trabajo' && p.role === 'photo') {
+        body.innerHTML = `
+          <h3 class="psn-h">Fotos subidas a la biblioteca${demo ? ' <small class="pnl-muted">DEMO</small>' : ''}</h3>
+          <div class="psn-kpis">${k(photos.length, 'en total')}${k(ph7, 'últimos 7 días')}${k(ph30, 'últimos 30 días')}${k(photos[0] ? when(photos[0].created_at) : '—', 'la más reciente')}</div>
+          <h3 class="psn-h">Las más recientes</h3>
+          ${photos.length ? `<ul class="psn-list">${photos.slice(0, 12).map((x) => `<li><span><b>${esc(x.caption || 'Sin descripción')}</b><small>${when(x.created_at)}</small></span></li>`).join('')}</ul>` : '<p class="pnl-muted">Todavía no ha subido fotos a la biblioteca.</p>'}
+          <p class="pnl-muted pnl-small">Sus fotos están en Fotos, la biblioteca de la redacción.</p>`;
+      } else if (tab === 'trabajo') {
+        const top = [...pub].filter((x) => reads[x.id]).sort((x, y) => (reads[y.id] ?? 0) - (reads[x.id] ?? 0)).slice(0, 5);
+        const bySection = new Map<string, number>(); pub.forEach((x) => bySection.set(x.section, (bySection.get(x.section) ?? 0) + 1));
+        body.innerHTML = `
+          <h3 class="psn-h">Publicaciones</h3>
+          <div class="psn-kpis">${k(pub.length, 'en total')}${k(pub7, 'últimos 7 días')}${k(pub30, 'últimos 30 días')}${k(pub[0] ? when(pub[0].date) : '—', 'la más reciente')}</div>
+          <h3 class="psn-h">Lectores <small class="pnl-muted">últimos 30 días${dm}</small></h3>
+          <div class="psn-kpis">${k(totalReads, 'lecturas')}${k(avg, 'promedio por publicación')}${k(totalCm, 'comentarios')}${k(top[0] ? reads[top[0].id] : 0, 'en su más leída')}</div>
+          <h3 class="psn-h">En proceso${demo ? ' <small class="pnl-muted">DEMO</small>' : ''}</h3>
+          <div class="psn-kpis">${k(wip.review, 'por aprobar', wip.review ? 'warn' : '')}${k(wip.back, 'devueltas con notas', wip.back ? 'bad' : '')}${k(wip.drafts, 'borradores')}${k(wip.scheduled, 'programadas')}</div>
+          ${bySection.size > 1 ? `<h3 class="psn-h">Por sección</h3><div class="psn-tags">${[...bySection.entries()].sort((x, y) => y[1] - x[1]).map(([sec, n]) => `<span>${esc(sec)} <b>${n}</b></span>`).join('')}</div>` : ''}
+          ${top.length ? `<h3 class="psn-h">Las más leídas (30 días)</h3><ol class="psn-list">${top.map((x) => `<li><span><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a></span><small>${num(reads[x.id] ?? 0)} lecturas · ${num(cmts[x.id] ?? 0)} coment.</small></li>`).join('')}</ol>` : ''}
+          <h3 class="psn-h">Las más recientes</h3>
+          ${pub.length ? `<ul class="psn-list">${pub.slice(0, 12).map((x) => `<li><span><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a><small>${esc(x.section)} · ${when(x.date)}</small></span><small>${num(reads[x.id] ?? 0)} lecturas · ${num(cmts[x.id] ?? 0)} coment.</small></li>`).join('')}</ul>` : '<p class="pnl-muted">Todavía no tiene publicaciones con su nombre en esta versión del sitio.</p>'}
+          <p class="pnl-muted pnl-small">Las lecturas cuentan a quien se queda unos segundos en la página de noticel.com; se guardan 30 días.</p>`;
+      } else if (tab === 'datos') {
+        const v = (key: keyof Rec) => esc(String(rec[key] ?? ''));
+        body.innerHTML = `<form class="psn-form" data-psn-datos novalidate>
+          <div class="psn-2">
+            <label>Puesto<input name="title" maxlength="60" value="${v('title')}" placeholder="ej. Periodista de deportes" /></label>
+            <label>Tipo<select name="kind">${['', 'Empleado a tiempo completo', 'Empleado a tiempo parcial', 'Contratista', 'Colaborador'].map((o) => `<option value="${o}"${rec.kind === o ? ' selected' : ''}>${o || '—'}</option>`).join('')}</select></label>
+            <label>Fecha de inicio<input name="start" type="date" value="${v('start')}" /></label>
+            <label>Teléfono<input name="phone" maxlength="20" inputmode="tel" value="${v('phone')}" /></label>
+            <label>Contacto de emergencia<input name="ecName" maxlength="60" value="${v('ecName')}" placeholder="Nombre y relación" /></label>
+            <label>Teléfono de emergencia<input name="ecPhone" maxlength="20" inputmode="tel" value="${v('ecPhone')}" /></label>
+            <label>Días de vacaciones al año<input name="vacDays" type="number" min="0" max="60" value="${v('vacDays')}" /></label>
+          </div>
+          <label>Notas<textarea name="notes" rows="3" maxlength="800" placeholder="Lo que haga falta recordar (no pongas datos de salud ni números de seguro social)">${v('notes')}</textarea></label>
+          <button type="submit" class="adp-btn">Guardar datos</button>
+        </form>`;
+      } else if (tab === 'dias') {
+        body.innerHTML = `<p class="pnl-muted">${rec.vacDays ? `Vacaciones ${year}: <b>${usedYear}</b> de <b>${rec.vacDays}</b> días usados.` : 'Pon sus días de vacaciones al año en «Datos personales» para ver el balance.'}</p>
+          <ul class="psn-list">${offs.map((o) => `<li><span><b>${day(o.day_from)}${o.day_to !== o.day_from ? ` – ${day(o.day_to)}` : ''}</b><small>${KIND_OFF[o.kind] ?? esc(o.kind)} · ${nDays(o)} ${nDays(o) === 1 ? 'día' : 'días'}${o.note ? ` · ${esc(o.note)}` : ''}</small></span><span class="psn-acts"><span class="pnl-chip ${o.status === 'aprobado' ? 'good' : o.status === 'pendiente' ? 'warn' : ''}">${STATUS[o.status] ?? esc(o.status)}</span>${o.status === 'pendiente' ? `<button type="button" class="adp-btn" data-psn-off-ok="${esc(o.id)}">Aprobar</button><button type="button" class="pnl-link danger" data-psn-off-no="${esc(o.id)}">Negar</button>` : ''}</span></li>`).join('') || '<li class="pnl-muted">No tiene días libres registrados.</li>'}</ul>
+          <p class="pnl-muted pnl-small">Cada persona pide sus días libres desde su Inicio. Para añadir días por alguien, usa «+ Añadir días libres» en Personal.</p>`;
+      } else if (tab === 'documentos') {
+        body.innerHTML = `<div class="psn-row"><p class="pnl-muted">Contratos, identificación, formularios y evaluaciones. Se guardan en una carpeta privada: solo un administrador puede abrirlos.</p>
+            <label class="adp-btn ghost-dark psn-upbtn">Subir documento<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.txt" data-psn-file class="sr" /></label></div>
+          <div class="psn-upf" data-psn-upf hidden><input data-psn-ftitle maxlength="120" placeholder="Nombre del documento" aria-label="Nombre del documento" />
+            <select data-psn-fkind aria-label="Tipo">${['Contrato', 'Identificación', 'Formulario de empleo', 'Evaluación', 'Acuerdo de confidencialidad', 'Certificación', 'Otro'].map((x) => `<option>${x}</option>`).join('')}</select>
+            <span class="psn-acts"><button type="button" class="adp-btn" data-psn-fsave>Subir</button><button type="button" class="pnl-link" data-psn-fcancel>Cancelar</button></span></div>
+          <ul class="psn-list">${files.map((f) => `<li><span><b>${esc(f.title)}</b><small>${esc(f.kind)} · ${when(f.created_at)}${f.size ? ` · ${Math.max(1, Math.round(f.size / 1024))} KB` : ''}${f.uploaded_by ? ` · subido por ${esc(f.uploaded_by)}` : ''}</small></span><span class="psn-acts"><button type="button" class="pnl-link" data-psn-fopen="${esc(f.id)}">Abrir</button><button type="button" class="pnl-link danger" data-psn-fdel="${esc(f.id)}">Borrar</button></span></li>`).join('') || '<li class="pnl-muted">Todavía no hay documentos.</li>'}</ul>`;
+      } else if (tab === 'notas') {
+        body.innerHTML = `<div class="psn-row"><p class="pnl-muted">Reconocimientos, quejas, advertencias y conversaciones importantes. Solo los administradores las ven; la persona no.</p>
+            <button type="button" class="adp-btn ghost-dark" data-psn-note-add>+ Añadir nota</button></div>
+          <ul class="psn-list">${notes.map((n) => `<li class="psn-note k-${esc(n.kind.toLowerCase())}"><span><b>${esc(n.kind)}</b><small>${when(n.created_at)}${n.author ? ` · ${esc(n.author)}` : ''}</small><p>${esc(n.body).replace(/\n/g, '<br>')}</p></span><button type="button" class="pnl-link danger" data-psn-note-del="${esc(n.id)}">Borrar</button></li>`).join('') || '<li class="pnl-muted">Sin notas.</li>'}</ul>`;
+      }
+    }
+
+    async function open(person: P, startTab = 'resumen') {
+      p = person; tab = TABS().some(([id]) => id === startTab) ? startTab : 'resumen';
+      $('[data-psn-name]').textContent = p.name;
+      $('[data-psn-av]').textContent = p.name.replace(/^Lcd[oa]\.?\s*/u, '').split(/\s+/).filter((w) => /^\p{L}/u.test(w)).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+      const rb = $('[data-psn-role]'); rb.textContent = ROLE[p.role] ?? p.role; rb.className = `role-badge role-${p.role}`;
+      $('[data-psn-mail]').textContent = p.mail ?? '';
+      $('[data-psn-tabs]').innerHTML = '';
+      $('[data-psn-body]').innerHTML = '<p class="pnl-muted">Cargando…</p>';
+      if (!dlg!.open) dlg!.showModal();
+      await load(); paint();
+    }
+    // The drawer's own toast box (inside the dialog, so it shows above the page)
+    dlg.querySelector('.psn-in')!.insertAdjacentHTML('beforeend', '<div class="psn-toast" data-psn-toast role="status" hidden></div>');
+    addEventListener('nc-person', (e) => { const d = (e as CustomEvent).detail as P & { tab?: string }; if (d?.name) void open(d, d.tab); });
+
+    dlg.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      if (t === dlg || t.closest('[data-psn-close]')) { dlg.close(); return; }
+      const tb = t.closest<HTMLElement>('[data-psn-tab]'); if (tb) { tab = tb.dataset.psnTab!; paint(); return; }
+      // Days off
+      const ok = t.closest<HTMLElement>('[data-psn-off-ok]'), no = t.closest<HTMLElement>('[data-psn-off-no]');
+      if (ok || no) {
+        const o = offs.find((x) => x.id === (ok?.dataset.psnOffOk ?? no?.dataset.psnOffNo)); if (!o) return;
+        if (no && !(await ask(`¿Negar los días libres del ${day(o.day_from)}?`, { ok: 'Negar', danger: true }))) return;
+        if (!live()) { o.status = ok ? 'aprobado' : 'negado'; paint(); toast('DEMO: no se guarda nada.'); return; }
+        const status = ok ? 'aprobado' : 'negado';
+        const r = await staffApi(`hr_timeoff?id=eq.${o.id}`, { method: 'PATCH', body: JSON.stringify({ status, decided_by: me()?.name ?? '', decided_at: new Date().toISOString() }) });
+        if (!r?.ok) { toast('No se pudo guardar.'); return; }
+        toast(ok ? 'Días libres aprobados.' : 'Días libres negados.'); dispatchEvent(new Event('nc-hr-changed')); await load(); paint(); return;
+      }
+      // Documents
+      if (t.closest('[data-psn-fcancel]')) { pendingFile = null; $('[data-psn-upf]').hidden = true; return; }
+      if (t.closest('[data-psn-fsave]')) {
+        if (!pendingFile || !p) return;
+        const title = $<HTMLInputElement>('[data-psn-ftitle]').value.trim(), kind = $<HTMLSelectElement>('[data-psn-fkind]').value;
+        if (!title) { toast('Escribe el nombre del documento.'); return; }
+        if (!live() || !p.id) { files.unshift({ id: String(Date.now()), title: `${title} (EJEMPLO)`, kind, path: '', size: pendingFile.size, uploaded_by: me()?.name, created_at: new Date().toISOString() }); pendingFile = null; paint(); toast('DEMO: no se sube nada.'); return; }
+        const ext = (pendingFile.name.match(/\.([a-z0-9]{1,5})$/i)?.[1] ?? 'bin').toLowerCase(), path = `${p.id}/${Date.now().toString(36)}.${ext}`;
+        toast('Subiendo…');
+        if (!(await hrFileUpload(path, pendingFile))) { toast('No se pudo subir. ¿Ya corriste supabase/expedientes.sql?'); return; }
+        const r = await staffApi('hr_files', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: p.id, title, kind, path, size: pendingFile.size, uploaded_by: me()?.name ?? '' }) });
+        if (!r?.ok) { await hrFileDelete(path); toast('No se pudo guardar el documento.'); return; }
+        logActivity('Subió un documento al expediente', `${p.name}: ${title}`); pendingFile = null;
+        toast('Documento guardado.'); await load(); paint(); return;
+      }
+      const fo = t.closest<HTMLElement>('[data-psn-fopen]');
+      if (fo) {
+        const f = files.find((x) => x.id === fo.dataset.psnFopen); if (!f) return;
+        if (!f.path) { toast('DEMO: documento de ejemplo.'); return; }
+        const b = await hrFileGet(f.path); if (!b) { toast('No se pudo abrir.'); return; }
+        const u = URL.createObjectURL(b); window.open(u, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(u), 60000); return;
+      }
+      const fd = t.closest<HTMLElement>('[data-psn-fdel]');
+      if (fd) {
+        const f = files.find((x) => x.id === fd.dataset.psnFdel); if (!f) return;
+        if (!(await ask(`¿Borrar «${f.title}»? No se puede recuperar.`, { ok: 'Borrar', danger: true }))) return;
+        if (!f.path) { files = files.filter((x) => x !== f); paint(); toast('DEMO: no se borra nada.'); return; }
+        await hrFileDelete(f.path); const r = await staffApi(`hr_files?id=eq.${f.id}`, { method: 'DELETE' }); if (!r?.ok) { toast('No se pudo borrar.'); return; }
+        logActivity('Borró un documento del expediente', `${p?.name ?? ''}: ${f.title}`); toast('Documento borrado.'); await load(); paint(); return;
+      }
+      // HR notes
+      if (t.closest('[data-psn-note-add]')) {
+        const kind = await askText('Tipo de nota: escribe Reconocimiento, Queja, Advertencia o Nota.', { ok: 'Seguir', value: 'Nota' }); if (kind === null) return;
+        const K = ['Reconocimiento', 'Queja', 'Advertencia', 'Nota'].find((x) => x.toLowerCase() === kind.trim().toLowerCase()) ?? 'Nota';
+        const text = await askText(`${K} para ${p?.name}: escribe qué pasó (fecha, hechos, qué se acordó).`, { ok: 'Guardar', multiline: true }); if (!text?.trim()) return;
+        if (!live() || !p?.id) { notes.unshift({ id: String(Date.now()), kind: K, body: text.trim(), author: me()?.name, created_at: new Date().toISOString() }); toast('DEMO: no se guarda.'); paint(); return; }
+        const r = await staffApi('hr_notes', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: p.id, kind: K, body: text.trim().slice(0, 2000), author: me()?.name ?? '' }) });
+        if (!r?.ok) { toast('No se pudo guardar. ¿Ya corriste supabase/expedientes.sql?'); return; }
+        logActivity('Añadió una nota de RR. HH.', `${p.name}: ${K}`); toast('Nota guardada.'); await load(); paint(); return;
+      }
+      const nd = t.closest<HTMLElement>('[data-psn-note-del]');
+      if (nd) {
+        if (!(await ask('¿Borrar esta nota?', { ok: 'Borrar', danger: true }))) return;
+        if (!live()) { notes = notes.filter((n) => n.id !== nd.dataset.psnNoteDel); paint(); return; }
+        const r = await staffApi(`hr_notes?id=eq.${nd.dataset.psnNoteDel}`, { method: 'DELETE' }); if (!r?.ok) { toast('No se pudo borrar.'); return; }
+        await load(); paint();
+      }
+    });
+    dlg.addEventListener('change', (e) => {
+      const inp = (e.target as HTMLElement).closest<HTMLInputElement>('[data-psn-file]'); if (!inp?.files?.[0]) return;
+      const f = inp.files[0]; inp.value = '';
+      if (f.size > 20 * 1024 * 1024) { toast('El archivo pesa más de 20 MB.'); return; }
+      pendingFile = f; $('[data-psn-upf]').hidden = false;
+      const ti = $<HTMLInputElement>('[data-psn-ftitle]'); ti.value = f.name.replace(/\.[^.]+$/, '').slice(0, 120); ti.focus();
+    });
+    dlg.addEventListener('submit', async (e) => {
+      const f = (e.target as HTMLElement).closest<HTMLFormElement>('[data-psn-datos]'); if (!f || !p) return;
+      e.preventDefault();
+      const g = (key: string) => (f.elements.namedItem(key) as HTMLInputElement).value.trim();
+      const data: Rec = { title: g('title'), kind: g('kind'), start: g('start'), phone: g('phone'), ecName: g('ecName'), ecPhone: g('ecPhone'), vacDays: Number(g('vacDays')) || undefined, notes: g('notes') };
+      if (!live() || !p.id) { rec = data; toast('DEMO: no se guarda nada.'); tab = 'resumen'; paint(); return; }
+      const r = await staffApi('hr_people?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: p.id, data, updated_at: new Date().toISOString(), updated_by: me()?.name ?? '' }) });
+      if (!r?.ok) { toast('No se pudo guardar.'); return; }
+      logActivity('Actualizó los datos de', p.name); toast('Datos guardados.'); dispatchEvent(new Event('nc-hr-changed'));
+      rec = data; tab = 'resumen'; paint();
+    });
+  }
+</script>
