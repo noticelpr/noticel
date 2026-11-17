@@ -549,6 +549,7 @@ const TABS = [
           <h1 class="pnl-h">Equipo</h1>
           <p class="pnl-muted">Quién entra al panel y qué puede hacer.</p>
           {hasBackendBuild && <p class="pnl-muted pnl-small">Para añadir a alguien: escribe su nombre, su correo y su rol, y toca <b>Invitar</b>. Le llega un correo para crear su contraseña. Cada vez que entra al panel recibe además un código por correo (verificación en dos pasos). Si ya tiene cuenta en el sitio, solo recibe el rol.</p>}
+          <div class="pnl-range team-bar" role="group" aria-label="Filtrar por rol" data-team-bar></div>
           <ul class="pnl-team" data-team></ul>
           <form class="pnl-add" data-add novalidate>
             <input placeholder="Nombre" data-add-name maxlength="30" aria-label="Nombre" />
@@ -858,6 +859,8 @@ const TABS = [
 
     let anRange: 1 | 7 | 28 = 7;
     let anView: 'visitas' | 'ingresos' | 'espacios' = 'visitas';
+    let teamFilter = 'all'; // Equipo: role bar (owner, 2026-11-17)
+    root.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-team-f]'); if (b) { teamFilter = b.dataset.teamF!; paint.equipo(); } });
     let trRange: 1 | 7 | 28 = 7, trPage = 'portada', trDev: 'todo' | 'm' | 'd' = 'todo';
 
     // ---------- Analítica → Ingresos: ad sales from the database (ad_requests), by order date ----------
@@ -1836,8 +1839,18 @@ const TABS = [
             ${iAmOwner && m.role === 'admin' && x?.accepted ? `<button type="button" class="pnl-link" data-owner-set="${i}" data-owner-to="${x?.owner ? '0' : '1'}">${x?.owner ? 'Quitar dueño' : 'Hacer dueño'}</button>` : ''}
             ${iAmOwner && !x?.owner ? `<button type="button" class="pnl-link" data-hide-set="${i}" data-hide-to="${x?.invisible ? '0' : '1'}">${x?.invisible ? 'Mostrar al equipo' : 'Ocultar del equipo'}</button>` : ''}` : '';
           // Name with a badge for what they do; then their email, activity; the admin's tools on the right
-          return `<li><span class="pnl-av sm">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span class="pnl-who"><span class="pnl-who-top"><b>${esc(m.name)}</b>${self ? '<small>(tú)</small>' : ''}<span class="role-badge role-${m.role}">${ROLE_NAME[m.role]}</span>${m.role === 'reporter' && isAdm ? `<label class="adb-check pnl-canphotos"><input type="checkbox" data-canphotos="${i}" ${m.canPhotos ? 'checked' : ''} /> Puede subir fotos</label>` : ''}${x?.owner || x?.hidden ? '<span class="role-badge role-owner">Dueño</span>' : ''}${x?.invisible ? '<span class="role-badge role-hidden" title="Solo tú lo ves en el equipo">Oculto</span>' : ''}</span><small>${esc(x?.email || m.mail)}</small>${chips ? `<span class="pnl-chips">${chips}</span>` : ''}${isAdm ? activityLine(m.id, m.name, m.role) : ''}</span>${tools || (!self && !locked && (isAdm || mgrCan(m.role))) ? `<details class="pnl-team-edit"><summary aria-label="Editar a ${esc(m.name)}" title="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></summary><div class="pnl-team-pop">${tools}${!self && !locked && (isAdm || mgrCan(m.role)) ? `<button type="button" class="pnl-link danger" data-rm="${i}">Quitar del equipo</button>` : ''}</div></details>` : ''}</li>`;
+          return `<li data-team-role="${m.role}"><span class="pnl-av sm">${esc(m.name[0]?.toUpperCase() ?? '?')}</span><span class="pnl-who"><span class="pnl-who-top"><b>${esc(m.name)}</b>${self ? '<small>(tú)</small>' : ''}<span class="role-badge role-${m.role}">${ROLE_NAME[m.role]}</span>${m.role === 'reporter' && isAdm ? `<label class="adb-check pnl-canphotos"><input type="checkbox" data-canphotos="${i}" ${m.canPhotos ? 'checked' : ''} /> Puede subir fotos</label>` : ''}${x?.owner || x?.hidden ? '<span class="role-badge role-owner">Dueño</span>' : ''}${x?.invisible ? '<span class="role-badge role-hidden" title="Solo tú lo ves en el equipo">Oculto</span>' : ''}</span><small>${esc(x?.email || m.mail)}</small>${chips ? `<span class="pnl-chips">${chips}</span>` : ''}${isAdm ? activityLine(m.id, m.name, m.role) : ''}</span>${tools || (!self && !locked && (isAdm || mgrCan(m.role))) ? `<details class="pnl-team-edit"><summary aria-label="Editar a ${esc(m.name)}" title="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></summary><div class="pnl-team-pop">${tools}${!self && !locked && (isAdm || mgrCan(m.role)) ? `<button type="button" class="pnl-link danger" data-rm="${i}">Quitar del equipo</button>` : ''}</div></details>` : ''}</li>`;
         }).join('');
+        // Role bar (owner, 2026-11-17): Todos, then each role that has someone, with its count
+        {
+          const items = [...$('[data-team]').querySelectorAll<HTMLElement>('li[data-team-role]')];
+          const ORDER: Staff['role'][] = ['admin', 'manager', 'editor', 'desk', 'reporter', 'columnist', 'photo', 'ads'];
+          const count = (r: string) => items.filter((li) => li.dataset.teamRole === r).length;
+          if (teamFilter !== 'all' && !count(teamFilter)) teamFilter = 'all';
+          $('[data-team-bar]').innerHTML = `<button type="button" data-team-f="all" aria-pressed="${teamFilter === 'all'}">Todos <b>${items.length}</b></button>`
+            + ORDER.filter((r) => count(r)).map((r) => `<button type="button" data-team-f="${r}" aria-pressed="${teamFilter === r}">${ROLE_NAME[r]} <b>${count(r)}</b></button>`).join('');
+          items.forEach((li) => (li.hidden = teamFilter !== 'all' && li.dataset.teamRole !== teamFilter));
+        }
         if (hasBackend() && (isAdm || isMgr || isChief) && !teamStatusLoading && !Object.keys(teamStatus).length) {
           teamStatusLoading = true;
           void Promise.all([teamAdmin('status'), staffApi('rpc/staff_activity_list', { method: 'POST', body: '{}' }).then((r) => (r?.ok ? r.json() : []))]).then(([st, act]) => {

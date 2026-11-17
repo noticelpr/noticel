@@ -425,6 +425,11 @@ export async function saveColumnist(c: ColumnistRow): Promise<string> {
   return r.status === 401 || r.status === 403 ? 'Solo un administrador o editor puede cambiar columnistas.' : `No se pudo guardar (error ${r.status}).`;
 }
 /** Switches a profile on (shows on the site) or off (hidden). */
+/** Deletes a columnist profile for good (administrator only; supabase/columnistas-borrar.sql). Their columns stay. */
+export async function deleteColumnist(slug: string): Promise<boolean> {
+  const r = await staffApi(`columnists?slug=eq.${encodeURIComponent(slug)}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+  return !!r?.ok && ((await r.json().catch(() => [])) as unknown[]).length > 0;
+}
 export async function setColumnistActive(slug: string, active: boolean): Promise<boolean> {
   const r = await staffApi(`columnists?slug=eq.${encodeURIComponent(slug)}`, { method: 'PATCH', body: JSON.stringify({ active, updated_at: new Date().toISOString() }) });
   return !!r?.ok;

@@ -75,6 +75,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
         <div class="cl-actions">
           <button type="submit" class="adp-btn" data-cl-save>Guardar</button>
           <button type="button" class="adp-btn ghost-dark" data-cl-cancel>Cancelar</button>
+          <button type="button" class="pnl-link danger cl-del" data-cl-del hidden>Borrar perfil</button>
         </div>
       </div>
     </div>
@@ -82,7 +83,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
 </div>
 
 <script>
-  import { hasBackend, listColumnists, saveColumnist, setColumnistActive, uploadColumnistPhoto, staffApi, teamAdmin, tokenInfo, type ColumnistRow } from '../../lib/backend';
+  import { hasBackend, listColumnists, saveColumnist, setColumnistActive, uploadColumnistPhoto, staffApi, teamAdmin, tokenInfo, deleteColumnist, type ColumnistRow } from '../../lib/backend';
   import { isDemo } from '../../lib/demo';
   import { ask, askText } from '../../lib/dialogs';
   const root = document.querySelector<HTMLElement>('[data-cl]');
@@ -135,6 +136,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       f('videos').value = (c?.videos ?? []).join('\n');
       f('sort').value = String(c?.sort ?? rows.length + 1);
       f('active').checked = c ? c.active : true;
+      $('[data-cl-del]').hidden = !c || role() !== 'admin'; // the administrator deletes a profile for good (owner, 2026-11-17)
       $('[data-cl-err]').hidden = true;
       showPic();
       form.hidden = false;
@@ -149,6 +151,13 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       const ed = t.closest<HTMLElement>('[data-cl-edit]'); if (ed) open(rows.find((r) => r.slug === ed.dataset.clEdit) ?? null);
       if (t.closest('[data-cl-cancel]')) { form.hidden = true; editing = null; }
       if (t.closest('[data-cl-nophoto]')) { f('photo').value = ''; showPic(); }
+      if (t.closest('[data-cl-del]') && editing) {
+        const c = editing;
+        if (!(await ask(`¿Borrar el perfil de ${c.name} para siempre? Deja de salir en Opinión y no se puede recuperar desde el panel. Sus columnas publicadas no se borran.`, { ok: 'Borrar perfil', danger: true }))) return;
+        if (live() && !(await deleteColumnist(c.slug))) return toast('No se pudo borrar. ¿Ya corriste supabase/columnistas-borrar.sql?');
+        rows = rows.filter((r) => r.slug !== c.slug); if (!live()) writeLocal();
+        form.hidden = true; editing = null; paint(); toast(`Perfil de ${c.name} borrado.`);
+      }
     });
     form.addEventListener('input', (e) => { const n = (e.target as HTMLInputElement).name; if (n === 'photo' || n === 'name') showPic(); });
 

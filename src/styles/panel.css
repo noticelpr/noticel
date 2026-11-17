@@ -1629,3 +1629,9 @@ canvas.apr-drag:active{cursor:grabbing}
 .mc-miles ul{max-height:none;overflow:visible;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
 .mc-miles li{padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--p-bg,transparent)}
 .mc-miles li.ok{border-color:rgba(146,208,0,.6)}
+/* Equipo: role bar (owner, 2026-11-17) */
+.team-bar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px}
+.team-bar button b{margin-left:4px;font-variant-numeric:tabular-nums;opacity:.75}
+.pnl-team li[hidden]{display:none}
+/* Columnistas: Borrar perfil (administrator) */
+.cl-actions .cl-del{margin-left:auto}
