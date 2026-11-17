@@ -85,7 +85,7 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
   <main class="wrap" id="main">
     <div class="art-grid">
       <div class="read-progress" aria-hidden="true"><span data-progress></span></div>
-      <article class="art" data-read-section={s.name} data-ad-section={isTpl ? undefined : s.id} data-read-url={storyUrl(story)}
+      <article class="art" data-story-id={isTpl ? undefined : story.id} data-read-section={s.name} data-ad-section={isTpl ? undefined : s.id} data-read-url={storyUrl(story)}
         data-title={d.title} data-date={d.date.toISOString()} data-image={url(d.image ?? fallback.src)}>
         <div class="crumbs"><a href={url()}>Portada</a> / <a href={isTpl ? 'ARCHSECURL0' : sectionUrl(s.id)}>{s.name}</a></div>
         {isTpl ? <span class="badge">ARCHSECNAME0</span> : <Label story={story} />}
@@ -191,6 +191,7 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
   </main>
   <DocViewer />
   <script>
+    import { BACKEND, hasBackend } from '../lib/backend';
     // Comment icon in the toolbar shows the same count as the comments section
     {
       const src = document.querySelector<HTMLElement>('[data-cm-count]');
@@ -210,6 +211,19 @@ const authorPage = (authorList as Array<{ slug: string; name: string }>).find((a
         const seen = JSON.parse(localStorage.getItem('nc-seen') || '[]').filter((u: string) => u !== art.dataset.readUrl);
         localStorage.setItem('nc-seen', JSON.stringify([art.dataset.readUrl, ...seen].slice(0, 50)));
       } catch { /* private mode or storage blocked: nothing to remember */ }
+    }
+
+    // The site's own read counter (supabase/anuncios-ventas.sql story_reads; ids allowed by supabase/columnas-quitar.sql):
+    // one read per visit after 8 seconds on the page, only on noticel.com, never in demo mode or with Global Privacy
+    // Control. Only a total per story and hour is kept: nothing about the reader. Feeds Mis columnas and Lo más leído.
+    {
+      const sid = art?.dataset.storyId;
+      if (sid && hasBackend() && /(^|\.)noticel\.com$/.test(location.hostname) && !(navigator as any).globalPrivacyControl) {
+        setTimeout(() => {
+          if (document.visibilityState !== 'visible') return;
+          void fetch(`${BACKEND.url}/rest/v1/rpc/leer_noticia`, { method: 'POST', keepalive: true, headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${BACKEND.anonKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ s: sid }) }).catch(() => null);
+        }, 8000);
+      }
     }
 
     // Reading tools. Everything is kept only in this browser.

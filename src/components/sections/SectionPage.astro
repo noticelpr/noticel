@@ -8,6 +8,7 @@ import TopStories from '../TopStories.astro';
 import OpinionTop from './OpinionTop.astro';
 import OpinionFeed from './OpinionFeed.astro';
 import OpinionSide from './OpinionSide.astro';
+import ColumnistApply from './ColumnistApply.astro';
 import StoryCard from '../StoryCard.astro';
 import Sidebar from '../Sidebar.astro';
 import AdSlot from '../AdSlot.astro';
@@ -130,6 +131,8 @@ const events = box === 'entretenimiento' ? upcomingEvents().slice(0, 4) : [];
             {page < pages && <a href={pageUrl(page + 1)} aria-label="Página siguiente">→</a>}
           </nav>
         )}
+        {/* Opiniones: «¿Quieres ser columnista?» (user, 2026-11-17) */}
+        {slug === 'opiniones' && <ColumnistApply />}
         {rows.length < 2 && <AdSlot size="infeed" />}
         {slug !== 'opiniones' && <GamesTeaser />}
         {fillRows.length > 0 && (

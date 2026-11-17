@@ -3,6 +3,9 @@
 // photo, contact and social links) and switch each one on (shows on the site) or off (hidden).
 // Saved in NotiCel's Supabase (supabase/columnistas.sql); the site reads the profiles that are on when it is built.
 // Without the database (preview or demo), changes stay on this device only.
+// 2026-11-17 (user): requests from «¿Quieres ser columnista?» on the Opiniones page, «Invitar a un columnista» and
+// columnists' requests to take a column down (supabase/columnistas-solicitudes.sql, supabase/columnas-quitar.sql), for
+// the administrator, the Editor en jefe and the Editors. Approving or inviting creates the profile turned off.
 import { COLUMNISTS } from '../../lib/columnists';
 const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.role ?? 'Columnista', bio: c.bio ?? '', photo: c.photo ?? '', active: true, sort: i + 1 }));
 ---
@@ -12,8 +15,27 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       <h1 class="pnl-h">Columnistas</h1>
       <p class="pnl-muted">Crea y edita los perfiles de los columnistas. Con el interruptor decides quién sale en el sitio.</p>
     </div>
-    <button type="button" class="adp-btn" data-cl-new>+ Nuevo columnista</button>
+    <div class="cl-btns"><button type="button" class="adp-btn ghost-dark" data-cl-invite-open>Invitar a un columnista</button><button type="button" class="adp-btn" data-cl-new>+ Nuevo columnista</button></div>
   </header>
+
+  {/* Requests from the Opiniones page and invitations (user, 2026-11-17; supabase/columnistas-solicitudes.sql) */}
+  <form class="pnl-card cl-invite" data-cl-invite hidden novalidate>
+    <h2 class="pnl-h3">Invitar a un columnista</h2>
+    <p class="pnl-muted pnl-small">Le llega un correo invitándolo a escribir en Opiniones, con un botón para crear su cuenta de columnista. Con esa cuenta solo puede enviar columnas (las aprueba un editor) y ver sus lecturas y comentarios.</p>
+    <div class="cl-two"><label>Nombre completo<input name="iname" maxlength="40" placeholder="Como firmará sus columnas" /></label><label>Correo<input name="imail" type="email" maxlength="120" autocapitalize="off" /></label></div>
+    <label>Tema o cargo <small>(opcional, sale bajo su nombre)</small><input name="irole" maxlength="80" placeholder="Ej.: Economía y familia" /></label>
+    <p class="cm-err" data-cl-ierr hidden></p>
+    <div class="cl-actions"><button type="submit" class="adp-btn" data-cl-isend>Enviar invitación</button><button type="button" class="adp-btn ghost-dark" data-cl-invite-cancel>Cancelar</button></div>
+  </form>
+  <section class="cl-req" data-cl-req hidden>
+    <h2 class="pnl-h2">Solicitudes para ser columnista <span class="pnl-n" data-cl-req-n></span></h2>
+    <ul class="cl-req-list" data-cl-req-list></ul>
+    <details class="cl-req-old"><summary>Solicitudes respondidas</summary><ul class="cl-req-list" data-cl-req-old></ul></details>
+  </section>
+  <section class="cl-req" data-cl-down hidden>
+    <h2 class="pnl-h2">Pedidos para quitar columnas <span class="pnl-n" data-cl-down-n></span></h2>
+    <ul class="cl-req-list" data-cl-down-list></ul>
+  </section>
   <p class="pnl-note" data-cl-note></p>
   <p class="cl-missing" data-cl-missing hidden>Falta preparar la base de datos: en Supabase → SQL Editor, corre el archivo <b>supabase/columnistas.sql</b> (una sola vez).</p>
   <ul class="cl-list" data-cl-list></ul>
@@ -53,7 +75,9 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
 </div>
 
 <script>
-  import { hasBackend, listColumnists, saveColumnist, setColumnistActive, uploadColumnistPhoto, type ColumnistRow } from '../../lib/backend';
+  import { hasBackend, listColumnists, saveColumnist, setColumnistActive, uploadColumnistPhoto, staffApi, teamAdmin, tokenInfo, type ColumnistRow } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  import { ask, askText } from '../../lib/dialogs';
   const root = document.querySelector<HTMLElement>('[data-cl]');
   if (root) {
     const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector<T>(s)!;
@@ -164,10 +188,149 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       toast(`Guardado: ${name}.`);
     });
 
+    // ---------- Requests, invitations and take-down requests (user, 2026-11-17) ----------
+    type Req = { id: string; created_at: string; name: string; email: string; phone?: string; profession: string; topics: string; bio: string; links?: string; status: 'nueva' | 'aprobada' | 'rechazada'; note?: string; reviewed_at?: string };
+    type Down = { id: string; created_at: string; slug: string; url?: string; title: string; reason: string; status: string };
+    let reqs: Req[] = [], downs: Down[] = [], asked = false; // asked: loaded once (a missing table must not be asked again on every count)
+    const role = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null')?.role ?? ''; } catch { return ''; } };
+    const canReview = () => ['admin', 'editor', 'desk'].includes(role()); // administrator, Editor en jefe, Editor
+    const when = (d: string) => new Date(d).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Puerto_Rico' });
+    const linkify = (t: string) => esc(t).replace(/(https?:\/\/[^\s,]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>');
+    // The menu's count (index.astro listens); sent once the page's own script is listening
+    const badge = () => setTimeout(() => dispatchEvent(new CustomEvent('nc-col-requests', { detail: reqs.filter((x) => x.status === 'nueva').length + downs.filter((x) => x.status === 'pedida').length })), 0);
+    const stamp = () => ({ reviewed_at: new Date().toISOString(), reviewed_by: tokenInfo().id || null });
+    const notLive = () => (isDemo() ? 'DEMO' : 'VISTA PREVIA');
+    // Demo and preview: one sample of each, labeled EJEMPLO (no real person)
+    const SAMPLE_REQ: Req = { id: 'ejemplo', created_at: new Date().toISOString(), name: 'Columnista (EJEMPLO)', email: 'ejemplo@correo.com', profession: 'Economista', topics: 'La economía de la familia y el costo de vida', bio: 'EJEMPLO para mostrar cómo se ve una solicitud: economista con experiencia en banca y en la universidad.', status: 'nueva' };
+    const SAMPLE_DOWN: Down = { id: 'ejemplo-quitar', created_at: new Date().toISOString(), slug: 'ejemplo', title: 'Columna de ejemplo (EJEMPLO)', reason: 'EJEMPLO: quiero corregir un dato y volver a enviarla.', status: 'pedida' };
+    function paintDowns() {
+      const open = downs.filter((x) => x.status === 'pedida' || x.status === 'quitando');
+      $('[data-cl-down]').hidden = !canReview() || !open.length;
+      $('[data-cl-down-n]').textContent = open.length ? String(open.length) : '';
+      $('[data-cl-down-list]').innerHTML = open.map((x) => `<li class="cl-rq">
+        <div class="cl-rq-h"><b>${esc(x.title || x.slug)}</b><small>${when(x.created_at)}</small></div>
+        <p><span class="cl-rq-k">Por qué:</span> ${esc(x.reason)}</p>
+        ${x.url ? `<p><a href="${esc(x.url)}" target="_blank" rel="noopener">Ver la columna ↗</a></p>` : ''}
+        <div class="cl-actions"><button type="button" class="adp-btn" data-dn-ok="${esc(x.id)}" ${x.status === 'quitando' ? 'disabled' : ''}>${x.status === 'quitando' ? 'Quitando…' : 'Quitar del sitio'}</button><button type="button" class="pnl-link" data-dn-no="${esc(x.id)}">Mantenerla</button></div>
+      </li>`).join('');
+      badge();
+    }
+    async function loadDowns() {
+      if (!canReview()) return;
+      if (!live()) { if (!downs.length) downs = [SAMPLE_DOWN]; return paintDowns(); }
+      const r = await staffApi('column_takedowns?select=*&status=eq.pedida&order=created_at.asc');
+      if (!r?.ok) return; // supabase/columnas-quitar.sql not run yet
+      downs = await r.json(); paintDowns();
+    }
+    // Escribir took the column down (or couldn't): nc-takedown → nc-takedown-done
+    addEventListener('nc-takedown-done', async (e) => {
+      const { id, ok } = (e as CustomEvent).detail as { id: string; ok: boolean };
+      const x = downs.find((d) => d.slug === id && d.status === 'quitando'); if (!x) return;
+      if (ok) { await staffApi(`column_takedowns?id=eq.${x.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'quitada', ...stamp() }) }); toast(`«${x.title}» se quitó del sitio.`); }
+      x.status = 'pedida';
+      void loadDowns();
+    });
+    async function loadReqs() {
+      if (!canReview()) return;
+      asked = true;
+      void loadDowns();
+      if (!live()) { if (!reqs.length) reqs = [SAMPLE_REQ]; paintReqs(); badge(); return; }
+      const r = await staffApi('columnist_requests?select=*&order=created_at.desc&limit=200');
+      if (!r?.ok) return; // supabase/columnistas-solicitudes.sql not run yet
+      reqs = await r.json(); paintReqs(); badge();
+    }
+    function paintReqs() {
+      const open = reqs.filter((x) => x.status === 'nueva'), old = reqs.filter((x) => x.status !== 'nueva');
+      $('[data-cl-req]').hidden = !canReview();
+      $('[data-cl-req-n]').textContent = open.length ? String(open.length) : '';
+      const card = (x: Req) => `<li class="cl-rq">
+        <div class="cl-rq-h"><b>${esc(x.name)}</b><small>${esc(x.profession)} · ${when(x.created_at)}</small></div>
+        <p><span class="cl-rq-k">Temas:</span> ${esc(x.topics)}</p>
+        <p><span class="cl-rq-k">Sobre la persona:</span> ${esc(x.bio)}</p>
+        <p><span class="cl-rq-k">Contacto:</span> <a href="mailto:${esc(x.email)}">${esc(x.email)}</a>${x.phone ? ` · ${esc(x.phone)}` : ''}</p>
+        ${x.links ? `<p><span class="cl-rq-k">Enlaces:</span> ${linkify(x.links)}</p>` : ''}
+        ${x.status === 'nueva' ? `<div class="cl-actions"><button type="button" class="adp-btn" data-rq-ok="${esc(x.id)}">Aprobar y enviar su cuenta</button><button type="button" class="pnl-link danger" data-rq-no="${esc(x.id)}">Rechazar</button></div>`
+          : `<p class="pnl-chip ${x.status === 'aprobada' ? 'good' : ''}">${x.status === 'aprobada' ? 'Aprobada' : 'Rechazada'}${x.reviewed_at ? ` · ${when(x.reviewed_at)}` : ''}${x.note ? ` · ${esc(x.note)}` : ''}</p>`}
+      </li>`;
+      $('[data-cl-req-list]').innerHTML = open.map(card).join('') || '<li class="cl-empty">No hay solicitudes nuevas. Llegan desde «¿Quieres ser columnista?» en la página de Opiniones.</li>';
+      $('[data-cl-req-old]').innerHTML = old.map(card).join('') || '<li class="cl-empty">Ninguna todavía.</li>';
+    }
+    // Approved request or a direct invitation → an account (Edge Function "equipo", role Columnista) and a profile,
+    // turned off until their first column is out. Returns '' or the problem to show.
+    async function makeColumnist(name: string, email: string, title: string, bio: string | null, reason: 'solicitud' | 'invitacion'): Promise<string> {
+      if (!live()) return `${notLive()}: sin la base de datos no se envían invitaciones.`;
+      const res = await teamAdmin('invite', { email, name: name.slice(0, 40), role: 'columnist', reason });
+      if (!res?.ok) return res?.error ?? 'No se pudo enviar la invitación.';
+      if (!rows.length) { const all = await listColumnists(); if (Array.isArray(all)) rows = all; } // the list may not have loaded yet
+      const slug = slugify(name);
+      if (!rows.some((r) => r.slug === slug)) {
+        const row: ColumnistRow = { slug, name, role: title || 'Columnista', bio, photo: null, email: null, website: null, x: null, instagram: null, facebook: null, active: false, sort: rows.length + 1, kind: 'columnista', owner: res.id ?? null }; // owner: they can edit it from Mi perfil público
+        if (!(await saveColumnist(row))) rows = [...rows, row];
+        paint();
+      }
+      return '';
+    }
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const inv = $<HTMLFormElement>('[data-cl-invite]');
+      if (t.closest('[data-cl-invite-open]')) { inv.hidden = false; inv.reset(); $('[data-cl-ierr]').hidden = true; (inv.elements.namedItem('iname') as HTMLInputElement).focus(); return; }
+      if (t.closest('[data-cl-invite-cancel]')) { inv.hidden = true; return; }
+      // Take-down requests
+      const dOk = t.closest<HTMLButtonElement>('[data-dn-ok]'), dNo = t.closest<HTMLButtonElement>('[data-dn-no]');
+      const d = downs.find((q) => q.id === (dOk?.dataset.dnOk ?? dNo?.dataset.dnNo));
+      if (d && dOk) {
+        if (!(await ask(`¿Quitar «${d.title}» del sitio? Desaparece en unos minutos y queda como borrador en Escribir.`, { ok: 'Quitar del sitio', danger: true }))) return;
+        if (!live()) { downs = downs.filter((x) => x !== d); paintDowns(); return toast(`${notLive()}: no se quita nada del sitio.`); }
+        d.status = 'quitando'; paintDowns();
+        dispatchEvent(new CustomEvent('nc-takedown', { detail: { id: d.slug } })); // Escribir takes it down (nc-takedown-done)
+        return;
+      }
+      if (d && dNo) {
+        if (!(await ask(`¿Mantener «${d.title}» en el sitio? El columnista verá que la redacción la mantuvo.`, { ok: 'Mantenerla' }))) return;
+        if (!live()) { downs = downs.filter((x) => x !== d); paintDowns(); return toast(`${notLive()}: la columna se queda en el sitio.`); }
+        await staffApi(`column_takedowns?id=eq.${d.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'mantenida', ...stamp() }) });
+        toast('La columna se queda en el sitio.'); void loadDowns(); return;
+      }
+      // Requests to be a columnist
+      const ok = t.closest<HTMLButtonElement>('[data-rq-ok]'), no = t.closest<HTMLButtonElement>('[data-rq-no]');
+      const x = reqs.find((q) => q.id === (ok ? ok.dataset.rqOk : no?.dataset.rqNo)); if (!x) return;
+      if (ok) {
+        if (!(await ask(`¿Aprobar a ${x.name}? Le llegará un correo a ${x.email} para crear su cuenta de columnista.`, { ok: 'Aprobar y enviar' }))) return;
+        ok.disabled = true; ok.textContent = 'Enviando…';
+        const problem = await makeColumnist(x.name, x.email, x.profession, x.bio, 'solicitud');
+        if (problem) { ok.disabled = false; ok.textContent = 'Aprobar y enviar su cuenta'; return toast(problem); }
+        await staffApi(`columnist_requests?id=eq.${x.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'aprobada', ...stamp() }) });
+        toast(`Aprobada. ${x.name} recibirá el correo para crear su cuenta. Su perfil quedó apagado: enciéndelo cuando salga su primera columna.`);
+      } else {
+        const note = await askText(`¿Rechazar la solicitud de ${x.name}? Puedes escribir una nota interna (opcional). La persona no recibe correo.`, { ok: 'Rechazar', danger: true, placeholder: 'Nota interna (opcional)' });
+        if (note === null) return;
+        if (!live()) { x.status = 'rechazada'; x.note = note.trim() || undefined; x.reviewed_at = new Date().toISOString(); paintReqs(); badge(); return toast(`${notLive()}: rechazada solo en esta pantalla.`); }
+        await staffApi(`columnist_requests?id=eq.${x.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'rechazada', note: note.trim() || null, ...stamp() }) });
+        toast('Solicitud rechazada.');
+      }
+      await loadReqs();
+    });
+    $<HTMLFormElement>('[data-cl-invite]').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fm = e.target as HTMLFormElement, g = (n: string) => (fm.elements.namedItem(n) as HTMLInputElement).value.trim();
+      const err = (m: string) => { const el = $('[data-cl-ierr]'); el.textContent = m; el.hidden = !m; };
+      if (g('iname').length < 3) return err('Escribe su nombre completo.');
+      if (!/^\S+@\S+\.\S+$/.test(g('imail'))) return err('Escribe un correo válido.');
+      const btn = $<HTMLButtonElement>('[data-cl-isend]'); btn.disabled = true; err('');
+      const problem = await makeColumnist(g('iname').replace(/\s+/g, ' '), g('imail').toLowerCase(), g('irole'), null, 'invitacion');
+      btn.disabled = false;
+      if (problem) return err(problem);
+      fm.hidden = true; toast(`Invitación enviada a ${g('imail')}. Su perfil quedó apagado: enciéndelo cuando salga su primera columna.`);
+    });
+    // The menu's count shows from the start (administrator, Editor en jefe, Editor)
+    if (canReview()) void loadReqs();
+    let lastRole = role();
+    addEventListener('nc-staff-change', () => { const r = role(); if (r !== lastRole) { lastRole = r; reqs = []; downs = []; asked = false; } if (canReview() && !asked) void loadReqs(); });
+
     // Load the first time the tab opens
     const pane = root.closest<HTMLElement>('[data-pane]');
     let loaded = false;
-    const check = () => { if (pane && !pane.hidden && !loaded) { loaded = true; void load(); } };
+    const check = () => { if (pane && !pane.hidden && !loaded) { loaded = true; void load(); void loadReqs(); } };
     if (pane) new MutationObserver(check).observe(pane, { attributes: true, attributeFilter: ['hidden'] });
     check();
   }

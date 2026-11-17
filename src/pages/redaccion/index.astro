@@ -102,6 +102,7 @@ const TABS = [
   ['anuncios', 'Anuncios', '<path d="M3 11v2l13 5V6L3 11z"/><path d="M16 9a3 3 0 0 1 0 6"/>'],
   ['analitica', 'Analítica', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'],
   ['salud', 'Salud del sitio', '<path d="M3 12h4l2-5 4 10 2-5h6"/>'],
+  ['mis-columnas', 'Mis columnas', '<path d="M5 4h11l3 3v13H5z"/><path d="M8 10h8M8 14h8M8 18h5"/>'], // a columnist's own columns (user, 2026-11-17)
   ['columnistas', 'Columnistas', '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M17 3l3 3-5 5"/>'],
   ['referidos', 'Mis referidos', '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>'],
   ['equipo', 'Equipo', '<circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0M16 4a3.5 3.5 0 0 1 0 7M22 20a7 7 0 0 0-4-6.3"/>'],
@@ -133,6 +134,7 @@ const TABS = [
         <option value="ads">Ventas: clientes, anuncios e ingresos</option>
         <option value="reporter">Periodista: escribir sus noticias</option>
         <option value="photo">Fotoperiodista: subir y organizar fotos</option>
+        <option value="columnist">Columnista: escribir sus columnas de Opiniones</option>
       </select>
       </div>
       <p class="cm-err" data-err hidden></p>
@@ -320,7 +322,7 @@ const TABS = [
         <!-- Analítica: real visits from Google Analytics (Edge Function "analitica") -->
         <section class="pnl-pane" data-pane="analitica" hidden>
           {/* Visitas (Google Analytics) or Ingresos (ad sales from the database); Ingresos: administrator and Ventas */}
-          <div class="pnl-range an-switch" role="group" aria-label="Qué ver" data-an-switch hidden><button type="button" data-an-view="visitas" aria-pressed="true">📈 Visitas</button><button type="button" data-an-view="ingresos" aria-pressed="false">💵 Ingresos</button><button type="button" data-an-view="espacios" aria-pressed="false">🧭 Espacios</button></div>
+          <div class="pnl-range an-switch" role="group" aria-label="Qué ver" data-an-switch hidden><button type="button" data-an-view="visitas" aria-pressed="true">Visitas</button><button type="button" data-an-view="ingresos" aria-pressed="false">Ingresos</button><button type="button" data-an-view="espacios" aria-pressed="false">Espacios</button></div>
           <div data-an-visits>
           <header class="sd-head"><div><h1 class="pnl-h">Analítica <span class="sp-demo" data-an-demo hidden>DEMO</span></h1><p class="pnl-muted"><span data-an-real>Visitas reales del sitio, de Google Analytics.</span> <span data-an-at></span></p><p class="pnl-note" data-an-demo hidden><span class="sp-demo">DEMO</span> Números de ejemplo para mostrar cómo funciona esta pestaña. Con el panel real, aquí salen las visitas de Google Analytics.</p></div>
             <div class="pnl-range" role="group" aria-label="Período"><button type="button" data-range="1">Hoy</button><button type="button" data-range="7" aria-pressed="true">7 días</button><button type="button" data-range="28">28 días</button></div></header>
@@ -491,6 +493,29 @@ const TABS = [
         </section>
 
 
+        <!-- Mis columnas: a columnist's own dashboard (user, 2026-11-17): their readers, comments, columns and status -->
+        <section class="pnl-pane mc" data-pane="mis-columnas" hidden>
+          <header class="mc-hero">
+            <span class="mc-av" data-mc-av aria-hidden="true"></span>
+            <div class="mc-hi"><h1 class="pnl-h" data-mc-hi>Mis columnas</h1><p class="pnl-muted">Columnista · Opiniones <span class="sp-demo" data-mc-demo hidden>DEMO</span></p></div>
+            <div class="mc-hero-btns"><button type="button" class="adp-btn" data-mc-new>+ Nueva columna</button><a class="adp-btn ghost-dark" data-mc-profile target="_blank" rel="noopener">Ver mi perfil ↗</a></div>
+          </header>
+          <p class="mc-note-data" data-mc-datanote hidden></p>
+          <div class="mc-kpis" data-mc-kpis></div>
+          <div class="mc-status" data-mc-status></div>
+          <div class="mc-grid">
+            <div class="pnl-card"><h2 class="pnl-h3">Lecturas por día <small class="pnl-muted">últimos 30 días</small></h2><div class="pnl-chart" data-mc-chart></div></div>
+            <div class="mc-side">
+              <div class="pnl-card mc-best" data-mc-best></div>
+              <div class="pnl-card mc-facts" data-mc-facts></div>
+            </div>
+          </div>
+          <h2 class="pnl-h2 mc-h">Tus columnas</h2>
+          <ul class="mc-cols" data-mc-list></ul>
+          <div class="pnl-card"><h2 class="pnl-h3">Lo que comentan tus lectores</h2><ul class="mc-comments" data-mc-comments></ul></div>
+          <p class="pnl-muted pnl-small">Las lecturas cuentan a quien se queda al menos unos segundos en la columna; las de cada día se guardan 30 días. Los comentarios los modera la redacción. Una columna publicada no se puede borrar: si necesitas quitarla, toca «Pedir que se quite» y la redacción decide.</p>
+        </section>
+
         <!-- Columnistas -->
         <section class="pnl-pane" data-pane="columnistas" hidden>
           <Columnists />
@@ -512,7 +537,7 @@ const TABS = [
           <form class="pnl-add" data-add novalidate>
             <input placeholder="Nombre" data-add-name maxlength="30" aria-label="Nombre" />
             <input placeholder={hasBackendBuild ? 'Correo' : 'Correo o @usuario'} data-add-mail maxlength="80" aria-label="Correo" autocapitalize="off" type={hasBackendBuild ? 'email' : 'text'} />
-            <select data-add-role aria-label="Rol"><option value="editor">Editor en jefe</option><option value="desk">Editor</option><option value="ads">Ventas</option><option value="reporter">Periodista</option><option value="manager">Gerente</option><option value="photo">Fotoperiodista</option><option value="admin">Administrador</option></select>
+            <select data-add-role aria-label="Rol"><option value="editor">Editor en jefe</option><option value="desk">Editor</option><option value="ads">Ventas</option><option value="reporter">Periodista</option><option value="manager">Gerente</option><option value="photo">Fotoperiodista</option><option value="columnist">Columnista</option><option value="admin">Administrador</option></select>
             <button type="submit" class="adp-btn">{hasBackendBuild ? 'Invitar' : 'Añadir'}</button>
             <label class="pnl-hide-chk" data-add-hidden-wrap hidden><input type="checkbox" data-add-hidden /> Oculto: solo tú lo ves en el equipo</label>
           </form>
@@ -561,20 +586,23 @@ const TABS = [
     const toast = (m: string) => { const t = $('[data-ptoast]'); t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 3800); };
 
     // ---------- login + roles ----------
-    type Staff = { name: string; role: 'admin' | 'editor' | 'ads' | 'reporter' | 'manager' | 'desk' | 'photo'; canPhotos?: boolean };
+    type Staff = { name: string; role: 'admin' | 'editor' | 'ads' | 'reporter' | 'manager' | 'desk' | 'photo' | 'columnist'; canPhotos?: boolean };
     // 'editor' is the Editor en jefe; 'desk' an Editor: every periodista's stories, not the front page (supabase/editores.sql, user 2026-11-02)
     const MGR_ROLES: Staff['role'][] = ['ads', 'reporter', 'desk', 'editor']; // what a Gerente manages in Equipo
-    const ROLE_NAME = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente', photo: 'Fotoperiodista' };
+    const ROLE_NAME = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente', photo: 'Fotoperiodista', columnist: 'Columnista' };
     const ROLE_TABS: Record<Staff['role'], string[]> = {
       admin: ['inicio', 'memos', 'noticias', 'escribir', 'periodistas', 'fotos', 'ventas', 'comentarios', 'anuncios', 'analitica', 'salud', 'columnistas', 'equipo', 'personal', 'ajustes'],
       editor: ['inicio', 'memos', 'noticias', 'escribir', 'periodistas', 'fotos', 'referidos', 'comentarios', 'analitica', 'salud', 'columnistas', 'equipo'], // Equipo: read only (user, 2026-11-03)
       ads: ['inicio', 'memos', 'ventas', 'anuncios'], // each ad's own numbers are in Ventas → Mis anuncios (📊) // comment moderation is the newsroom's (the database allows it for admin and editor only)
       reporter: ['inicio', 'memos', 'escribir', 'fotos', 'referidos'],
-      desk: ['inicio', 'memos', 'noticias', 'escribir', 'periodistas', 'fotos', 'referidos', 'comentarios', 'analitica'], // a periodista's tabs, plus approving every story (Noticias, Escribir) and the comments (user, 2026-11-03); no front page or analytics
+      desk: ['inicio', 'memos', 'noticias', 'escribir', 'periodistas', 'fotos', 'referidos', 'comentarios', 'analitica', 'columnistas'], // Columnistas: approves and invites columnists (user, 2026-11-17) // a periodista's tabs, plus approving every story (Noticias, Escribir) and the comments (user, 2026-11-03); no front page or analytics
       photo: ['inicio', 'memos', 'fotos'], // Fotoperiodista: the photo library (upload, albums, editing)
+      columnist: ['mis-columnas', 'escribir'], // Columnista (supabase/columnistas-solicitudes.sql): Opiniones columns only; an editor approves each one
       manager: ['inicio', 'memos', 'noticias', 'periodistas', 'ventas', 'comentarios', 'anuncios', 'analitica', 'salud', 'equipo', 'personal'], // Gerente (supabase/gerente.sql, permisos-equipo.sql): sales, invoices, the team; Noticias read only
     };
     const me = () => get<Staff | null>('nc-staff', null);
+    // Columnistas: new requests to be a columnist and take-down requests (Columnists.astro; user, 2026-11-17)
+    addEventListener('nc-col-requests', (e) => { const el = root.querySelector<HTMLElement>('[data-count="columnistas"]'); if (el) el.textContent = (e as CustomEvent).detail ? String((e as CustomEvent).detail) : ''; });
     // Memos not read yet: a count on the menu's «Memos»
     addEventListener('nc-memos-unread', (e) => { const el = root.querySelector<HTMLElement>('[data-count="memos"]'); if (el) el.textContent = (e as CustomEvent).detail ? String((e as CustomEvent).detail) : ''; });
     // Mi perfil, Mi cuenta and the day's list close with a click outside the window (on the dark backdrop)
@@ -693,7 +721,7 @@ const TABS = [
       const s = me(); if (!s) return;
       const allowed = ROLE_TABS[s.role];
       root.dataset.role = s.role; // the Gerente sees Noticias read only (no approve, edit or take-down buttons; CSS)
-      if (!allowed.includes(t)) t = 'inicio';
+      if (!allowed.includes(t)) t = allowed.includes('inicio') ? 'inicio' : allowed[0]; // a Columnista has no Inicio
       tab = t;
       $$('[data-tab]').forEach((b) => { b.hidden = !allowed.includes(b.dataset.tab!); b.setAttribute('aria-current', String(b.dataset.tab === t)); });
       $$('[data-pane]').forEach((p) => (p.hidden = p.dataset.pane !== t));
@@ -1276,7 +1304,155 @@ const TABS = [
       root.querySelectorAll('[data-spd]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
       root.querySelectorAll<HTMLElement>('[data-spd-dev]').forEach((t) => (t.hidden = t.dataset.spdDev !== b.dataset.spd));
     });
+    // ---------- Mis columnas (user, 2026-11-17): a columnist's own dashboard ----------
+    root.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const c = t.closest<HTMLElement>('[data-mc-copy]'); if (c) { void navigator.clipboard?.writeText(c.dataset.mcCopy!).then(() => toast('Enlace copiado.'), () => toast(c.dataset.mcCopy!)); return; }
+      if (t.closest('[data-mc-new]')) { showTab('escribir'); scrollTo({ top: 0 }); document.querySelector<HTMLButtonElement>('[data-wr-new]')?.click(); }
+    });
+    // Ask the newsroom to take a column down (a columnist can't do it; supabase/columnas-quitar.sql)
+    root.addEventListener('click', async (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-mc-down]'); if (!b) return;
+      const reason = await askText(`¿Pedir que se quite «${b.dataset.mcTitle}» del sitio? Cuéntale a la redacción por qué. Un editor decide.`, { ok: 'Enviar pedido', placeholder: 'Por qué quieres quitarla', multiline: true });
+      if (reason === null) return;
+      if (!reason.trim()) { toast('Escribe por qué quieres quitarla.'); return; }
+      if (isDemo() || !hasBackend()) { toast('DEMO: el pedido no se envía.'); return; }
+      b.disabled = true;
+      const r = await staffApi('column_takedowns', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ slug: b.dataset.mcDown, url: b.dataset.mcUrl ?? '', title: (b.dataset.mcTitle ?? '').slice(0, 300), reason: reason.trim().slice(0, 600) }) });
+      if (!r?.ok) { b.disabled = false; toast(r?.status === 404 ? 'Falta preparar la base de datos (supabase/columnas-quitar.sql).' : 'No se pudo enviar. Intenta otra vez.'); return; }
+      toast('Pedido enviado. La redacción decide si la quita.');
+      void paint['mis-columnas']();
+    });
     const paint: Record<string, () => void> = {
+      async 'mis-columnas'() {
+        const s = me(); if (!s) return;
+        const demo = isDemo() || !hasBackend();
+        $$('[data-mc-demo]').forEach((e) => (e.hidden = !demo));
+        $('[data-mc-hi]').textContent = `¡Hola, ${s.name.replace(/^Lcd[oa]\.?\s*/u, '').split(/\s+/)[0] || s.name}!`;
+        $('[data-mc-av]').textContent = s.name.replace(/^Lcd[oa]\.?\s*/u, '').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+        $<HTMLAnchorElement>('[data-mc-profile]').href = `${root.dataset.base!.replace(/\/$/, '')}/opinion/${slugOf(s.name)}/`;
+        // Their published columns: Opiniones stories signed with their name (story ids are the comments' and reads' key)
+        const opinion = PUBLISHED.filter((p) => p.section === SEC_NAME.opiniones && !isGone(p.id));
+        let mine = opinion.filter((p) => p.author === s.name).sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+        // Demo: a guest has no columns of their own, so recent Opiniones columns stand in, only to show the layout
+        const borrowed = demo && !mine.length;
+        if (borrowed) mine = [...opinion].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 6);
+        const ids = mine.map((p) => p.id);
+        const day = (t: number) => new Date(t).toLocaleDateString('en-CA', { timeZone: 'America/Puerto_Rico' });
+        const days30 = Array.from({ length: 30 }, (_, i) => day(Date.now() - (29 - i) * 864e5));
+        // Data: reads per column and day, the week's reads of every Opiniones column (rank), comments, take-down requests, drafts
+        let perDay: Array<{ s: string; d: string; total: number }> = [], week: Record<string, number> = {};
+        let comments: Array<{ story: string; body: string; created_at: string; likes?: number; legacy_author?: string | null; author?: { username?: string } | null }> = [];
+        let asked: Record<string, string> = {}, arts: Array<{ status: string; doc?: { title?: string; note?: string } }> = [];
+        if (demo) {
+          const seed = (t: string) => [...t].reduce((a, c) => a + c.charCodeAt(0), 0);
+          perDay = ids.slice(0, 12).flatMap((id, k) => days30.map((d, i) => ({ s: id, d, total: Math.max(0, Math.round((40 - k * 3) * Math.exp(-((29 - i) % 9) / 3) + (seed(id + d) % 9))) })));
+          week = Object.fromEntries(opinion.map((p) => [p.id, seed(p.id) % 300]));
+          ids.slice(0, 3).forEach((id, i) => (week[id] = 400 - i * 60));
+          comments = ids.slice(0, 3).map((id, i) => ({ story: id, body: ['EJEMPLO: excelente columna, muy necesaria.', 'EJEMPLO: estoy de acuerdo en casi todo. Gracias por escribir.', 'EJEMPLO: ¿cuándo sale la próxima?'][i], created_at: new Date(Date.now() - (i + 1) * 5e6).toISOString(), likes: 12 - i * 4, author: { username: `lector_ejemplo${i + 1}` } }));
+          arts = [{ status: 'review', doc: { title: 'EJEMPLO: columna en revisión' } }, { status: 'draft', doc: { title: 'EJEMPLO: columna devuelta', note: 'Acorta el segundo párrafo.' } }];
+        } else {
+          const anon = { apikey: BACKEND.anonKey, Authorization: `Bearer ${BACKEND.anonKey}`, 'Content-Type': 'application/json' };
+          const [pd, wk, cm, tk, ar] = await Promise.all([
+            ids.length ? fetch(`${BACKEND.url}/rest/v1/rpc/lecturas_por_dia`, { method: 'POST', headers: anon, body: JSON.stringify({ slugs: ids, dias: 30 }) }).then((r) => (r.ok ? r.json() : [])).catch(() => []) : [],
+            fetch(`${BACKEND.url}/rest/v1/rpc/noticias_leidas`, { method: 'POST', headers: anon, body: JSON.stringify({ horas: 168 }) }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+            ids.length ? staffApi(`comments?story=in.(${ids.map((x) => `"${x}"`).join(',')})&status=eq.visible&select=story,body,created_at,likes,legacy_author,author:profiles!comments_user_id_fkey(username)&order=created_at.desc&limit=300`).then((r) => (r?.ok ? r.json() : [])).catch(() => []) : [],
+            staffApi('column_takedowns?select=slug,status&order=created_at.asc').then((r) => (r?.ok ? r.json() : [])).catch(() => []),
+            listArticles().catch(() => null),
+          ]);
+          perDay = (Array.isArray(pd) ? pd : []).map((x: any) => ({ s: x.s, d: String(x.d), total: Number(x.total) }));
+          week = Object.fromEntries((Array.isArray(wk) ? wk : []).map((x: { slug: string; n: number }) => [x.slug, Number(x.n)]));
+          comments = Array.isArray(cm) ? cm : []; arts = ((ar ?? []) as typeof arts).filter((a) => a.status !== 'published');
+          asked = Object.fromEntries((Array.isArray(tk) ? tk : []).map((x: { slug: string; status: string }) => [x.slug, x.status]));
+        }
+        // Daily numbers come from the site's own counter (story pages count since supabase/columnas-quitar.sql). Until
+        // there are some, each column's total is noticel.com's own view count (the story's "views"), said in a note.
+        const daily = perDay.length > 0;
+        const note = $('[data-mc-datanote]');
+        note.hidden = !(borrowed || !daily);
+        note.textContent = borrowed ? 'DEMO: como esta cuenta de ejemplo no tiene columnas, se muestran columnas recientes de Opiniones solo para enseñar cómo se ve. Todos los números son de ejemplo.'
+          : 'Todavía no hay lecturas por día: el contador del sitio empieza a guardarlas ahora. Mientras tanto, el total de cada columna es el de noticel.com.';
+        const reads30 = (id: string) => perDay.filter((x) => x.s === id).reduce((t, x) => t + x.total, 0);
+        const total1 = (id: string) => (daily ? reads30(id) : Number(mine.find((p) => p.id === id)?.views ?? 0));
+        const byDay = days30.map((d) => perDay.filter((x) => x.d === d).reduce((t, x) => t + x.total, 0));
+        const total = daily ? byDay.reduce((a, b) => a + b, 0) : ids.reduce((t, id) => t + total1(id), 0);
+        const last7 = byDay.slice(-7).reduce((a, b) => a + b, 0), prev7 = byDay.slice(-14, -7).reduce((a, b) => a + b, 0);
+        const change = daily && prev7 ? Math.round(((last7 - prev7) / prev7) * 100) : null;
+        const commentsWeek = comments.filter((c) => Date.now() - Date.parse(c.created_at) < 7 * 864e5).length;
+        const monthStart = day(Date.now()).slice(0, 7);
+        const thisMonth = mine.filter((p) => day(Date.parse(p.date)).startsWith(monthStart)).length;
+        // Rank among Opiniones writers this week (by reads)
+        const authors = new Map<string, number>();
+        opinion.forEach((p) => authors.set(p.author, (authors.get(p.author) ?? 0) + (week[p.id] ?? 0)));
+        const order = [...authors.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+        const myRank = borrowed ? 2 : order.findIndex(([a]) => a === s.name) + 1;
+        // Opiniones columns ranked by this week's reads (the "#1 en Opiniones" chips)
+        const colRank = opinion.map((p) => p.id).filter((id) => (week[id] ?? 0) > 0).sort((a, b) => (week[b] ?? 0) - (week[a] ?? 0));
+        // Streak: weeks in a row (counting back from this one) with at least one column
+        const wk0 = (t: number) => Math.floor((t - 4 * 864e5) / (7 * 864e5)); // weeks start on Monday
+        const weeks = new Set(mine.map((p) => wk0(Date.parse(p.date))));
+        let streak = 0; for (let w = wk0(Date.now()); weeks.has(w) || (w === wk0(Date.now()) && weeks.has(w - 1)); w--) { if (weeks.has(w)) streak++; else if (w !== wk0(Date.now())) break; }
+        const avg = mine.length ? Math.round(ids.reduce((t, id) => t + total1(id), 0) / mine.length) : 0;
+        const ex = demo ? 'DEMO · ' : '';
+        const tile = (label: string, value: string, sub = '', tone = '') => `<div class="mc-kpi ${tone}"><span class="mc-kl">${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+        $('[data-mc-kpis]').innerHTML = [
+          tile('Lecturas', num(total), `${ex}${daily ? 'últimos 30 días' : 'en total, según noticel.com'}`),
+          tile('Esta semana', daily ? num(last7) : '—', !daily ? `${ex}sin lecturas por día todavía` : change === null ? `${ex}lecturas en 7 días` : `${ex}${change >= 0 ? '▲' : '▼'} ${Math.abs(change)}% vs. la semana anterior`, change === null ? '' : change >= 0 ? 'up' : 'down'),
+          tile('Puesto en Opiniones', myRank ? `#${myRank}` : '—', myRank ? `${ex}de ${Math.max(order.length, myRank)} columnistas esta semana` : `${ex}aún sin lecturas esta semana`, myRank && myRank <= 3 ? 'up' : ''),
+          tile('Comentarios', num(comments.length), `${ex}${commentsWeek} esta semana`),
+          tile('Columnas', num(mine.length), `${borrowed ? 'DEMO · ' : ''}${thisMonth} este mes`),
+          tile('Racha', streak ? String(streak) : '—', `${borrowed ? 'DEMO · ' : ''}${streak ? `${streak === 1 ? 'semana' : 'semanas seguidas'} publicando` : 'publica esta semana para empezar una'}`),
+          tile('Promedio', num(avg), `${ex}lecturas por columna`),
+        ].join('');
+        // Their columns waiting: in review, sent back with a note, drafts
+        const rev = arts.filter((a) => a.status === 'review').length, back = arts.filter((a) => a.status === 'draft' && a.doc?.note?.trim()), drafts = arts.filter((a) => a.status === 'draft' && !a.doc?.note?.trim()).length;
+        $('[data-mc-status]').innerHTML = (rev || back.length || drafts) ? `
+          <button type="button" class="mc-st" data-go="escribir"><b>${rev}</b><span>en revisión</span></button>
+          <button type="button" class="mc-st ${back.length ? 'warn' : ''}" data-go="escribir"><b>${back.length}</b><span>devueltas con notas</span></button>
+          <button type="button" class="mc-st" data-go="escribir"><b>${drafts}</b><span>borradores</span></button>
+          ${back[0] ? `<p class="mc-note">Nota de la redacción en «${esc(back[0].doc?.title ?? '')}»: ${esc(back[0].doc?.note ?? '')}</p>` : ''}` : '';
+        // Chart (only with daily numbers)
+        const chart = $('[data-mc-chart]');
+        if (daily) barChart(chart, days30.map((d, i) => ({ label: new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' }), value: byDay[i], tip: `${new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'long', day: 'numeric', month: 'short' })}: ${num(byDay[i])} lecturas${demo ? ' (DEMO)' : ''}` })), (n) => num(n));
+        else { charts.delete(chart); chart.innerHTML = '<p class="pnl-muted">La gráfica aparece cuando el sitio tenga lecturas por día de tus columnas.</p>'; }
+        // Best column and facts
+        const best = [...ids].sort((a, b) => total1(b) - total1(a))[0];
+        const bp = mine.find((p) => p.id === best);
+        $('[data-mc-best]').innerHTML = bp && total1(best) ? `<h2 class="pnl-h3">Tu columna más leída</h2><a class="mc-best-t" href="${esc(bp.url)}" target="_blank" rel="noopener">${esc(bp.title)}</a><p class="mc-best-n"><b>${num(total1(best))}</b> lecturas${daily ? ' en 30 días' : ''} · <b>${num(comments.filter((c) => c.story === best).length)}</b> comentarios${demo ? ' · DEMO' : ''}</p>`
+          : '<h2 class="pnl-h3">Tu columna más leída</h2><p class="pnl-muted">Aparece aquí cuando tus columnas tengan lectores.</p>';
+        const DOW = ['domingos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados'];
+        const dow = Array(7).fill(0); days30.forEach((d, i) => (dow[new Date(`${d}T12:00:00`).getDay()] += byDay[i]));
+        const topDow = dow.indexOf(Math.max(...dow));
+        $('[data-mc-facts]').innerHTML = `<h2 class="pnl-h3">Datos curiosos${demo ? ' <span class="sp-demo">DEMO</span>' : ''}</h2><ul class="mc-fact-list">
+          <li>${daily && total ? `Tus lectores leen más los <b>${DOW[topDow]}</b>.` : 'Pronto sabrás qué día te leen más.'}</li>
+          <li>${comments.length ? `Tu columna más comentada tiene <b>${num(Math.max(...ids.map((id) => comments.filter((c) => c.story === id).length)))}</b> comentarios.` : 'Todavía no hay comentarios: invita a tus lectores a opinar.'}</li>
+          <li>Comparte tus columnas en tus redes: los lectores que llegan por ti cuentan en tus números.</li>
+          ${mine.length && !borrowed ? `<li>Has publicado <b>${num(mine.length)}</b> ${mine.length === 1 ? 'columna' : 'columnas'} en NotiCel.</li>` : ''}
+        </ul>`;
+        // Column cards: trend line (last 14 days), reads, comments, rank, share buttons
+        const spark = (id: string) => {
+          if (!daily) return '';
+          const v = days30.slice(-14).map((d) => perDay.filter((x) => x.s === id && x.d === d).reduce((t, x) => t + x.total, 0));
+          const mx = Math.max(...v, 1), W = 120, H = 32;
+          const pts = v.map((n, i) => `${(i / (v.length - 1)) * W},${H - 2 - (n / mx) * (H - 4)}`).join(' ');
+          return `<svg class="mc-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Lecturas de los últimos 14 días"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+        };
+        const share = (p: { url: string; title: string }) => { const full = new URL(p.url, location.origin).toString(), u = encodeURIComponent(full), t = encodeURIComponent(p.title);
+          return `<div class="mc-share" role="group" aria-label="Compartir"><a href="https://wa.me/?text=${t}%20${u}" target="_blank" rel="noopener">WhatsApp</a><a href="https://www.facebook.com/sharer/sharer.php?u=${u}" target="_blank" rel="noopener">Facebook</a><a href="https://x.com/intent/post?text=${t}&url=${u}" target="_blank" rel="noopener">X</a><button type="button" data-mc-copy="${esc(full)}">Copiar enlace</button></div>`; };
+        $('[data-mc-list]').innerHTML = mine.length ? mine.map((p) => {
+          const rk = colRank.indexOf(p.id) + 1, nc = comments.filter((c) => c.story === p.id).length;
+          return `<li class="mc-col">
+            <div class="mc-col-top"><a class="mc-col-t" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>${rk && rk <= 3 ? `<span class="mc-rank">#${rk} en Opiniones esta semana</span>` : ''}</div>
+            <small class="pnl-muted">${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' })}${demo ? ' · números DEMO' : ''}</small>
+            <div class="mc-col-nums"><span><b>${num(total1(p.id))}</b> ${daily ? 'lecturas (30 días)' : 'lecturas en total'}</span>${daily ? `<span><b>${num(week[p.id] ?? 0)}</b> esta semana</span>` : ''}<span><b>${num(nc)}</b> comentarios</span>${spark(p.id)}</div>
+            <div class="mc-col-foot">${share(p)}${asked[p.id] === 'pedida' ? '<span class="pnl-chip warn">Pediste quitarla</span>' : asked[p.id] === 'mantenida' ? '<span class="pnl-chip">La redacción la mantuvo</span>' : `<button type="button" class="pnl-link mc-down" data-mc-down="${esc(p.id)}" data-mc-url="${esc(new URL(p.url, location.origin).pathname)}" data-mc-title="${esc(p.title)}">Pedir que se quite</button>`}</div>
+          </li>`; }).join('')
+          : '<li class="mc-empty"><b>Todavía no tienes columnas publicadas.</b><span>Escribe la primera: la redacción la revisa y te avisa.</span><button type="button" class="adp-btn" data-mc-new>+ Nueva columna</button></li>';
+        const titleOf = (id: string) => mine.find((p) => p.id === id)?.title ?? '';
+        $('[data-mc-comments]').innerHTML = comments.slice(0, 30).map((c) => { const u = c.author?.username ? `@${c.author.username}` : c.legacy_author || 'Lector';
+          return `<li><span class="mc-cav" aria-hidden="true">${esc(u.replace('@', '')[0]?.toUpperCase() ?? 'L')}</span><div><small><b>${esc(u)}</b> · ${ago(Date.parse(c.created_at))} · en «${esc(titleOf(c.story))}»${c.likes ? ` · ${num(c.likes)} me gusta` : ''}${demo ? ' · DEMO' : ''}</small><p>${esc(c.body)}</p></div></li>`; }).join('')
+          || '<li class="pnl-muted">Todavía no hay comentarios en tus columnas.</li>';
+      },
       inicio() {
         const s = me()!; const c = counts(); const allowed = ROLE_TABS[s.role];
         const h = new Date().getHours(); $$('[data-me]').forEach((e) => (e.textContent = s.name));
@@ -1468,7 +1644,7 @@ const TABS = [
           const locked = !!x?.hidden; // the owner, seen by another administrator: no tools
           // The administrator's tools for this person, behind the edit (pencil) button
           const canEdit = hasBackend() && (isAdm || (isMgr && mgrCan(m.role))) && !self && m.id && !locked;
-          const tools = canEdit ? `${isAdm || isMgr ? `<label class="pnl-team-role">Rol<select data-role-set="${i}" aria-label="Rol de ${esc(m.name)}">${(isAdm ? ['admin', 'manager', 'editor', 'desk', 'ads', 'reporter', 'photo'] as const : MGR_ROLES).map((r) => `<option value="${r}" ${r === m.role ? 'selected' : ''}>${ROLE_NAME[r]}</option>`).join('')}</select></label>` : ''}
+          const tools = canEdit ? `${isAdm || isMgr ? `<label class="pnl-team-role">Rol<select data-role-set="${i}" aria-label="Rol de ${esc(m.name)}">${(isAdm ? ['admin', 'manager', 'editor', 'desk', 'ads', 'reporter', 'photo', 'columnist'] as const : MGR_ROLES).map((r) => `<option value="${r}" ${r === m.role ? 'selected' : ''}>${ROLE_NAME[r]}</option>`).join('')}</select></label>` : ''}
             <button type="button" class="pnl-link" data-team-pw="${i}">${x && !x.accepted ? 'Reenviar invitación' : 'Enviar enlace de contraseña'}</button>
             ${iAmOwner && m.role === 'admin' && x?.accepted ? `<button type="button" class="pnl-link" data-owner-set="${i}" data-owner-to="${x?.owner ? '0' : '1'}">${x?.owner ? 'Quitar dueño' : 'Hacer dueño'}</button>` : ''}
             ${iAmOwner && !x?.owner ? `<button type="button" class="pnl-link" data-hide-set="${i}" data-hide-to="${x?.invisible ? '0' : '1'}">${x?.invisible ? 'Mostrar al equipo' : 'Ocultar del equipo'}</button>` : ''}` : '';
@@ -1492,7 +1668,10 @@ const TABS = [
           ['Manejar el equipo', [true, false, false, false, false]],
         ];
         can.forEach((row) => { if (row[1].length === 4) row[1].push(false); }); // the Fotoperiodista column
-        $('[data-perms]').innerHTML = `<table class="pnl-table perms"><thead><tr><th></th><th>Admin</th><th>Editor</th><th>Ventas</th><th>Periodista</th><th>Fotoperiodista</th></tr></thead><tbody>${can.map(([k, v]) => `<tr><th scope="row">${k}</th>${v.map((x) => `<td>${x === 'if-allowed' ? '<span title="Solo si el administrador lo permite en Equipo">Si se le permite</span>' : x ? '✓' : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        // Columnista (user, 2026-11-17): writes Opiniones columns only (an editor approves each one) and sees Mis columnas
+        can.splice(2, 0, ['Escribir columnas de Opiniones', [true, true, false, false, false]], ['Aprobar e invitar columnistas', [true, true, false, false, false]]);
+        can.forEach((row) => row[1].push(row[0] === 'Escribir columnas de Opiniones'));
+        $('[data-perms]').innerHTML = `<table class="pnl-table perms"><thead><tr><th></th><th>Admin</th><th>Editor</th><th>Ventas</th><th>Periodista</th><th>Fotoperiodista</th><th>Columnista</th></tr></thead><tbody>${can.map(([k, v]) => `<tr><th scope="row">${k}</th>${v.map((x) => `<td>${x === 'if-allowed' ? '<span title="Solo si el administrador lo permite en Equipo">Si se le permite</span>' : x ? '✓' : '—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
       },
     };
 
@@ -1871,8 +2050,8 @@ const TABS = [
       e.preventDefault(); const err = $('[data-pp-err]'); err.hidden = true;
       const name = me()?.name ?? '';
       if (ppVal('bio').length < 20) { err.textContent = 'Escribe una biografía corta (al menos una oración).'; err.hidden = false; return; }
-      const res = await saveColumnist({ slug: profRow?.slug ?? slugOf(name), name, role: ppVal('role') || 'Periodista', bio: ppVal('bio'), photo: profPhoto || null, active: profRow?.active ?? true, sort: profRow?.sort ?? 50,
-        kind: profRow?.kind ?? 'periodista', owner: profRow?.owner ?? tokenInfo().id });
+      const res = await saveColumnist({ slug: profRow?.slug ?? slugOf(name), name, role: ppVal('role') || (me()?.role === 'columnist' ? 'Columnista' : 'Periodista'), bio: ppVal('bio'), photo: profPhoto || null, active: profRow?.active ?? true, sort: profRow?.sort ?? 50,
+        kind: profRow?.kind ?? (me()?.role === 'columnist' ? 'columnista' : 'periodista'), owner: profRow?.owner ?? tokenInfo().id });
       if (res) { err.textContent = /administrador o editor|error 400/.test(res) ? 'Falta un paso en la base de datos (supabase/perfiles.sql). Avísale al administrador.' : res; err.hidden = false; return; }
       prof.close(); toast('Perfil guardado. Sale en el sitio en unos minutos.');
     });

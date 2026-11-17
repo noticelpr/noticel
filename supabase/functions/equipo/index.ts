@@ -14,6 +14,8 @@
 // A Gerente (role 'manager', supabase/gerente.sql) can use it for Ventas, periodistas and editors (user, 2026-11-02;
 // not administrators or other Gerentes): invite them, send them
 // password links, and see their status.
+// Columnists (user, 2026-11-17; supabase/columnistas-solicitudes.sql): the Editor en jefe and the Editors approve
+// requests and invite columnists from panel → Columnistas; they may invite that role only, with its own two emails.
 //
 // Deploy: Supabase → Edge Functions → Deploy a new function → Via Editor → name "equipo" → paste this file.
 // Uses the RESEND_API_KEY secret (already there for "correos"); SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are built in.
@@ -28,7 +30,7 @@ const CF_ACCOUNT = ''; // NotiCel's Cloudflare account id goes in the CF_ACCOUNT
 const CF_POLICY = 'Equipo NotiCel';
 // What a Gerente can manage: everyone but administrators and Gerentes
 const MGR_ROLES = ['ads', 'reporter', 'desk', 'editor'];
-const ROLES: Record<string, string> = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente', photo: 'Fotoperiodista' };
+const ROLES: Record<string, string> = { admin: 'Administrador', editor: 'Editor en jefe', desk: 'Editor', ads: 'Ventas', reporter: 'Periodista', manager: 'Gerente', photo: 'Fotoperiodista', columnist: 'Columnista' };
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 const out = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -70,7 +72,9 @@ Deno.serve(async (req) => {
     // The Editor en jefe only reads the newsroom's status (Equipo, read only; user 2026-11-03)
     const chief = row?.role === 'editor';
     const peek = await req.clone().json().catch(() => ({}));
-    if (row?.role !== 'admin' && !manager && !(chief && peek.action === 'status')) return out({ error: 'Solo el administrador puede hacer esto.' }, 403);
+    // The Editor en jefe and the Editors approve columnists (panel → Columnistas → Solicitudes): they may invite that role only (user, 2026-11-17)
+    const newsroomColumnist = ['editor', 'desk'].includes(row?.role) && peek.action === 'invite' && peek.role === 'columnist';
+    if (row?.role !== 'admin' && !manager && !(chief && peek.action === 'status') && !newsroomColumnist) return out({ error: 'Solo el administrador puede hacer esto.' }, 403);
     const roleOf = async (id: string) => (await (await fetch(`${base}/rest/v1/staff?user_id=eq.${id}&select=role`, { headers: admin })).json())[0]?.role as string | undefined;
     const iAmOwner = !!row?.is_owner; // supabase/dueno.sql
     const owners = new Set(((await (await fetch(`${base}/rest/v1/staff?is_owner=eq.true&select=user_id`, { headers: admin })).json()) ?? []).map((x: { user_id: string }) => x.user_id));
@@ -139,13 +143,16 @@ Deno.serve(async (req) => {
       }
       // A Gerente can't change someone who is already on the team with another role
       if (manager) { const had = await roleOf(uid); if (had && !MGR_ROLES.includes(had)) return out({ error: 'Esa persona es administrador o Gerente. Solo el administrador la puede cambiar.' }, 403); }
+      if (newsroomColumnist) { const had = await roleOf(uid); if (had && had !== 'columnist') return out({ error: 'Esa persona ya es parte del equipo con otro rol. Pídele al administrador que la cambie.' }, 403); }
       const add = await fetch(`${base}/rest/v1/staff?on_conflict=user_id`, { method: 'POST', headers: { ...admin, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: uid, name, role, ...(iAmOwner && body.hidden === true ? { hidden: true } : {}) }) });
       if (!add.ok) return out({ error: 'Se invitó, pero no se pudo dar el rol. Intenta otra vez.' }, 500);
       link ??= await makeLink('recovery', email);
       if (!link) return out({ error: 'Se dio el rol, pero no se pudo crear el enlace. Envía la invitación otra vez.' }, 500);
-      await mail(email, 'Te invitaron al equipo de NotiCel', `Hola ${name}:`, invited(role), 'Crear mi contraseña', `${link.href}&bienvenida=1`);
+      if (role === 'columnist' && body.reason === 'invitacion') await mail(email, 'Te invitamos a escribir en NotiCel', `Hola ${name}:`, COLUMNIST_INVITE, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
+      else if (role === 'columnist') await mail(email, '¡Tu solicitud para ser columnista fue aprobada!', `Hola ${name}:`, COLUMNIST_OK, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
+      else await mail(email, 'Te invitaron al equipo de NotiCel', `Hola ${name}:`, invited(role), 'Crear mi contraseña', `${link.href}&bienvenida=1`);
       const access = await syncAccess().catch(() => 'error'); // the new person can open the panel right away
-      return out({ ok: true, existing, access });
+      return out({ ok: true, existing, access, id: uid }); // id: Columnistas links the new profile to this account (owner)
     }
 
     if (body.action === 'reset_password') {
@@ -175,6 +182,10 @@ async function makeLink(type: 'invite' | 'recovery', email: string, data?: Recor
   return hash ? { id, href: `${PANEL}?token_hash=${encodeURIComponent(hash)}&type=${type}` } : null;
 }
 const GATE = 'Primero se abrirá una página de Cloudflare: escribe este mismo correo y te enviaremos un código para entrar. Abre el enlace en el navegador donde vas a trabajar. Si el enlace venció, pide que te lo envíen otra vez.';
+// Approved columnist (user, 2026-11-17): their request from the Opiniones page was approved; they create their account here
+const COLUMNIST_OK = '¡Felicidades! La redacción de NotiCel aprobó tu solicitud para ser <b>columnista</b> de la sección de Opiniones. Toca el botón para crear tu cuenta y tu contraseña. Desde tu cuenta podrás enviar tus columnas (la redacción las revisa antes de publicarlas) y ver cuántas personas las leen y sus comentarios. ' + GATE;
+// Invited by the newsroom without a request (panel → Columnistas → Invitar a un columnista)
+const COLUMNIST_INVITE = 'La redacción de NotiCel te invita a ser <b>columnista</b> de nuestra sección de Opiniones. Nos gustaría publicar tu voz y tu experiencia. Toca el botón para crear tu cuenta y tu contraseña. Desde tu cuenta podrás enviar tus columnas (la redacción las revisa antes de publicarlas) y ver cuántas personas las leen y sus comentarios. ' + GATE;
 const invited = (role: string) => `Te invitaron a ser parte del equipo de NotiCel como <b>${ROLES[role]}</b>. Toca el botón para crear tu contraseña. ${GATE}`;
 
 /** Every NotiCel email has the same look (user, 2026-11-03): a white card on a light gray page, the logo (with

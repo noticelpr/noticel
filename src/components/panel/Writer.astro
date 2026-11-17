@@ -71,7 +71,7 @@ const TOOLS = [
       <div class="wr-main">
         <textarea class="wr-title" data-f="title" rows="1" maxlength="140" placeholder="Titular" aria-label="Titular"></textarea>
         <p class="wr-count" data-cnt="title"></p>
-        <details class="wr-titleb"><summary>Probar un segundo titular (opcional)</summary>
+        <details class="wr-titleb" data-col-hide><summary>Probar un segundo titular (opcional)</summary>
           <input class="wr-titleb-in" data-f="titleB" maxlength="140" placeholder="Otro titular para la misma noticia: mismo hecho, otro enfoque" aria-label="Segundo titular" />
           <p class="pnl-muted pnl-small">Durante 3 días, la mitad de los lectores ve este titular en las portadas y secciones. El que reciba más clics se queda solo. Analítica → Espacios muestra el resultado.</p>
         </details>
@@ -94,7 +94,7 @@ const TOOLS = [
           </div>
         </div>
 
-        <details class="wr-gal" data-wr-gal>
+        <details class="wr-gal" data-wr-gal data-col-hide>
           <summary><b>Galería de fotos</b> <span class="pnl-muted pnl-small" data-gal-n>(opcional)</span></summary>
           <p class="pnl-muted pnl-small">Fotos adicionales: en la noticia se ven en una presentación junto a la foto principal (se deslizan en el celular). Cada una lleva su pie y su crédito.</p>
           <ul class="wr-gal-list" data-gal-list></ul>
@@ -110,7 +110,7 @@ const TOOLS = [
       </div>
 
       <aside class="wr-side">
-        <div class="pnl-card"><h2 class="pnl-h3">Publicación</h2>
+        <div class="pnl-card" data-col-hide><h2 class="pnl-h3">Publicación</h2>
           <label>Sección<select data-f="section">{secs.map((s) => <option value={s.id}>{s.name}</option>)}</select></label>
           <label>Lugar<input data-f="place" list="wr-towns" maxlength="60" placeholder="San Juan" /></label>
           <datalist id="wr-towns">{PR_MUNICIPIOS.map((t) => <option value={t} />)}<option value="Puerto Rico" /><option value="Washington" /><option value="Nueva York" /><option value="Orlando, Florida" /></datalist>
@@ -118,7 +118,7 @@ const TOOLS = [
           <label>Fecha y hora de publicación<input type="datetime-local" data-f="date" /></label>
           <p class="pnl-muted pnl-small">Déjala en el pasado o ahora para publicar ya; ponla en el futuro para programarla.</p>
         </div>
-        <div class="pnl-card wr-social"><h2 class="pnl-h3">Redes sociales</h2>
+        <div class="pnl-card wr-social" data-col-hide><h2 class="pnl-h3">Redes sociales</h2>
           <label class="adb-check"><input type="checkbox" data-sc="ig" /> Instagram: imagen y texto automáticos</label>
           <div class="wr-ig" data-ig-box hidden>
             <canvas class="wr-ig-prev" data-ig-canvas width="1080" height="1350" aria-label="Imagen para Instagram"></canvas>
@@ -141,20 +141,20 @@ const TOOLS = [
           <label class="adb-check"><input type="checkbox" data-f="sectionLead" /> Principal de su sección</label>
           <label class="adb-check"><input type="checkbox" data-f="live" /> En vivo / en desarrollo</label>
         </div>
-        <div class="pnl-card"><h2 class="pnl-h3">Fuentes</h2>
+        <div class="pnl-card" data-col-hide><h2 class="pnl-h3">Fuentes</h2>
           <ul class="wr-srcs" data-srcs></ul>
           <div class="wr-addsrc"><input data-src-name placeholder="Nombre (ej. Policía de PR)" aria-label="Nombre de la fuente" /><input data-src-url type="url" placeholder="Enlace (opcional)" aria-label="Enlace de la fuente" /><button type="button" class="pnl-link" data-src-add>Añadir</button></div>
         </div>
-        <div class="pnl-card"><h2 class="pnl-h3">Noticias relacionadas</h2>
+        <div class="pnl-card" data-col-hide><h2 class="pnl-h3">Noticias relacionadas</h2>
           <p class="pnl-muted pnl-small">Salen al final de la noticia. Escoge las que quieras (hasta 6).</p>
           <ul class="wr-srcs wr-rels" data-rels></ul>
           <input type="search" class="wr-rel-q" data-rel-q placeholder="Buscar noticias publicadas…" aria-label="Buscar noticias relacionadas" />
           <ul class="wr-rel-res" data-rel-res></ul>
         </div>
-        <div class="pnl-card"><h2 class="pnl-h3">Corrección</h2>
+        <div class="pnl-card" data-col-hide><h2 class="pnl-h3">Corrección</h2>
           <textarea data-f="correction" rows="2" maxlength="300" placeholder="Solo si corriges algo ya publicado: qué se corrigió y cuándo"></textarea>
         </div>
-        <div class="pnl-card"><h2 class="pnl-h3">NotiCel Fact Check</h2>
+        <div class="pnl-card" data-col-hide><h2 class="pnl-h3">NotiCel Fact Check</h2>
           <p class="pnl-muted pnl-small">Solo si esta noticia verifica algo que circula (una frase, un video, un rumor). Sale en la caja “NotiCel Fact Check” del sitio.</p>
           <select data-f="factCheck" aria-label="Veredicto">
             <option value="">No es un fact check</option>
@@ -167,7 +167,7 @@ const TOOLS = [
           <textarea data-f="factClaim" rows="2" maxlength="200" placeholder="Lo que se verificó, en una frase (ej.: «La AEE subirá la luz 50% en enero»)"></textarea>
         </div>
         <div class="pnl-card"><h2 class="pnl-h3">Antes de publicar</h2><ul class="pnl-checks" data-checks></ul></div>
-        <div class="pnl-card"><h2 class="pnl-h3">Archivo</h2>
+        <div class="pnl-card" data-col-hide><h2 class="pnl-h3">Archivo</h2>
           <p class="pnl-muted pnl-small">La noticia como archivo del sitio (Markdown).</p>
           <button type="button" class="pnl-link" data-dl>Descargar archivo</button>
           <details class="wr-md"><summary>Ver el archivo</summary><textarea readonly rows="10" data-md></textarea></details>
@@ -245,7 +245,7 @@ const TOOLS = [
   import { embedFor } from '../../lib/embeds.mjs';
   import { docCard } from '../../lib/doccard.mjs';
   import { ask, askText } from '../../lib/dialogs';
-  import { logActivity, hasBackend, repoRead, listArticles, putArticle, deleteArticle, uploadStoryFile, publishArticle, lastSaveError, logPanelError, getAnalytics, queueSocial, staffApi } from '../../lib/backend';
+  import { logActivity, hasBackend, repoRead, listArticles, putArticle, deleteArticle, uploadStoryFile, publishArticle, lastSaveError, logPanelError, getAnalytics, queueSocial, staffApi, deleteStoryForever } from '../../lib/backend';
   import { isDemo, demoAnalytics } from '../../lib/demo';
   import { REPO, BRANCH } from '../../lib/repo';
   import { listRequests, loadRequests } from '../../lib/adrequests';
@@ -288,6 +288,7 @@ const TOOLS = [
     const toast = (m: string) => { const t = $('[data-wr-toast]'); t.textContent = m; t.hidden = false; clearTimeout((t as any).tm); (t as any).tm = setTimeout(() => (t.hidden = true), 4000); };
     const me = () => { try { return JSON.parse(localStorage.getItem('nc-staff') || 'null') as { name: string; role: string } | null; } catch { return null; } };
     const canPublish = () => ['admin', 'editor', 'desk'].includes(me()?.role ?? ''); // desk: an Editor (their periodistas' stories only; supabase/editores.sql)
+    const columnist = () => me()?.role === 'columnist'; // Columnista (user, 2026-11-17): Opiniones only, signed with their own name
     // With Supabase (src/lib/backend.ts) articles are shared by the team; without it they stay on this device ('nc-articles')
     const DB = hasBackend();
     const DEMO = isDemo(); // sample stories, nothing is published (src/lib/demo.ts)
@@ -338,6 +339,7 @@ const TOOLS = [
     let tab: Art['status'] = 'draft';
     function renderList() {
       const s = me(); const all = load().filter((a) => canPublish() || DB || a.owner === s?.name); // periodistas see their own (with the database, it only sends them their own)
+      $('[data-wr-new]').textContent = columnist() ? '+ Nueva columna' : '+ Nueva noticia';
       (['draft', 'review', 'scheduled', 'published'] as const).forEach((k) => { const n = all.filter((a) => a.status === k).length; $(`[data-wn="${k}"]`).textContent = n ? String(n) : ''; });
       const pubs = publishedList();
       $('[data-wn="published"]').textContent = pubs.length ? String(pubs.length) : '';
@@ -362,8 +364,49 @@ const TOOLS = [
       const local = mineHere.map((a) => ({ id: a.id, title: a.title || 'Sin titular', section: SECS.find((x) => x.id === a.section)?.name ?? '', author: a.author || a.owner,
         date: new Date(a.date || a.updated).toISOString(), url: a.slug ? `${BASE}${pathOf(a)}` : '', ai: false, local: !DB }));
       const slugs = new Set(mineHere.map((a) => a.slug).filter(Boolean));
-      return [...local, ...PUBLISHED.filter((p) => !slugs.has(p.id))].filter(mine);
+      const gone = goneIds();
+      return [...local, ...PUBLISHED.filter((p) => !slugs.has(p.id))].filter(mine).filter((p) => !gone.has(p.id));
     }
+    // Stories just taken off the site or deleted (the panel's 'nc-story-fix', kept 2 hours until the site rebuilds)
+    function goneIds(): Set<string> {
+      try { const f = JSON.parse(localStorage.getItem('nc-story-fix') || '{}') as Record<string, { gone?: boolean; at: number }>; return new Set(Object.keys(f).filter((k) => f[k].gone && Date.now() - f[k].at < 2 * 36e5)); } catch { return new Set(); }
+    }
+    const markGone = (id: string) => { try { const f = JSON.parse(localStorage.getItem('nc-story-fix') || '{}'); f[id] = { ...f[id], gone: true, at: Date.now() }; localStorage.setItem('nc-story-fix', JSON.stringify(f)); } catch { /* storage blocked */ } };
+    // Publicadas → the trash can (user, 2026-11-17), editors and the administrator: take a story off the site (it stays in
+    // Borradores) or, the administrator only, delete it for good. Same actions as Noticias → Publicadas.
+    const TRASH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+    const trashFor = (p: Pub, mineArt: boolean) => {
+      if (!canPublish() || !p.url || p.local) return '';
+      const slug = mineArt ? load().find((a) => a.id === p.id)?.slug : p.id; if (!slug) return '';
+      return `<details class="wr-trash" data-tr-slug="${esc(slug)}"><summary title="Quitar o borrar" aria-label="Quitar o borrar «${esc(p.title)}»">${TRASH}</summary><div class="wr-trash-pop"><button type="button" class="pnl-link" data-tr-down>Quitar del sitio <small>queda en Borradores</small></button>${me()?.role === 'admin' ? '<button type="button" class="pnl-link danger" data-tr-del>Borrar para siempre <small>no se puede deshacer</small></button>' : ''}</div></details>`;
+    };
+    root.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const down = t.closest<HTMLButtonElement>('[data-tr-down]'), del = t.closest<HTMLButtonElement>('[data-tr-del]');
+      if (!down && !del) return;
+      const box = t.closest<HTMLDetailsElement>('[data-tr-slug]'); if (!box) return;
+      const slug = box.dataset.trSlug!, title = box.closest('[data-pid]')?.querySelector('h2')?.textContent?.trim() ?? '';
+      box.open = false;
+      if (down) {
+        if (!(await ask(`¿Quitar «${title}» del sitio? Desaparece en unos 2 minutos y queda en Borradores para corregirla y publicarla otra vez.`, { ok: 'Quitar del sitio', danger: true }))) return;
+        down.disabled = true;
+        dispatchEvent(new CustomEvent('nc-takedown', { detail: { id: slug } })); // takeDown() below; the panel's lists follow nc-takedown-done
+        return;
+      }
+      if (me()?.role !== 'admin') return;
+      if (!(await ask(`¿Borrar «${title}» para siempre? Desaparece del sitio en unos 2 minutos y no queda en Borradores. Esto no se puede deshacer desde el panel.`, { ok: 'Borrar para siempre', danger: true }))) return;
+      if (!DB) { toast(`${PREV}, se borra del sitio.`); return; }
+      del!.disabled = true;
+      const art = load().find((a) => a.slug === slug);
+      const res = await deleteStoryForever(slug, art?.id ?? slug);
+      if (!res.ok) { del!.disabled = false; toast(`No se pudo borrar: ${res.error}`); return; }
+      markGone(slug); if (art) markGone(art.id);
+      await refresh(); renderList(); dispatchEvent(new Event('nc-articles-changed'));
+      toast('Borrada. Desaparece del sitio en unos 2 minutos.');
+      logActivity('Borró una noticia para siempre', title);
+    });
+    // A story taken off the site leaves Publicadas at once
+    addEventListener('nc-takedown-done', (e) => { const d = (e as CustomEvent).detail as { id: string; ok: boolean }; if (d.ok) { markGone(d.id); if (tab === 'published') renderList(); } });
     const LIVE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
     // Real views per story (last 28 days, Google Analytics), for editors and the admin; loaded once
     let VIEWS: Map<string, number> | null = null; let viewsAsked = false;
@@ -388,7 +431,7 @@ const TOOLS = [
           <div class="wr-pub-main"><p class="pnl-muted">${esc(p.section)} · ${esc(p.author)} · ${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'short', year: 'numeric' })}${p.local ? ' · <span class="wr-ai">desde el editor</span>' : ''}${viewsOf(p)}</p>
             <h2>${p.url ? `<a href="${p.url}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)}</h2>
           </div>
-          <div class="pnl-row-acts">${mineArt ? '<button type="button" class="adp-btn" data-la="edit">Editar o corregir</button>' : siteStory ? `<button type="button" class="adp-btn" data-import="${esc(p.id)}">Editar o corregir</button>` : ''}${p.url ? `<a class="adp-btn ghost-dark" href="${p.url}" target="_blank" rel="noopener">Ver en el sitio ↗</a>` : ''}</div>
+          <div class="pnl-row-acts">${mineArt ? '<button type="button" class="adp-btn" data-la="edit">Editar o corregir</button>' : siteStory ? `<button type="button" class="adp-btn" data-import="${esc(p.id)}">Editar o corregir</button>` : ''}${p.url ? `<a class="adp-btn ghost-dark" href="${p.url}" target="_blank" rel="noopener">Ver en el sitio ↗</a>` : ''}${trashFor(p, mineArt)}</div>
         </article>`;
       }).join('') || '<p class="apr-empty">Todavía no hay noticias publicadas.</p>';
     }
@@ -434,8 +477,8 @@ const TOOLS = [
       box.hidden = !list.length; $('[data-wr-hist-n]').textContent = list.length ? `(${list.length})` : '';
       $('[data-wr-hist-list]').innerHTML = list.map((e) => `<li><b>${esc(e.by)}</b> · ${whenTxt(e.at)}<br>Cambió ${esc(e.what.join(', '))}.</li>`).join('');
     }
-    const blank = (): Art => ({ id: `A-${Date.now().toString(36)}`, status: 'draft', updated: Date.now(), owner: me()?.name ?? '', title: '', description: '', section: 'noticias', league: '',
-      place: '', author: me()?.name ?? 'NotiCel', date: localNow(), image: '', imageUrl: '', imageCaption: '', imageCredit: '', breaking: false, trending: false, featured: false, live: false, pinned: false, homeLead: false, sectionLead: false, sectionPinned: false,
+    const blank = (): Art => ({ id: `A-${Date.now().toString(36)}`, status: 'draft', updated: Date.now(), owner: me()?.name ?? '', title: '', description: '', section: columnist() ? 'opiniones' : 'noticias', league: '',
+      place: columnist() ? 'Puerto Rico' : '', author: me()?.name ?? 'NotiCel', date: localNow(), image: '', imageUrl: '', imageCaption: '', imageCredit: '', breaking: false, trending: false, featured: false, live: false, pinned: false, homeLead: false, sectionLead: false, sectionPinned: false,
       sources: [], related: [], correction: '', factCheck: '', factClaim: '', body: '' });
     const field = (k: string) => $<HTMLInputElement>(`[data-f="${k}"]`);
     // "Lugar en la Portada / en su sección": one choice each, stored as the story's flags (the strongest one wins)
@@ -458,12 +501,16 @@ const TOOLS = [
     function openEditor(a: Art) {
       cur = structuredClone(a); opened = structuredClone(a); sessionAt = Date.now(); paintHistory();
       $('[data-gal-list]').dataset.sig = ''; ($('[data-wr-gal]') as HTMLDetailsElement).open = !!cur.gallery?.length;
+      if (columnist()) { cur.section = 'opiniones'; cur.author = me()!.name; } // a columnist writes Opiniones only, signed with their own name
       (['title', 'titleB', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => (field(k).value = String(cur![k] ?? '')));
       (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (field(k).checked = !!cur![k]));
       body.innerHTML = cur.body || '<p><br></p>';
       body.querySelectorAll<HTMLElement>('figure.wr-embed').forEach(paintEmbed);
       $$('[data-editor-only]').forEach((e) => (e.hidden = !canPublish()));
       $$('[data-chief-only]').forEach((e) => (e.hidden = me()?.role === 'desk')); // the front page is the Editor en jefe's
+      $$('[data-col-hide]').forEach((e) => (e.hidden = columnist())); // a columnist sees only what a column needs: headline, subtitle, photo and text
+      field('section').disabled = columnist(); field('author').readOnly = columnist();
+      $('[data-wr-back]').textContent = columnist() ? '← Mis columnas' : '← Mis noticias';
       $('[data-wr-list-view]').hidden = true; $('[data-wr-editor]').hidden = false;
       sync(); dirty = false; $('[data-wr-saved]').textContent = ''; scrollTo({ top: 0 });
       paintSocial(true); void paintSocialStatus(); void paintConflict();
@@ -538,10 +585,10 @@ const TOOLS = [
         [cur.title.length >= 20 && cur.title.length <= 70, 'Titular claro (20 a 70 caracteres, para que Google no lo corte)'],
         [cur.description.length >= 40, 'Subtítulo de una o dos oraciones'],
         [words >= 80, 'Al menos 80 palabras'],
-        [!!cur.place, 'Lugar'],
+        ...(columnist() ? [] : [[!!cur.place, 'Lugar'] as [boolean, string]]), // a column needs no place or sources
         [!photo || !!cur.imageCredit, 'Crédito de la foto (si tiene foto)'],
         ...((cur.gallery ?? []).length ? [[(cur.gallery ?? []).every((g) => g.credit.trim()), 'Crédito en cada foto de la galería'] as [boolean, string]] : []),
-        [cur.sources.length > 0, 'Al menos una fuente'],
+        ...(columnist() ? [] : [[cur.sources.length > 0, 'Al menos una fuente'] as [boolean, string]]),
       ];
       $('[data-checks]').innerHTML = checks.map(([ok, t]) => `<li class="${ok ? 'ok' : ''}"><span>${ok ? '✓' : '○'} ${t}</span></li>`).join('');
       $<HTMLTextAreaElement>('[data-md]').value = toFile(cur);

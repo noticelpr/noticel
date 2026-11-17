@@ -1,0 +1,66 @@
+---
+// Opiniones page: "¿Quieres ser columnista?" (user, 2026-11-17; supabase/columnistas-solicitudes.sql). A box with a
+// button that opens a form; the request goes to panel → Columnistas for the administrator, the Editor en jefe and the
+// Editors. No writing sample is asked. In demo mode (or without the database) nothing is sent.
+---
+<div class="col-apply" role="region" aria-labelledby="col-apply-h">
+  <div class="col-apply-t">
+    <h2 id="col-apply-h">¿Quieres ser columnista?</h2>
+    <p>Cuéntanos quién eres y de qué te gustaría escribir. Si te aprobamos, te enviamos tu cuenta de columnista para que envíes tus columnas.</p>
+  </div>
+  <button type="button" class="btn col-apply-go" data-col-open>Solicitar</button>
+</div>
+
+<dialog class="col-dlg" data-col-dlg aria-labelledby="col-h">
+  <form class="col-form" data-col-form novalidate>
+    <button type="button" class="col-x" data-col-close aria-label="Cerrar">×</button>
+    <h2 id="col-h">¿Quieres ser columnista?</h2>
+    <p class="col-sub">Buscamos voces con experiencia y algo que aportar. La redacción revisa cada solicitud y te escribe si es aprobada.</p>
+    <label>Nombre completo<input name="nombre" required maxlength="80" autocomplete="name" /></label>
+    <div class="col-two">
+      <label>Correo electrónico<input name="correo" type="email" required maxlength="120" autocomplete="email" /></label>
+      <label>Teléfono <small>(opcional)</small><input name="telefono" type="tel" maxlength="30" autocomplete="tel" /></label>
+    </div>
+    <label>Profesión u ocupación<input name="profesion" required maxlength="120" placeholder="Ej.: economista, maestra jubilada, abogado" /></label>
+    <label>¿De qué temas escribirías?<textarea name="temas" required rows="2" maxlength="400" placeholder="Ej.: la economía de la familia, la educación, la salud"></textarea></label>
+    <label>Unas líneas sobre ti<textarea name="bio" required rows="3" maxlength="1200" placeholder="Tu experiencia y por qué quieres escribir en NotiCel."></textarea></label>
+    <label>Enlaces a tus escritos o redes <small>(opcional)</small><input name="enlaces" maxlength="600" placeholder="Pega uno o varios enlaces" /></label>
+    <label class="col-ok"><input type="checkbox" name="acepto" required /> Confirmo que la información es cierta y que lo que envíe será de mi autoría.</label>
+    <p class="col-err" data-col-err role="alert" hidden></p>
+    <button type="submit" class="btn" data-col-send>Enviar solicitud</button>
+    <p class="col-done" data-col-done role="status" hidden>¡Gracias! Recibimos tu solicitud. Si es aprobada, te enviaremos un correo para crear tu cuenta de columnista.</p>
+  </form>
+</dialog>
+
+<script>
+  import { BACKEND, hasBackend } from '../../lib/backend';
+  import { isDemo } from '../../lib/demo';
+  const dlg = document.querySelector<HTMLDialogElement>('[data-col-dlg]');
+  const form = document.querySelector<HTMLFormElement>('[data-col-form]');
+  if (dlg && form) {
+    const v = (n: string) => ((form.elements.namedItem(n) as HTMLInputElement).value || '').trim();
+    const err = (m: string) => { const e = form.querySelector<HTMLElement>('[data-col-err]')!; e.textContent = m; e.hidden = !m; };
+    document.querySelector('[data-col-open]')?.addEventListener('click', () => { err(''); dlg.showModal(); });
+    form.querySelector('[data-col-close]')!.addEventListener('click', () => dlg.close());
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (v('nombre').length < 3) return err('Escribe tu nombre completo.');
+      if (!/^\S+@\S+\.\S+$/.test(v('correo'))) return err('Escribe un correo válido.');
+      if (v('profesion').length < 2) return err('Escribe tu profesión u ocupación.');
+      if (v('temas').length < 5) return err('Cuéntanos de qué temas escribirías.');
+      if (v('bio').length < 20) return err('Escribe unas líneas sobre ti (al menos 20 letras).');
+      if (!(form.elements.namedItem('acepto') as HTMLInputElement).checked) return err('Marca la casilla para confirmar.');
+      if (isDemo()) return err('DEMO: en esta vista de ejemplo la solicitud no se envía.');
+      if (!hasBackend()) return err('Las solicitudes todavía no están disponibles en esta vista.');
+      const btn = form.querySelector<HTMLButtonElement>('[data-col-send]')!; btn.disabled = true; err('');
+      const r = await fetch(`${BACKEND.url}/rest/v1/rpc/solicitar_columna`, { method: 'POST',
+        headers: { apikey: BACKEND.anonKey, Authorization: `Bearer ${BACKEND.anonKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: v('nombre'), correo: v('correo'), telefono: v('telefono'), profesion: v('profesion'), temas: v('temas'), bio: v('bio'), enlaces: v('enlaces'), muestra: '' }) }).catch(() => null);
+      btn.disabled = false;
+      const msg = r?.ok ? await r.json().catch(() => null) : null;
+      if (msg === 'ok') { form.querySelectorAll('label, .col-sub, [data-col-send]').forEach((el) => ((el as HTMLElement).hidden = true)); form.querySelector<HTMLElement>('[data-col-done]')!.hidden = false; return; }
+      err(typeof msg === 'string' ? msg : 'No se pudo enviar. Revisa tu conexión e intenta otra vez.');
+    });
+  }
+</script>

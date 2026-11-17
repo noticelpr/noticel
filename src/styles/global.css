@@ -5163,3 +5163,27 @@ html.cm-open .mlv{opacity:0;pointer-events:none}
 .live-card a:hover h3{text-decoration:underline}
 @media (max-width:760px){.live-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){.live-dot{animation:none}}
+
+/* Opiniones: «¿Quieres ser columnista?» box and form (user, 2026-11-17; src/components/sections/ColumnistApply.astro) */
+.col-apply{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin:var(--gap-lg,28px) 0;padding:18px 20px;border-radius:12px;background:var(--card);border:1px solid var(--line);border-left:6px solid #009DE9}
+.col-apply-t{flex:1 1 280px;min-width:0}
+.col-apply-t h2{margin:0 0 4px;font-family:var(--head);font-size:20px;line-height:1.25;color:var(--ink)}
+.col-apply-t p{margin:0;color:var(--muted);font-size:15px;line-height:1.5}
+.col-apply-go{flex:none;cursor:pointer}
+.col-dlg{border:0;border-radius:14px;padding:0;width:min(560px,calc(100% - 32px));max-height:calc(100dvh - 32px);background:var(--card);color:var(--ink);border-top:5px solid #009DE9}
+.col-dlg::backdrop{background:rgba(0,0,0,.6)}
+.col-form{position:relative;display:grid;gap:12px;padding:22px}
+.col-form h2{margin:0;padding-right:28px;font-family:var(--head);font-size:22px;color:var(--ink)}
+.col-sub{margin:0;color:var(--muted);font-size:15px}
+.col-form label{display:grid;gap:4px;font-size:14px;font-weight:600}
+.col-form label small{font-weight:400;color:var(--muted)}
+.col-form input:not([type=checkbox]),.col-form textarea{font:inherit;font-weight:400;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg,#fff);color:var(--ink);min-width:0}
+.col-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.col-form .col-ok{display:flex;gap:8px;align-items:flex-start;font-weight:400}
+.col-err{margin:0;color:var(--red,#D7263D);font-size:14px}
+.col-done{margin:0;font-size:16px;line-height:1.5}
+.col-x{all:unset;cursor:pointer;position:absolute;top:10px;right:14px;font-size:26px;line-height:1;color:var(--muted)}
+.col-form [hidden]{display:none}
+@media (max-width:560px){.col-two{grid-template-columns:1fr}.col-apply-go{width:100%}}
+.role-columnist{background:#E1F3FC;color:#00557D}
+[data-theme="dark"] .role-columnist{background:#0F3347;color:#9FDCFA}
