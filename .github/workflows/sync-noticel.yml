@@ -28,6 +28,8 @@ jobs:
         run: node scripts/sync-wp.mjs
       - name: Read noticel.com's front page order (home page and sections, until switch day)
         run: node scripts/portada-wp.mjs
+      - name: Two-headline tests (the winner becomes the headline)
+        run: node scripts/titulares.mjs
       - name: Save them (only when something changed)
         run: |
           git add src/content/noticias src/data/sync-state.json src/data/portada-noticel.json

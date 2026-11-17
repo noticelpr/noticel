@@ -45,6 +45,9 @@ export const SITE = {
   },
   // Google Analytics 4 Measurement ID of NotiCel's own property. Empty = no visitor counting.
   gaId: '',
+  // Microsoft Clarity project ID of NotiCel's own Clarity project (heatmaps, free at clarity.microsoft.com; public, safe
+  // to keep here). Empty = off. In Clarity → Settings → Masking, choose "Strict".
+  clarityId: '',
   // GIPHY key for GIF search in comments. Empty = only our own animated GIFs.
   giphyKey: '',
   // Until switch day the newsroom works in WordPress: the home page and sections show noticel.com's own order first

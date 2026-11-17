@@ -71,6 +71,10 @@ const TOOLS = [
       <div class="wr-main">
         <textarea class="wr-title" data-f="title" rows="1" maxlength="140" placeholder="Titular" aria-label="Titular"></textarea>
         <p class="wr-count" data-cnt="title"></p>
+        <details class="wr-titleb"><summary>Probar un segundo titular (opcional)</summary>
+          <input class="wr-titleb-in" data-f="titleB" maxlength="140" placeholder="Otro titular para la misma noticia: mismo hecho, otro enfoque" aria-label="Segundo titular" />
+          <p class="pnl-muted pnl-small">Durante 3 días, la mitad de los lectores ve este titular en las portadas y secciones. El que reciba más clics se queda solo. Analítica → Espacios muestra el resultado.</p>
+        </details>
         <textarea class="wr-sub" data-f="description" rows="2" maxlength="260" placeholder="Subtítulo o resumen: una o dos oraciones que expliquen la noticia" aria-label="Subtítulo"></textarea>
         <p class="wr-count" data-cnt="description"></p>
 
@@ -257,6 +261,7 @@ const TOOLS = [
       image: string; imageUrl: string; imageCaption: string; imageCredit: string; breaking: boolean; trending: boolean; featured: boolean; live: boolean; pinned?: boolean; homeLead?: boolean; placedAt?: string; sectionPlacedAt?: string; leaguePinned?: boolean; leaguePlacedAt?: string; sectionLead?: boolean; sectionPinned?: boolean;
       sources: Src[]; related: string[]; correction: string; body: string; slug?: string;
       factCheck?: string; factClaim?: string; // NotiCel Fact Check: verdict and the claim checked
+      titleB?: string; // two-headline test (owner, 2026-11-17; src/lib/traffic.ts, scripts/titulares.mjs)
       path?: string; cats?: string[]; // NotiCel: the story's address on the site and its other categories (kept from the story file)
       gallery?: Gal[]; // extra photos shown as a slideshow with the main one
       aiAssisted?: boolean; fmExtra?: string; // kept from an existing story file: the AI label and fields the editor doesn't show
@@ -453,7 +458,7 @@ const TOOLS = [
     function openEditor(a: Art) {
       cur = structuredClone(a); opened = structuredClone(a); sessionAt = Date.now(); paintHistory();
       $('[data-gal-list]').dataset.sig = ''; ($('[data-wr-gal]') as HTMLDetailsElement).open = !!cur.gallery?.length;
-      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => (field(k).value = String(cur![k] ?? '')));
+      (['title', 'titleB', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => (field(k).value = String(cur![k] ?? '')));
       (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (field(k).checked = !!cur![k]));
       body.innerHTML = cur.body || '<p><br></p>';
       body.querySelectorAll<HTMLElement>('figure.wr-embed').forEach(paintEmbed);
@@ -481,7 +486,7 @@ const TOOLS = [
     function closeEditor() { if (dirty) void persist(); cur = null; $('[data-wr-editor]').hidden = true; $('[data-wr-list-view]').hidden = false; renderList(); }
     function readEditor() {
       if (!cur) return;
-      (['title', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => ((cur as any)[k] = field(k).value.trim()));
+      (['title', 'titleB', 'description', 'section', 'place', 'author', 'date', 'imageUrl', 'imageCaption', 'imageCredit', 'correction', 'factCheck', 'factClaim'] as const).forEach((k) => ((cur as any)[k] = field(k).value.trim()));
       (['breaking', 'featured', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned'] as const).forEach((k) => (cur![k] = field(k).checked));
       const c = body.cloneNode(true) as HTMLElement; c.querySelectorAll('.wr-mv').forEach((x) => x.remove()); // the move controls aren't part of the story
       cur.body = c.innerHTML;
@@ -728,7 +733,7 @@ const TOOLS = [
     // The story file: from NotiCel's GitHub repository when it exists (newest), else from the site itself (redaccion/archivo/)
     const RAW = REPO ? `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/content/noticias/` : `${BASE}/redaccion/archivo/`;
     const MANAGED = new Set(['title', 'description', 'categories', 'path', 'place', 'date', 'author', 'image', 'imageCaption', 'imageCredit',
-      'breaking', 'topStory', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned', 'aiAssisted', 'draft', 'sources', 'related', 'correction', 'gallery', 'factCheck', 'factClaim']);
+      'breaking', 'topStory', 'live', 'pinned', 'homeLead', 'sectionLead', 'sectionPinned', 'aiAssisted', 'draft', 'sources', 'related', 'correction', 'gallery', 'factCheck', 'factClaim', 'titleB']);
     const BROAD = ['noticias', 'ultima-hora', 'uncategorized']; // never the main category when a story has a more specific one
     const unq = (v: string) => { v = v.trim(); try { return v.startsWith('"') ? JSON.parse(v) : v.replace(/^'(.*)'$/, '$1'); } catch { return v; } };
     const inline = (t: string) => esc(t.replace(/\\([*_`[\]\\])/g, '$1'))
@@ -774,7 +779,7 @@ const TOOLS = [
       const main = cats.find((c) => !BROAD.includes(c)) ?? cats[0] ?? 'noticias';
       const d = new Date(unq(fm.date || '')); const local = isNaN(+d) ? localNow() : new Date(+d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       return { id: `A-${Date.now().toString(36)}`, status: 'published', updated: Date.now(), owner: me()?.name ?? '', slug: id,
-        title: unq(fm.title || ''), description: unq(fm.description || ''), section: main, league: '', path: unq(fm.path || '') || undefined, cats: cats.filter((c) => c !== main),
+        title: unq(fm.title || ''), titleB: unq(fm.titleB || ''), description: unq(fm.description || ''), section: main, league: '', path: unq(fm.path || '') || undefined, cats: cats.filter((c) => c !== main),
         place: unq(fm.place || ''), author: unq(fm.author || 'NotiCel'), date: local, image: unq(fm.image || ''), imageUrl: '',
         imageCaption: unq(fm.imageCaption || ''), imageCredit: unq(fm.imageCredit || ''),
         breaking: yes('breaking'), trending: false, featured: yes('topStory'), live: yes('live'), pinned: yes('pinned'), homeLead: yes('homeLead'), sectionLead: yes('sectionLead'), sectionPinned: yes('sectionPinned'),
@@ -852,7 +857,7 @@ const TOOLS = [
       const date = new Date(a.date || Date.now());
       // Main category first (the label over the headline), then the story's other categories; Última hora adds that category
       const cats = [...new Set([a.section, ...(a.cats ?? []).filter((c) => c !== a.section), ...(a.breaking ? ['ultima-hora'] : [])])];
-      return ['---', `title: ${y(a.title)}`, `description: ${y(a.description)}`, `date: ${date.toISOString()}`, `author: ${y(a.author || 'NotiCel')}`,
+      return ['---', `title: ${y(a.title)}`, ...(a.titleB && a.titleB !== a.title ? [`titleB: ${y(a.titleB)}`] : []), `description: ${y(a.description)}`, `date: ${date.toISOString()}`, `author: ${y(a.author || 'NotiCel')}`,
         `path: ${y(pathOf(a))}`, `categories: ${JSON.stringify(cats)}`, ...(a.place ? [`place: ${y(a.place)}`] : []),
         ...(a.image || a.imageUrl ? [`image: ${y(a.imageUrl || (a.image.startsWith('data:') ? `imagenes/${a.id.toLowerCase()}.jpg` : a.image))}`, ...(a.imageCaption ? [`imageCaption: ${y(a.imageCaption)}`] : []), ...(a.imageCredit ? [`imageCredit: ${y(a.imageCredit)}`] : [])] : []),
         ...gy,

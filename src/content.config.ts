@@ -28,6 +28,10 @@ const noticias = defineCollection({
     // Written by the staff panel (same fields as Noticias Xtra). Imported WordPress stories leave them at the defaults.
     place: z.string().default(''), // dateline, e.g. "San Juan" (imported WordPress stories have none)
     imageCredit: z.string().optional(),
+    // Two-headline test (owner, 2026-11-17): an optional second headline the editor writes in Escribir. Half the readers see
+    // it on the cards; the one with more clicks becomes `title` (scripts/titulares.mjs) and `titleTested` records the result.
+    titleB: z.string().optional(),
+    titleTested: z.string().optional(),
     imageCreditUrl: z.string().optional(),
     gallery: z.array(z.object({ src: z.string(), caption: z.string().default(''), credit: z.string().default(''), creditUrl: z.string().optional() })).default([]),
     breaking: z.boolean().default(false), // Última hora: eligible for the ÚLTIMA HORA bar for 12 hours

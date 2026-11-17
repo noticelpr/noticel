@@ -69,6 +69,15 @@ const TABS = [
         }
       </script>
     )}
+    {SITE.clarityId && !staff && (
+      <script is:inline define:vars={{ clarityId: SITE.clarityId }}>
+        // Microsoft Clarity heatmaps (owner, 2026-11-17): where readers click and how far they scroll. Real site only,
+        // never with the Global Privacy Control signal; text and form fields are masked (Clarity → Settings → Masking: Strict)
+        if (/(^|\.)noticel\.com$/.test(location.hostname) && !navigator.globalPrivacyControl && !/[?&]demo=1/.test(location.search)) {
+          (function (c, l, a, r, i) { c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); }; const t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i; l.head.appendChild(t); })(window, document, 'clarity', 'script', clarityId);
+        }
+      </script>
+    )}
     <meta property="og:site_name" content={SITE.name} />
     <meta property="og:title" content={title ?? SITE.name} />
     <meta property="og:description" content={description} />
@@ -390,6 +399,8 @@ const TABS = [
       startSavedSync(); // saved stories follow the reader's account to any device
       import { startPointsSync } from '../lib/points-sync';
       startPointsSync(); // Juegos NotiCel points follow the reader's account (real leaderboards)
+      import { startTraffic } from '../lib/traffic';
+      startTraffic(); // views and clicks per spot, and the two-headline tests (supabase/trafico.sql)
       import { renderNotifs, sentence } from '../lib/notif-view';
       // Profile menu: every reader setting in one place, opens over the page (Escape or a tap outside closes it)
       const pfBtn = document.querySelector<HTMLButtonElement>('[data-pf-toggle]');

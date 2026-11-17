@@ -110,7 +110,7 @@ const TABS = [
 ];
 ---
 <Base title="Panel de la redacción" description="Panel interno de NotiCel (uso del personal)." noindex staff>
-  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(CATEGORY_OPTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url, views }) => ({ id, title, section, author, date, url, views })))} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()}>
+  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(CATEGORY_OPTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url, views }) => ({ id, title, section, author, date, url, views })))} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()} data-clarity={SITE.clarityId}>
     <form class="pnl-login" data-login hidden>
       <p class="pnl-kicker">NotiCel</p>
       <h1>Panel de la redacción</h1>
@@ -320,7 +320,7 @@ const TABS = [
         <!-- Analítica: real visits from Google Analytics (Edge Function "analitica") -->
         <section class="pnl-pane" data-pane="analitica" hidden>
           {/* Visitas (Google Analytics) or Ingresos (ad sales from the database); Ingresos: administrator and Ventas */}
-          <div class="pnl-range an-switch" role="group" aria-label="Qué ver" data-an-switch hidden><button type="button" data-an-view="visitas" aria-pressed="true">📈 Visitas</button><button type="button" data-an-view="ingresos" aria-pressed="false">💵 Ingresos</button></div>
+          <div class="pnl-range an-switch" role="group" aria-label="Qué ver" data-an-switch hidden><button type="button" data-an-view="visitas" aria-pressed="true">📈 Visitas</button><button type="button" data-an-view="ingresos" aria-pressed="false">💵 Ingresos</button><button type="button" data-an-view="espacios" aria-pressed="false">🧭 Espacios</button></div>
           <div data-an-visits>
           <header class="sd-head"><div><h1 class="pnl-h">Analítica <span class="sp-demo" data-an-demo hidden>DEMO</span></h1><p class="pnl-muted"><span data-an-real>Visitas reales del sitio, de Google Analytics.</span> <span data-an-at></span></p><p class="pnl-note" data-an-demo hidden><span class="sp-demo">DEMO</span> Números de ejemplo para mostrar cómo funciona esta pestaña. Con el panel real, aquí salen las visitas de Google Analytics.</p></div>
             <div class="pnl-range" role="group" aria-label="Período"><button type="button" data-range="1">Hoy</button><button type="button" data-range="7" aria-pressed="true">7 días</button><button type="button" data-range="28">28 días</button></div></header>
@@ -365,6 +365,25 @@ const TABS = [
             </div>
             <p class="pnl-muted pnl-small">“Ahora mismo” es al instante. Las visitas de hoy pueden tardar unas horas en aparecer completas. Mientras el sitio tenga clave de acceso, solo cuentan quienes la conocen.</p>
           </div>
+          </div>
+          {/* Espacios (owner, 2026-11-17; supabase/trafico.sql, src/lib/traffic.ts): which spots readers see and click, when
+              they read, the two-headline tests and suggestions. Administrator, editors and gerente. */}
+          <div data-tr hidden>
+            <header class="sd-head"><div><h1 class="pnl-h">Espacios <span class="sp-demo" data-tr-demo hidden>DEMO</span></h1><p class="pnl-muted">Qué espacios del sitio ven y tocan los lectores, a qué horas leen y qué titular funciona mejor. Solo totales: nada de cada lector.</p><p class="pnl-note" data-tr-demo hidden><span class="sp-demo">DEMO</span> Números de ejemplo para mostrar cómo funciona esta vista.</p></div>
+              <div class="pnl-range" role="group" aria-label="Período"><button type="button" data-tr-range="1">Hoy</button><button type="button" data-tr-range="7" aria-pressed="true">7 días</button><button type="button" data-tr-range="28">28 días</button></div></header>
+            <div data-tr-msg hidden></div>
+            <div data-tr-body>
+              <div class="pnl-kpis" data-tr-kpis></div>
+              <div class="pnl-card"><h2 class="pnl-h3">Recomendaciones de la semana</h2><ul class="tr-recs" data-tr-recs></ul><p class="pnl-muted pnl-small">El orden de las noticias y el titular ganador cambian solos. Mover secciones o anuncios es tu decisión: aquí solo se recomienda.</p></div>
+              <div class="pnl-card"><div class="tr-head"><h2 class="pnl-h3">Espacios de</h2><select data-tr-page aria-label="Página"></select><div class="pnl-range" role="group" aria-label="Dispositivo"><button type="button" data-tr-dev="todo" aria-pressed="true">Todo</button><button type="button" data-tr-dev="m">Celular</button><button type="button" data-tr-dev="d">Computadora</button></div></div>
+                <div class="sp-table-wrap"><table class="tr-table"><thead><tr><th scope="col">Espacio</th><th scope="col">Lo vieron</th><th scope="col">Clics</th><th scope="col">% que hace clic</th><th scope="col">Llegan a verlo</th></tr></thead><tbody data-tr-spots></tbody></table></div>
+                <p class="pnl-muted pnl-small">«Lo vieron»: la mitad del espacio estuvo en pantalla (anuncios: un segundo completo). «Llegan a verlo»: de cada 100 visitas a la página, cuántas bajaron hasta ese espacio.</p></div>
+              <div class="pnl-an-grid">
+                <div class="pnl-card"><h2 class="pnl-h3">A qué hora leen (hora de Puerto Rico)</h2><div data-tr-hours></div></div>
+                <div class="pnl-card"><h2 class="pnl-h3">Prueba de titulares</h2><div data-tr-heads></div></div>
+              </div>
+              <p class="pnl-muted pnl-small">Mapas de calor (dónde tocan y hasta dónde bajan): <span data-tr-clarity></span></p>
+            </div>
           </div>
           <div data-earn hidden>
             <header class="sd-head"><div><h1 class="pnl-h">Ingresos <span class="sp-demo" data-earn-demo hidden>DEMO</span></h1><p class="pnl-note" data-earn-demo hidden><span class="sp-demo">DEMO</span> Ventas de ejemplo para mostrar cómo funciona esta pestaña.</p></div>
@@ -794,7 +813,8 @@ const TABS = [
     }
 
     let anRange: 1 | 7 | 28 = 7;
-    let anView: 'visitas' | 'ingresos' = 'visitas';
+    let anView: 'visitas' | 'ingresos' | 'espacios' = 'visitas';
+    let trRange: 1 | 7 | 28 = 7, trPage = 'portada', trDev: 'todo' | 'm' | 'd' = 'todo';
 
     // ---------- Analítica → Ingresos: ad sales from the database (ad_requests), by order date ----------
     let earnRange: 'mes' | 'pasado' | 'ano' = 'mes';
@@ -956,6 +976,112 @@ const TABS = [
         || '<li class="pnl-muted">Todavía no hay ventas en este período.</li>';
     }
 
+    // ---------- Analítica → Espacios (owner, 2026-11-17) ----------
+    type SpotRow = { page: string; spot: string; device: string; views: number; clicks: number };
+    let trData: { spots: SpotRow[]; hours: Array<{ dow: number; hr: number; n: number }>; heads: Array<{ slug: string; variant: string; views: number; clicks: number }>; titles: Record<string, string>; demo: boolean } | null = null;
+    const SPOT_NAME: Record<string, string> = { principal: 'Noticia principal', menu: 'Menú de secciones', cabecera: 'Cabecera', pie: 'Pie de página', marcadores: 'Marcadores', videos: 'Videos', foro: 'Foro NotiCel', mercados: 'Mercados', juegos: 'Juegos NotiCel', 'columna-lateral': 'Columna lateral', tira: 'Tira bajo el menú', 'caja-seccion': 'Caja de la sección', subsecciones: 'Subsecciones', paginas: 'Páginas siguientes', 'enlaces-en-el-texto': 'Enlaces dentro de la noticia', migas: 'Ruta (arriba de la noticia)', comentarios: 'Comentarios', 'en-vivo': 'En vivo', 'barra-ultima-hora': 'Barra de Última hora', boletin: 'Boletín', 'barra-celular': 'Barra de abajo (celular)' };
+    const SPOT_PART: Record<string, string> = { lado: 'Al lado de la principal', fila: 'Fila bajo la principal', 'mas-noticias': 'Más noticias', 'mas-titulares': 'Más titulares', 'principal-relacionadas': 'Relacionadas de la principal', centro: 'Centro', 'recien-publicado': 'Recién publicado', 'tira-lista': 'Tira bajo el menú', relacionadas: 'Noticias relacionadas', tambien: 'También te puede interesar', tendencias: 'Tendencias', 'lo-ultimo': 'Lo último', factcheck: 'NotiCel Fact Check' };
+    const AD_NAME: Record<string, string> = { leaderboard: 'banner ancho', rectangle: 'cuadrado', halfpage: 'vertical', infeed: 'banner entre noticias' };
+    function spotName(sp: string) {
+      if (SPOT_NAME[sp]) return SPOT_NAME[sp];
+      const ad = sp.match(/^anuncio-([a-z]+)-(\d+)$/); if (ad) return `Anuncio ${AD_NAME[ad[1]] ?? ad[1]} #${ad[2]}`;
+      const sec = sp.match(/^seccion-(.+)$/); if (sec) return `Sección ${SEC_NAME[sec[1]] ?? sec[1]}`;
+      const n = sp.match(/^(.+)-(\d+|x)$/); if (n && SPOT_PART[n[1]]) return `${SPOT_PART[n[1]]} · ${n[2] === 'x' ? '' : `#${n[2]}`}`.replace(/ · $/, '');
+      return sp;
+    }
+    const pageName = (p: string) => p === 'portada' ? 'Portada' : p === 'noticia' ? 'Página de una noticia' : p === 'autor' ? 'Página de un autor' : p === 'columnista' ? 'Página de un columnista' : p.startsWith('seccion-') ? `Sección ${SEC_NAME[p.slice(8)] ?? p.slice(8)}` : p;
+    function demoTraffic() {
+      const spots: SpotRow[] = [];
+      const add = (page: string, spot: string, base: number, ctr: number) => { for (const [device, k] of [['m', 0.68], ['d', 0.32]] as const) spots.push({ page, spot, device, views: Math.round(base * k), clicks: Math.round(base * k * ctr) }); };
+      add('portada', 'principal', 4200, 0.21); add('portada', 'lado-1', 3900, 0.09); add('portada', 'lado-2', 3700, 0.12); add('portada', 'lado-3', 3300, 0.04);
+      ['gobierno', 'policiacas', 'deportes', 'economia', 'entretenimiento', 'el-tiempo', 'opiniones'].forEach((id, i) => add('portada', `seccion-${id}`, 2600 - i * 300, [0.08, 0.11, 0.05, 0.07, 0.03, 0.06, 0.04][i]));
+      add('portada', 'tendencias-1', 2100, 0.1); add('portada', 'anuncio-rectangle-1', 3000, 0.006); add('portada', 'anuncio-infeed-1', 1400, 0.004);
+      add('noticia', 'relacionadas-1', 1800, 0.07); add('noticia', 'tambien-1', 900, 0.05); add('noticia', 'anuncio-rectangle-1', 2500, 0.005);
+      const hours = Array.from({ length: 7 * 24 }, (_, i) => ({ dow: Math.floor(i / 24), hr: i % 24, n: Math.round(40 + 120 * Math.exp(-(((i % 24) - 7) ** 2) / 6) + 140 * Math.exp(-(((i % 24) - 21) ** 2) / 8) + 50 * Math.exp(-(((i % 24) - 12) ** 2) / 4)) }));
+      const ids = PUBLISHED.slice(0, 4).map((p) => p.id);
+      const heads = ids.flatMap((slug, i) => [{ slug, variant: 'A', views: 300 + i * 40, clicks: 24 + i * 3 }, { slug, variant: 'B', views: 310 + i * 30, clicks: i % 2 ? 41 : 19 }]);
+      return { spots, hours, heads, titles: Object.fromEntries(PUBLISHED.slice(0, 4).map((p) => [p.id, p.title])), demo: true };
+    }
+    async function paintTraffic(load = true) {
+      const msg = $('[data-tr-msg]'), body = $('[data-tr-body]');
+      const demo = isDemo(); $$('[data-tr-demo]').forEach((e) => (e.hidden = !demo));
+      if (!hasBackend() && !demo) { msg.hidden = false; msg.innerHTML = '<p class="pnl-muted">Los espacios se ven cuando el panel está conectado a Supabase.</p>'; body.hidden = true; return; }
+      if (load || !trData) {
+        $('[data-tr-kpis]').innerHTML = kpi('Espacios vistos', '…') + kpi('Clics', '…');
+        if (demo) trData = demoTraffic();
+        else {
+          const call = (fn: string, b: unknown) => staffApi(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(b) }).then((r) => (r?.ok ? r.json() : null)).catch(() => null);
+          const [spots, hours, heads] = await Promise.all([call('trafico_espacios', { dias: trRange }), call('trafico_horas', { dias: Math.max(trRange, 7) }), call('titulares_resultados', {})]);
+          if (!spots) { msg.hidden = false; body.hidden = true; msg.innerHTML = '<div class="pnl-card"><h2 class="pnl-h3">Falta un paso</h2><p class="pnl-muted">Para contar los espacios, corre <b>supabase/trafico.sql</b> una vez en Supabase → SQL Editor.</p></div>'; return; }
+          const titles = Object.fromEntries(PUBLISHED.map((x) => [x.id, x.title]));
+          trData = { spots: spots.map((x: any) => ({ ...x, views: Number(x.views), clicks: Number(x.clicks) })), hours: (hours ?? []).map((x: any) => ({ ...x, n: Number(x.n) })), heads: heads ?? [], titles, demo: false };
+        }
+      }
+      msg.hidden = true; body.hidden = false;
+      const d = trData!, ex = d.demo ? 'DEMO · ' : '';
+      const byDev = (x: SpotRow) => trDev === 'todo' || x.device === trDev;
+      // Pages to choose from, the busiest first
+      const pages = [...new Set(d.spots.map((x) => x.page))].sort((a, b) => (a === 'portada' ? -1 : b === 'portada' ? 1 : 0) || d.spots.filter((x) => x.page === b).reduce((t, x) => t + x.views, 0) - d.spots.filter((x) => x.page === a).reduce((t, x) => t + x.views, 0));
+      if (!pages.includes(trPage)) trPage = pages[0] ?? 'portada';
+      const sel = $<HTMLSelectElement>('[data-tr-page]');
+      sel.innerHTML = (pages.length ? pages : ['portada']).map((p) => `<option value="${esc(p)}"${p === trPage ? ' selected' : ''}>${esc(pageName(p))}</option>`).join('');
+      sel.onchange = () => { trPage = sel.value; void paintTraffic(false); };
+      // Totals per spot on the chosen page
+      const sum = new Map<string, { v: number; c: number }>();
+      for (const x of d.spots.filter((x) => x.page === trPage && byDev(x))) { const o = sum.get(x.spot) ?? { v: 0, c: 0 }; o.v += x.views; o.c += x.clicks; sum.set(x.spot, o); }
+      const top = Math.max(sum.get('principal')?.v ?? 0, sum.get('cabecera')?.v ?? 0, sum.get('menu')?.v ?? 0, ...[...sum.values()].map((o) => o.v)) || 1; // visits to the page ≈ its most-seen spot (the top)
+      const rows = [...sum.entries()].sort((a, b) => b[1].v - a[1].v);
+      const pc = (a: number, b: number, dec = 1) => (b ? `${((a / b) * 100).toFixed(dec)}%` : '—');
+      $('[data-tr-spots]').innerHTML = rows.length ? rows.map(([sp, o]) => `<tr><th scope="row">${esc(spotName(sp))}</th><td>${num(o.v)}</td><td>${num(o.c)}</td><td><b>${pc(o.c, o.v)}</b></td><td><span class="tr-bar"><i style="width:${Math.min(100, (o.v / top) * 100)}%"></i></span>${pc(o.v, top, 0)}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="pnl-muted">Todavía no hay datos de esta página. Se llenan cuando la gente lea el sitio en noticel.com (después del día del cambio).</td></tr>';
+      const all = d.spots.filter(byDev), V = all.reduce((t, x) => t + x.views, 0), C = all.reduce((t, x) => t + x.clicks, 0);
+      const phone = d.spots.filter((x) => x.device === 'm').reduce((t, x) => t + x.views, 0), allV = d.spots.reduce((t, x) => t + x.views, 0);
+      $('[data-tr-kpis]').innerHTML = [kpi('Espacios vistos', num(V), ex + (trRange === 1 ? 'hoy' : `últimos ${trRange} días`)), kpi('Clics', num(C), `${ex}${pc(C, V)} de lo visto`), kpi('En celular', pc(phone, allV, 0), `${ex}de lo visto`), kpi('Pruebas de titulares', num(new Set(d.heads.map((h) => h.slug)).size), `${ex}con resultados`)].join('');
+      // When they read: weekday × hour (darker = more reads)
+      const DOW = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const grid = Array.from({ length: 7 }, () => Array(24).fill(0)); d.hours.forEach((h) => (grid[h.dow][h.hr] += h.n));
+      const maxH = Math.max(...grid.flat()) || 1, hourName = (h: number) => `${h % 12 || 12} ${h < 12 ? 'a.m.' : 'p.m.'}`;
+      const byHour = Array.from({ length: 24 }, (_, h) => grid.reduce((t, r) => t + r[h], 0));
+      $('[data-tr-hours]').innerHTML = d.hours.length ? `<div class="tr-heat" role="img" aria-label="Lecturas por día y hora">${grid.map((r, i) => `<span class="tr-dow">${DOW[i]}</span>${r.map((n, h) => `<i title="${DOW[i]} ${hourName(h)}: ${num(n)} lecturas" style="opacity:${0.08 + 0.92 * (n / maxH)}"></i>`).join('')}`).join('')}<span></span>${[0, 6, 12, 18].map((h) => `<b style="grid-column:${h + 2} / span 6">${hourName(h)}</b>`).join('')}</div>`
+        : '<p class="pnl-muted">Todavía no hay lecturas.</p>';
+      // Headline tests
+      const tests = new Map<string, { A?: { v: number; c: number }; B?: { v: number; c: number } }>();
+      d.heads.forEach((h) => { const o = tests.get(h.slug) ?? {}; o[h.variant as 'A' | 'B'] = { v: h.views, c: h.clicks }; tests.set(h.slug, o); });
+      const tl = [...tests.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12);
+      $('[data-tr-heads]').innerHTML = tl.length ? `<ul class="tr-heads">${tl.map(([slug, o]) => { const a = o.A ?? { v: 0, c: 0 }, b = o.B ?? { v: 0, c: 0 }; const ra = a.v ? a.c / a.v : 0, rb = b.v ? b.c / b.v : 0; return `<li><b>${esc(d.titles[slug] ?? slug)}</b><small>A: ${pc(a.c, a.v)} de ${num(a.v)} · B: ${pc(b.c, b.v)} de ${num(b.v)}${a.v >= 150 && b.v >= 150 ? ` · <span class="pnl-chip ${rb > ra ? 'good' : ''}">va ganando ${rb > ra ? 'B' : 'A'}</span>` : ' · <span class="pnl-chip">reuniendo datos</span>'}</small></li>`; }).join('')}</ul><p class="pnl-muted pnl-small">En Escribir, el editor puede poner un segundo titular; la mitad de los lectores ve cada uno en las tarjetas. Con suficientes visitas, el que recibe más clics se queda como titular solo.</p>`
+        : '<p class="pnl-muted">Todavía no hay pruebas con resultados. Empiezan cuando un editor escribe un segundo titular en Escribir.</p>';
+      const clarity = root.dataset.clarity ?? '';
+      $('[data-tr-clarity]').innerHTML = clarity ? `<a href="https://clarity.microsoft.com/projects/view/${esc(clarity)}/heatmaps" target="_blank" rel="noopener">abrir Microsoft Clarity ↗</a>` : 'falta conectar Microsoft Clarity (gratis; el ID va en <code>clarityId</code> de src/lib/site.ts).';
+      // Suggestions in plain words
+      const recs: string[] = [];
+      const P = (sp: string, dev: 'todo' | 'm' | 'd' = 'todo') => d.spots.filter((x) => x.page === 'portada' && x.spot === sp && (dev === 'todo' || x.device === dev)).reduce((o, x) => ({ v: o.v + x.views, c: o.c + x.clicks }), { v: 0, c: 0 });
+      const front = P('principal');
+      if (front.v < 200 && !d.demo) recs.push('Todavía hay pocas visitas para sacar conclusiones. Las recomendaciones salen solas cuando la Portada pase de 200 visitas en el período (en noticel.com, después del día del cambio).');
+      else {
+        const side = [1, 2, 3].map((i) => ({ i, ...P(`lado-${i}`) })).filter((x) => x.v);
+        const best = [...side].sort((a, b) => b.c / b.v - a.c / a.v)[0];
+        if (best && best.i !== 1 && side[0] && best.c / best.v > 1.4 * (side[0].c / side[0].v)) recs.push(`El espacio #${best.i} al lado de la principal recibe ${(best.c / best.v / (side[0].c / side[0].v || 1)).toFixed(1)} veces más clics que el #1. Pon ahí las noticias que más quieres que se lean.`);
+        const secs = [...new Set(d.spots.filter((x) => x.page === 'portada' && x.spot.startsWith('seccion-')).map((x) => x.spot))].map((sp) => ({ sp, ...P(sp), m: P(sp, 'm'), fm: P('principal', 'm') })).filter((x) => x.v);
+        const hot = [...secs].sort((a, b) => b.c / b.v - a.c / a.v);
+        if (hot.length >= 3) recs.push(`En la Portada, las secciones que más clics reciben son ${hot.slice(0, 3).map((x) => spotName(x.sp).replace('Sección ', '')).join(', ')}; las que menos, ${hot.slice(-2).map((x) => spotName(x.sp).replace('Sección ', '')).join(' y ')}. Considera subir las primeras.`);
+        const low = secs.filter((x) => x.fm.v && x.m.v / x.fm.v < 0.25).sort((a, b) => a.m.v - b.m.v)[0];
+        if (low) recs.push(`En celular, solo ${pc(low.m.v, low.fm.v, 0)} de quienes abren la Portada llegan hasta ${spotName(low.sp)}.`);
+        const ads = [...new Set(d.spots.filter((x) => x.spot.startsWith('anuncio-')).map((x) => `${x.page}|${x.spot}`))].map((k) => { const [pg, sp] = k.split('|'); const o = d.spots.filter((x) => x.page === pg && x.spot === sp).reduce((t, x) => ({ v: t.v + x.views, c: t.c + x.clicks }), { v: 0, c: 0 }); const per: Record<string, number> = {}; d.spots.filter((x) => x.page === pg).forEach((x) => (per[x.spot] = (per[x.spot] ?? 0) + x.views)); const tp = Math.max(...Object.values(per)) || 1; return { pg, sp, ...o, reach: Math.min(1, o.v / tp) }; });
+        const weak = ads.filter((a) => a.reach < 0.3).sort((a, b) => a.reach - b.reach)[0];
+        if (weak) recs.push(`El ${spotName(weak.sp).toLowerCase()} de ${pageName(weak.pg)} solo se ve en ${(weak.reach * 100).toFixed(0)}% de las visitas. Valora subirlo o venderlo más barato.`);
+        const strong = ads.sort((a, b) => b.reach - a.reach)[0];
+        if (strong && strong.reach > 0.6) recs.push(`El ${spotName(strong.sp).toLowerCase()} de ${pageName(strong.pg)} se ve en ${(strong.reach * 100).toFixed(0)}% de las visitas: es el mejor espacio para vender.`);
+      }
+      if (d.hours.length) {
+        const peaks = byHour.map((n, h) => ({ n, h })).sort((a, b) => b.n - a.n).slice(0, 3).sort((a, b) => a.h - b.h);
+        recs.push(`Las horas con más lectura son ${peaks.map((p) => hourName(p.h)).join(', ')}: ten lo más importante publicado un rato antes de esas horas.`);
+      }
+      const done = [...tests.values()].filter((o) => (o.A?.v ?? 0) >= 150 && (o.B?.v ?? 0) >= 150);
+      if (done.length >= 3) { const bw = done.filter((o) => o.B!.c / o.B!.v > o.A!.c / o.A!.v).length; recs.push(`En las pruebas de titulares, el segundo titular ganó ${bw} de ${done.length} veces.`); }
+      $('[data-tr-recs]').innerHTML = recs.map((x) => `<li>${esc(x)}${d.demo ? ' <span class="sp-demo">DEMO</span>' : ''}</li>`).join('') || '<li class="pnl-muted">Sin recomendaciones por ahora.</li>';
+    }
+
+
     async function paintAnalytics(fresh = false) {
       const msg = $('[data-an-msg]'), bodyEl = $('[data-an-body]');
       const demo = isDemo(); $$('[data-an-demo]').forEach((e) => (e.hidden = !demo)); $('[data-an-real]').hidden = demo;
@@ -999,7 +1125,11 @@ const TABS = [
     root.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
       const sw = t.closest<HTMLElement>('[data-an-view]');
-      if (sw) { anView = sw.dataset.anView as 'visitas' | 'ingresos'; paint.analitica(); return; }
+      if (sw) { anView = sw.dataset.anView as typeof anView; paint.analitica(); return; }
+      const tr = t.closest<HTMLElement>('[data-tr-range]');
+      if (tr) { trRange = Number(tr.dataset.trRange) as 1 | 7 | 28; $$('[data-tr-range]').forEach((b) => b.setAttribute('aria-pressed', String(b === tr))); void paintTraffic(); return; }
+      const td2 = t.closest<HTMLElement>('[data-tr-dev]');
+      if (td2) { trDev = td2.dataset.trDev as typeof trDev; $$('[data-tr-dev]').forEach((b) => b.setAttribute('aria-pressed', String(b === td2))); void paintTraffic(false); return; }
       const es = t.closest<HTMLElement>('[data-earn-src]');
       if (es) { earnSrc = es.dataset.earnSrc as typeof earnSrc; void paintEarnings(); return; }
       const er = t.closest<HTMLElement>('[data-earn-range]');
@@ -1219,11 +1349,13 @@ const TABS = [
       },
 
       analitica() {
-        const canEarn = ['admin', 'manager'].includes(me()?.role ?? ''); if (!canEarn) anView = 'visitas'; // a salesperson sees their own money in Ventas → Mis comisiones
-        $('[data-an-switch]').hidden = !canEarn;
-        $$('[data-an-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.anView === anView)));
-        $('[data-an-visits]').hidden = anView !== 'visitas'; $('[data-earn]').hidden = anView !== 'ingresos';
-        void (anView === 'ingresos' ? paintEarnings() : paintAnalytics());
+        const role = me()?.role ?? '';
+        const canEarn = ['admin', 'manager'].includes(role); if (!canEarn && anView === 'ingresos') anView = 'visitas'; // a salesperson sees their own money in Ventas → Mis comisiones
+        const canSpots = ['admin', 'editor', 'manager'].includes(role); if (!canSpots && anView === 'espacios') anView = 'visitas';
+        $('[data-an-switch]').hidden = !canEarn && !canSpots;
+        $$('[data-an-view]').forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.anView === anView)); b.hidden = (b.dataset.anView === 'ingresos' && !canEarn) || (b.dataset.anView === 'espacios' && !canSpots); });
+        $('[data-an-visits]').hidden = anView !== 'visitas'; $('[data-earn]').hidden = anView !== 'ingresos'; $('[data-tr]').hidden = anView !== 'espacios';
+        void (anView === 'ingresos' ? paintEarnings() : anView === 'espacios' ? paintTraffic() : paintAnalytics());
       },
 
       // Mis periodistas: who they are, what's waiting for an editor, what was sent back, what they published, their tasks

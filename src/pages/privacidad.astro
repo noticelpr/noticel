@@ -40,6 +40,13 @@ const updated = '4 de octubre de 2026';
       <h3>Lo que se guarda en tu propio dispositivo</h3>
       <p>Tu navegador recuerda algunas preferencias para que el sitio funcione mejor: modo oscuro, tamaño de letra, idioma, el pueblo del clima, qué secciones lees más (para la tarjeta <strong>Para ti</strong>), tu sesión si entraste con tu cuenta, y el progreso de los juegos. Se queda en tu dispositivo y puedes borrarlo limpiando los datos del sitio en tu navegador. No usamos cookies de publicidad.{SITE.gaId ? ' Para contar las visitas usamos Google Analytics, que guarda sus propias cookies (más abajo).' : ' Tampoco usamos cookies de rastreo.'}</p>
 
+      <h3>Qué espacios se leen (contador propio)</h3>
+      <p>Nuestro propio contador suma, en números totales, cuántas veces se vio y se tocó cada espacio de las páginas (la noticia principal, cada sección, los anuncios) y si fue en celular o computadora, para ordenar mejor el sitio. También probamos a veces dos titulares para una misma noticia y nos quedamos con el que más se lee. No guarda quién eres, tu dirección IP ni nada de tu dispositivo, y no usa cookies. No funciona si tu navegador envía la señal <strong>Global Privacy Control</strong>.</p>
+      {SITE.clarityId && (<>
+        <h3>Mapas de calor (Microsoft Clarity)</h3>
+        <p><strong>Microsoft Clarity</strong> nos muestra, sin decirnos quién eres, dónde toca la gente en las páginas y hasta dónde baja, usando sus propias cookies. Oculta el texto de las páginas y lo que escribes en los formularios. No se carga si tu navegador envía la señal Global Privacy Control (<a href="https://privacy.microsoft.com/es-es/privacystatement" rel="noopener" target="_blank">privacidad de Microsoft</a>).</p>
+      </>)}
+
       <h2>Para qué la usamos</h2>
       <ul>
         <li>Para que funcionen tu cuenta, los comentarios, el foro, las notificaciones, las noticias guardadas y los juegos.</li>
