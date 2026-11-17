@@ -36,7 +36,7 @@ const TOOLS = [
   ['clear', 'Quitar formato', '<path d="M6 5h12M12 5l-3 14M4 20L20 4"/>'],
 ];
 ---
-<section class="wr" data-wr data-secs={JSON.stringify(secs)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published)} data-base={url()} data-sec-photos={JSON.stringify(secPhotos)} data-cat-paths={JSON.stringify(catPaths)}>
+<section class="wr" data-wr data-secs={JSON.stringify(secs)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published)} data-base={url()} data-sec-photos={JSON.stringify(secPhotos)} data-cat-paths={JSON.stringify(catPaths)} data-built={Date.now()}>
   <!-- List of my articles -->
   <div data-wr-list-view>
     <header class="sd-head">
@@ -360,7 +360,13 @@ const TOOLS = [
     // ---------- Publicadas: every published article (newest first) ----------
     function publishedList(): Pub[] {
       const s = me(); const mine = (p: Pub) => canPublish() || p.author === s?.name;
-      const mineHere = load().filter((a) => a.status === 'published');
+      // A saved copy marked "published" whose story is no longer on the site (taken down or deleted elsewhere) isn't listed.
+      // NotiCel publishes fast (functions/_lib/live.js): a story can be live from the database for hours before a rebuild
+      // adds it to the built list. So it only counts as gone when it was saved and due well before THIS build (the panel
+      // page and the built list come from the same build; 10 minutes of margin for a build already running) and the
+      // build still doesn't have it (user, 2026-11-17).
+      const onSite = new Set(PUBLISHED.map((p) => p.id)), BUILT = Number(root.dataset.built) || 0, before = (t: number) => BUILT > 0 && t < BUILT - 10 * 60e3;
+      const mineHere = load().filter((a) => a.status === 'published' && !(a.slug && !onSite.has(a.slug) && before(a.updated) && before(Date.parse(a.date) || 0)));
       const local = mineHere.map((a) => ({ id: a.id, title: a.title || 'Sin titular', section: SECS.find((x) => x.id === a.section)?.name ?? '', author: a.author || a.owner,
         date: new Date(a.date || a.updated).toISOString(), url: a.slug ? `${BASE}${pathOf(a)}` : '', ai: false, local: !DB }));
       const slugs = new Set(mineHere.map((a) => a.slug).filter(Boolean));
