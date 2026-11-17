@@ -77,6 +77,8 @@ const seoChecks: Array<[string, number, string]> = [
   ['Foto sin descripción', recentSeo.filter((s) => s.data.image && !s.data.imageCaption).length, 'La descripción ayuda a Google Imágenes y a lectores con discapacidad visual.'],
 ];
 const sitemapCount = (() => { try { return (fs.readFileSync('dist/sitemap.xml', 'utf8').match(/<loc>/g) || []).length; } catch { return stories.length; } })();
+// Mis columnas: each Opiniones column's subtitle and word count (columnists see what they wrote while reader numbers are hidden)
+const opinionInfo = Object.fromEntries(stories.filter((s) => mainCategory(s) === 'opiniones').map((s) => [s.id, { d: s.data.description ?? '', w: words(s.body) }]));
 const problems = stories.map((s) => {
   const d = s.data; const p: string[] = [];
   if (!d.image) p.push('sin foto propia');
@@ -111,7 +113,7 @@ const TABS = [
 ];
 ---
 <Base title="Panel de la redacción" description="Panel interno de NotiCel (uso del personal)." noindex staff>
-  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(CATEGORY_OPTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url, views }) => ({ id, title, section, author, date, url, views })))} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-base={url()} data-clarity={SITE.clarityId}>
+  <main class="wrap pnl" id="main" data-pnl data-secs={JSON.stringify(Object.fromEntries(CATEGORY_OPTIONS.map((x) => [x.id, x.short])))} data-pin={JSON.stringify(pin)} data-section-pins={JSON.stringify(sectionPins)} data-recent={JSON.stringify(recent)} data-published={JSON.stringify(published.map(({ id, title, section, author, date, url, views }) => ({ id, title, section, author, date, url, views })))} data-problems={JSON.stringify(problems)} data-photos={JSON.stringify(webPhotos)} data-ahead={JSON.stringify(aheadFiles)} data-opinion={JSON.stringify(opinionInfo)} data-base={url()} data-clarity={SITE.clarityId}>
     <form class="pnl-login" data-login hidden>
       <p class="pnl-kicker">NotiCel</p>
       <h1>Panel de la redacción</h1>
@@ -503,7 +505,12 @@ const TABS = [
           <p class="mc-note-data" data-mc-datanote hidden></p>
           <div class="mc-kpis" data-mc-kpis></div>
           <div class="mc-status" data-mc-status></div>
-          <div class="mc-grid">
+          {/* Without reader numbers (SHOW_READS false): next goal, rhythm and milestones */}
+          <div class="mc-grid" data-mc-goalbox hidden>
+            <div class="pnl-card mc-goal" data-mc-goal></div>
+            <div class="pnl-card mc-miles" data-mc-miles></div>
+          </div>
+          <div class="mc-grid" data-mc-readsbox>
             <div class="pnl-card"><h2 class="pnl-h3">Lecturas por día <small class="pnl-muted">últimos 30 días</small></h2><div class="pnl-chart" data-mc-chart></div></div>
             <div class="mc-side">
               <div class="pnl-card mc-best" data-mc-best></div>
@@ -513,7 +520,7 @@ const TABS = [
           <h2 class="pnl-h2 mc-h">Tus columnas</h2>
           <ul class="mc-cols" data-mc-list></ul>
           <div class="pnl-card"><h2 class="pnl-h3">Lo que comentan tus lectores</h2><ul class="mc-comments" data-mc-comments></ul></div>
-          <p class="pnl-muted pnl-small">Las lecturas cuentan a quien se queda al menos unos segundos en la columna; las de cada día se guardan 30 días. Los comentarios los modera la redacción. Una columna publicada no se puede borrar: si necesitas quitarla, toca «Pedir que se quite» y la redacción decide.</p>
+          <p class="pnl-muted pnl-small" data-mc-foot>Las lecturas cuentan a quien se queda al menos unos segundos en la columna; las de cada día se guardan 30 días. Los comentarios los modera la redacción. Una columna publicada no se puede borrar: si necesitas quitarla, toca «Pedir que se quite» y la redacción decide.</p>
         </section>
 
         <!-- Columnistas -->
@@ -1325,6 +1332,10 @@ const TABS = [
     });
     const paint: Record<string, () => void> = {
       async 'mis-columnas'() {
+        // Reader numbers (reads, this week, rank, average, the chart, best column, facts, each column's numbers and trend
+        // line) stay hidden from columnists while the site is new and traffic is low, so they aren't discouraged (user,
+        // 2026-11-17). The reads code below stays in place: switch to true when traffic grows.
+        const SHOW_READS = false;
         const s = me(); if (!s) return;
         const demo = isDemo() || !hasBackend();
         $$('[data-mc-demo]').forEach((e) => (e.hidden = !demo));
@@ -1369,8 +1380,8 @@ const TABS = [
         // there are some, each column's total is noticel.com's own view count (the story's "views"), said in a note.
         const daily = perDay.length > 0;
         const note = $('[data-mc-datanote]');
-        note.hidden = !(borrowed || !daily);
-        note.textContent = borrowed ? 'DEMO: como esta cuenta de ejemplo no tiene columnas, se muestran columnas recientes de Opiniones solo para enseñar cómo se ve. Todos los números son de ejemplo.'
+        note.hidden = !(borrowed || (SHOW_READS && !daily));
+        note.textContent = borrowed ? `DEMO: como esta cuenta de ejemplo no tiene columnas, se muestran columnas recientes de Opiniones solo para enseñar cómo se ve.${SHOW_READS ? ' Todos los números son de ejemplo.' : ''}`
           : 'Todavía no hay lecturas por día: el contador del sitio empieza a guardarlas ahora. Mientras tanto, el total de cada columna es el de noticel.com.';
         const reads30 = (id: string) => perDay.filter((x) => x.s === id).reduce((t, x) => t + x.total, 0);
         const total1 = (id: string) => (daily ? reads30(id) : Number(mine.find((p) => p.id === id)?.views ?? 0));
@@ -1395,7 +1406,22 @@ const TABS = [
         const avg = mine.length ? Math.round(ids.reduce((t, id) => t + total1(id), 0) / mine.length) : 0;
         const ex = demo ? 'DEMO · ' : '';
         const tile = (label: string, value: string, sub = '', tone = '') => `<div class="mc-kpi ${tone}"><span class="mc-kl">${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
-        $('[data-mc-kpis]').innerHTML = [
+        // Without reader numbers: what they wrote and how steadily (built from the published columns only)
+        const INFO: Record<string, { d: string; w: number }> = JSON.parse(root.dataset.opinion || '{}');
+        const allWords = ids.reduce((t, id) => t + (INFO[id]?.w ?? 0), 0);
+        let bestRun = 0; { const ws = [...weeks].sort((a, b) => a - b); let run = 0; ws.forEach((w, i) => { run = i && w === ws[i - 1] + 1 ? run + 1 : 1; bestRun = Math.max(bestRun, run); }); }
+        const lastAt = mine[0] ? Date.parse(mine[0].date) : 0, sinceDays = lastAt ? Math.round((Date.parse(day(Date.now())) - Date.parse(day(lastAt))) / 864e5) : -1; // calendar days, Puerto Rico time
+        const bx = borrowed ? 'DEMO · ' : '';
+        $('[data-mc-goalbox]').hidden = SHOW_READS; $('[data-mc-readsbox]').hidden = !SHOW_READS;
+        $('[data-mc-foot]').textContent = `${SHOW_READS ? 'Las lecturas cuentan a quien se queda al menos unos segundos en la columna; las de cada día se guardan 30 días. ' : ''}Los comentarios los modera la redacción. Una columna publicada no se puede borrar: si necesitas quitarla, toca «Pedir que se quite» y la redacción decide.`;
+        if (!SHOW_READS) $('[data-mc-kpis]').innerHTML = [
+          tile('Columnas publicadas', num(mine.length), mine.length ? `${bx}${thisMonth} este mes` : 'la primera te espera'),
+          tile('Racha', streak ? String(streak) : '—', `${bx}${streak ? `${streak === 1 ? 'semana' : 'semanas seguidas'} publicando` : 'publica esta semana para empezar una'}`, streak >= 2 ? 'up' : ''),
+          tile('Mejor racha', bestRun ? String(bestRun) : '—', `${bx}${bestRun ? (bestRun === 1 ? 'semana' : 'semanas seguidas') : 'tu récord personal'}`),
+          tile('Palabras escritas', num(allWords), `${bx}en todas tus columnas`),
+          tile('Última columna', sinceDays < 0 ? '—' : sinceDays === 0 ? 'Hoy' : sinceDays === 1 ? 'Ayer' : `Hace ${sinceDays} días`, `${bx}${sinceDays > 7 ? 'tus lectores esperan la próxima' : sinceDays >= 0 ? '¡vas al día!' : 'escribe la primera'}`, sinceDays >= 0 && sinceDays <= 7 ? 'up' : ''),
+        ].join('');
+        else $('[data-mc-kpis]').innerHTML = [
           tile('Lecturas', num(total), `${ex}${daily ? 'últimos 30 días' : 'en total, según noticel.com'}`),
           tile('Esta semana', daily ? num(last7) : '—', !daily ? `${ex}sin lecturas por día todavía` : change === null ? `${ex}lecturas en 7 días` : `${ex}${change >= 0 ? '▲' : '▼'} ${Math.abs(change)}% vs. la semana anterior`, change === null ? '' : change >= 0 ? 'up' : 'down'),
           tile('Puesto en Opiniones', myRank ? `#${myRank}` : '—', myRank ? `${ex}de ${Math.max(order.length, myRank)} columnistas esta semana` : `${ex}aún sin lecturas esta semana`, myRank && myRank <= 3 ? 'up' : ''),
@@ -1411,11 +1437,38 @@ const TABS = [
           <button type="button" class="mc-st ${back.length ? 'warn' : ''}" data-go="escribir"><b>${back.length}</b><span>devueltas con notas</span></button>
           <button type="button" class="mc-st" data-go="escribir"><b>${drafts}</b><span>borradores</span></button>
           ${back[0] ? `<p class="mc-note">Nota de la redacción en «${esc(back[0].doc?.title ?? '')}»: ${esc(back[0].doc?.note ?? '')}</p>` : ''}` : '';
+        if (!SHOW_READS) {
+          // Next goal, rhythm (last 12 weeks) and milestones: no reader numbers
+          const STEPS = [1, 5, 10, 25, 50, 100];
+          const next = STEPS.find((n) => n > mine.length) ?? mine.length + 50, prevStep = [...STEPS].reverse().find((n) => n <= mine.length) ?? 0;
+          const pct = Math.round(((mine.length - prevStep) / Math.max(1, next - prevStep)) * 100);
+          const MILES: Array<[boolean, string, string]> = [
+            [mine.length >= 1, 'Primera columna', 'Publicaste tu primera columna en NotiCel.'],
+            [mine.length >= 5, '5 columnas', 'Ya eres una voz conocida en Opiniones.'],
+            [mine.length >= 10, '10 columnas', 'Diez columnas: constancia de verdad.'],
+            [mine.length >= 25, '25 columnas', 'Una columna fija de la casa.'],
+            [bestRun >= 4, 'Un mes seguido', 'Cuatro semanas seguidas publicando.'],
+            [bestRun >= 12, 'Tres meses seguidos', 'Doce semanas seguidas sin fallar.'],
+            [comments.length >= 1, 'Primer comentario', 'Un lector comentó tu columna.'],
+          ];
+          const wkNow = wk0(Date.now());
+          const cal = Array.from({ length: 12 }, (_, i) => wkNow - 11 + i).map((w) => `<i class="${weeks.has(w) ? 'on' : ''}${w === wkNow ? ' now' : ''}" title="${weeks.has(w) ? 'Publicaste esta semana' : 'Sin columna'}"></i>`).join('');
+          $('[data-mc-goal]').innerHTML = `<h2 class="pnl-h3">Tu próxima meta${borrowed ? ' <span class="sp-demo">DEMO</span>' : ''}</h2>
+            <p class="mc-goal-t">${mine.length ? `${next - mine.length === 1 ? 'Te falta 1 columna' : `Te faltan ${next - mine.length} columnas`} para llegar a <b>${next}</b>.` : 'Publica tu <b>primera columna</b>.'}</p>
+            <div class="mc-bar" role="progressbar" aria-label="Avance hacia tu próxima meta" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${Math.max(4, pct)}%"></span></div>
+            <h3 class="mc-sub">Tu ritmo: las últimas 12 semanas</h3>
+            <div class="mc-cal" role="img" aria-label="Semanas en que publicaste: ${Array.from({ length: 12 }, (_, i) => wkNow - 11 + i).filter((w) => weeks.has(w)).length} de las últimas 12">${cal}</div>
+            <p class="pnl-muted pnl-small">Cada cuadro es una semana; los llenos son las semanas en que publicaste. Una columna por semana mantiene viva tu racha.</p>
+            <button type="button" class="adp-btn" data-mc-new>+ Nueva columna</button>`;
+          $('[data-mc-miles]').innerHTML = `<h2 class="pnl-h3">Tus logros</h2><ul>${MILES.map(([ok, t, d]) => `<li class="${ok ? 'ok' : ''}"><span class="mc-dot" aria-hidden="true">${ok ? '✓' : ''}</span><span><b>${t}</b><small>${d}${ok ? '' : ' (pendiente)'}</small></span></li>`).join('')}</ul>`;
+        }
         // Chart (only with daily numbers)
         const chart = $('[data-mc-chart]');
-        if (daily) barChart(chart, days30.map((d, i) => ({ label: new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' }), value: byDay[i], tip: `${new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'long', day: 'numeric', month: 'short' })}: ${num(byDay[i])} lecturas${demo ? ' (DEMO)' : ''}` })), (n) => num(n));
+        if (!SHOW_READS) { /* hidden: no reader numbers */ }
+        else if (daily) barChart(chart, days30.map((d, i) => ({ label: new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { day: 'numeric', month: 'short' }), value: byDay[i], tip: `${new Date(`${d}T12:00:00`).toLocaleDateString('es-PR', { weekday: 'long', day: 'numeric', month: 'short' })}: ${num(byDay[i])} lecturas${demo ? ' (DEMO)' : ''}` })), (n) => num(n));
         else { charts.delete(chart); chart.innerHTML = '<p class="pnl-muted">La gráfica aparece cuando el sitio tenga lecturas por día de tus columnas.</p>'; }
-        // Best column and facts
+        // Best column and facts (with reader numbers only)
+        if (SHOW_READS) {
         const best = [...ids].sort((a, b) => total1(b) - total1(a))[0];
         const bp = mine.find((p) => p.id === best);
         $('[data-mc-best]').innerHTML = bp && total1(best) ? `<h2 class="pnl-h3">Tu columna más leída</h2><a class="mc-best-t" href="${esc(bp.url)}" target="_blank" rel="noopener">${esc(bp.title)}</a><p class="mc-best-n"><b>${num(total1(best))}</b> lecturas${daily ? ' en 30 días' : ''} · <b>${num(comments.filter((c) => c.story === best).length)}</b> comentarios${demo ? ' · DEMO' : ''}</p>`
@@ -1429,6 +1482,7 @@ const TABS = [
           <li>Comparte tus columnas en tus redes: los lectores que llegan por ti cuentan en tus números.</li>
           ${mine.length && !borrowed ? `<li>Has publicado <b>${num(mine.length)}</b> ${mine.length === 1 ? 'columna' : 'columnas'} en NotiCel.</li>` : ''}
         </ul>`;
+        }
         // Column cards: trend line (last 14 days), reads, comments, rank, share buttons
         const spark = (id: string) => {
           if (!daily) return '';
@@ -1440,11 +1494,12 @@ const TABS = [
         const share = (p: { url: string; title: string }) => { const full = new URL(p.url, location.origin).toString(), u = encodeURIComponent(full), t = encodeURIComponent(p.title);
           return `<div class="mc-share" role="group" aria-label="Compartir"><a href="https://wa.me/?text=${t}%20${u}" target="_blank" rel="noopener">WhatsApp</a><a href="https://www.facebook.com/sharer/sharer.php?u=${u}" target="_blank" rel="noopener">Facebook</a><a href="https://x.com/intent/post?text=${t}&url=${u}" target="_blank" rel="noopener">X</a><button type="button" data-mc-copy="${esc(full)}">Copiar enlace</button></div>`; };
         $('[data-mc-list]').innerHTML = mine.length ? mine.map((p) => {
-          const rk = colRank.indexOf(p.id) + 1, nc = comments.filter((c) => c.story === p.id).length;
+          const rk = colRank.indexOf(p.id) + 1, nc = comments.filter((c) => c.story === p.id).length, info = INFO[p.id];
           return `<li class="mc-col">
-            <div class="mc-col-top"><a class="mc-col-t" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>${rk && rk <= 3 ? `<span class="mc-rank">#${rk} en Opiniones esta semana</span>` : ''}</div>
-            <small class="pnl-muted">${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' })}${demo ? ' · números DEMO' : ''}</small>
-            <div class="mc-col-nums"><span><b>${num(total1(p.id))}</b> ${daily ? 'lecturas (30 días)' : 'lecturas en total'}</span>${daily ? `<span><b>${num(week[p.id] ?? 0)}</b> esta semana</span>` : ''}<span><b>${num(nc)}</b> comentarios</span>${spark(p.id)}</div>
+            <div class="mc-col-top"><a class="mc-col-t" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>${SHOW_READS && rk && rk <= 3 ? `<span class="mc-rank">#${rk} en Opiniones esta semana</span>` : ''}</div>
+            ${info?.d ? `<p class="mc-desc">${esc(info.d)}</p>` : ''}
+            <small class="pnl-muted">${new Date(p.date).toLocaleDateString('es-PR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Puerto_Rico' })}${info?.w ? ` · ${num(info.w)} palabras · ${Math.max(1, Math.round(info.w / 200))} min de lectura` : ''}${demo && SHOW_READS ? ' · números DEMO' : ''}</small>
+            ${!SHOW_READS ? '' : `<div class="mc-col-nums"><span><b>${num(total1(p.id))}</b> ${daily ? 'lecturas (30 días)' : 'lecturas en total'}</span>${daily ? `<span><b>${num(week[p.id] ?? 0)}</b> esta semana</span>` : ''}<span><b>${num(nc)}</b> comentarios</span>${spark(p.id)}</div>`}
             <div class="mc-col-foot">${share(p)}${asked[p.id] === 'pedida' ? '<span class="pnl-chip warn">Pediste quitarla</span>' : asked[p.id] === 'mantenida' ? '<span class="pnl-chip">La redacción la mantuvo</span>' : `<button type="button" class="pnl-link mc-down" data-mc-down="${esc(p.id)}" data-mc-url="${esc(new URL(p.url, location.origin).pathname)}" data-mc-title="${esc(p.title)}">Pedir que se quite</button>`}</div>
           </li>`; }).join('')
           : '<li class="mc-empty"><b>Todavía no tienes columnas publicadas.</b><span>Escribe la primera: la redacción la revisa y te avisa.</span><button type="button" class="adp-btn" data-mc-new>+ Nueva columna</button></li>';

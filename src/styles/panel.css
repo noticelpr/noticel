@@ -1546,3 +1546,23 @@ canvas.apr-drag:active{cursor:grabbing}
 .mc-comments p{margin:4px 0 0;overflow-wrap:anywhere}
 .mc-cav{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none;font-weight:700;font-size:14px;background:var(--line);color:var(--ink)}
 @media (max-width:860px){.mc-grid{grid-template-columns:1fr}.mc-hero-btns{width:100%}.mc-hero-btns>*{flex:1;text-align:center}.mc-cols{grid-template-columns:minmax(0,1fr)}.mc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.mc-kpi b{font-size:22px}}
+/* Mis columnas without reader numbers: goal, rhythm and milestones; each column's subtitle (user, 2026-11-17) */
+.mc-goal{display:grid;gap:10px;align-content:start}
+.mc-goal-t{margin:0;font-size:17px}
+.mc-bar{height:12px;border-radius:999px;background:var(--line);overflow:hidden}
+.mc-bar span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#009DE9,#92D000)}
+.mc-sub{margin:6px 0 0;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.mc-cal{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;max-width:420px}
+.mc-cal i{aspect-ratio:1;border-radius:6px;background:var(--line)}
+.mc-cal i.on{background:#009DE9}
+.mc-cal i.now{outline:2px solid #92D000;outline-offset:1px}
+.mc-goal .adp-btn{justify-self:start}
+.mc-miles ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.mc-miles li{display:flex;gap:10px;align-items:flex-start;opacity:.6}
+.mc-miles li.ok{opacity:1}
+.mc-miles li span:last-child{display:grid}
+.mc-miles small{color:var(--muted)}
+.mc-dot{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:13px;font-weight:700;border:2px solid var(--line);color:#000}
+.mc-miles li.ok .mc-dot{background:#92D000;border-color:#92D000}
+.mc-desc{margin:0;font-size:14px;line-height:1.45;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+[data-mc-goalbox][hidden],[data-mc-readsbox][hidden]{display:none}
