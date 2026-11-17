@@ -44,7 +44,7 @@ const TABS = [
 ];
 ---
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme={staff ? 'dark' : undefined} data-force-dark={staff ? '' : undefined}>{/* the staff panel is always dark (owner, 2026-11-17) */}
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -93,7 +93,7 @@ const TABS = [
     <script is:inline>
       // Theme before the page paints (no white flash). Automatic by Puerto Rico time: dark from 7 p.m. to 6 a.m.,
       // light during the day. A reader's switch in the profile menu lasts until the next automatic change.
-      // Sports pages are always dark (data-force-dark).
+      // The staff panel is always dark (data-force-dark).
       (function () {
         var h = (new Date().getUTCHours() + 20) % 24; // Puerto Rico is UTC-4 all year
         var auto = h >= 19 || h < 6 ? 'dark' : 'light';
@@ -414,7 +414,7 @@ const TABS = [
 
       // Dark mode switch (remembered in this browser)
       const themeBtn = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
-      // Sports pages are always dark, so the switch is hidden there
+      // The staff panel is always dark, so the switch is hidden there
       if (themeBtn && document.documentElement.hasAttribute('data-force-dark')) themeBtn.hidden = true;
       else if (themeBtn) {
         const sync = () => {
