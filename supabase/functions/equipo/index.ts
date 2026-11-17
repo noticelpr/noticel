@@ -163,7 +163,13 @@ Deno.serve(async (req) => {
         await mail(email, '¡Bienvenido de vuelta a NotiCel!', `Hola ${name}:`, COLUMNIST_BACK, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
         await fetch(`${base}/rest/v1/columnist_removed?user_id=eq.${uid}`, { method: 'DELETE', headers: admin });
         await profilesOf(uid, name, true);
-      } else if (role === 'columnist' && body.reason === 'invitacion') await mail(email, 'Te invitamos a escribir en NotiCel', `Hola ${name}:`, COLUMNIST_INVITE, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
+      } else if (role === 'columnist' && body.reason === 'invitacion') {
+        // An optional personal message from whoever invites (panel → Columnistas → Invitar; owner, 2026-11-17)
+        const note = String(body.message ?? '').trim().slice(0, 600).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!).replace(/\n/g, '<br>');
+        const from = ((await (await fetch(`${base}/rest/v1/staff?user_id=eq.${me.id}&select=name`, { headers: admin })).json())[0]?.name as string) ?? '';
+        const personal = note ? `<span style="display:block;margin:4px 0 16px;padding:12px 14px;border-left:4px solid #009DE9;background:#F2F8FC;border-radius:6px">${note}${from ? `<br><span style="color:#5C5F6E">— ${from.replace(/[&<>"]/g, '')}</span>` : ''}</span>` : '';
+        await mail(email, 'Te invitamos a escribir en NotiCel', `Hola ${name}:`, personal + COLUMNIST_INVITE, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
+      }
       else if (role === 'columnist') await mail(email, '¡Tu solicitud para ser columnista fue aprobada!', `Hola ${name}:`, COLUMNIST_OK, 'Crear mi cuenta', `${link.href}&bienvenida=1`);
       else await mail(email, 'Te invitaron al equipo de NotiCel', `Hola ${name}:`, invited(role), 'Crear mi contraseña', `${link.href}&bienvenida=1`);
       const access = await syncAccess().catch(() => 'error'); // the new person can open the panel right away

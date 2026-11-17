@@ -1649,3 +1649,5 @@ form.pnl-add.pnl-add-card{display:grid!important;grid-template-columns:minmax(0,
 form.pnl-add.pnl-add-card[hidden]{display:none!important}
 form.pnl-add.pnl-add-card > *{flex:none;width:auto;max-width:none}
 .pnl-add-card .pnl-hide-chk[hidden]{display:none}
+.cl-invite input,.cl-invite textarea{font:inherit;font-weight:400;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg,#fff);color:var(--ink);width:100%}
+.cl-invite textarea{resize:vertical}

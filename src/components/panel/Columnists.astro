@@ -24,6 +24,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
     <p class="pnl-muted pnl-small">Le llega un correo invitándolo a escribir en Opiniones, con un botón para crear su cuenta de columnista. Con esa cuenta solo puede enviar columnas (las aprueba un editor) y ver sus lecturas y comentarios.</p>
     <div class="cl-two"><label>Nombre completo<input name="iname" maxlength="40" placeholder="Como firmará sus columnas" /></label><label>Correo<input name="imail" type="email" maxlength="120" autocapitalize="off" /></label></div>
     <label>Tema o cargo <small>(opcional, sale bajo su nombre)</small><input name="irole" maxlength="80" placeholder="Ej.: Economía y familia" /></label>
+    <label>Mensaje personal <small>(opcional, sale en el correo)</small><textarea name="imsg" rows="3" maxlength="600" placeholder="Ej.: Hola, leímos tus escritos sobre la economía de la familia y nos encantaría tenerte en Opinión."></textarea></label>
     <p class="cm-err" data-cl-ierr hidden></p>
     <div class="cl-actions"><button type="submit" class="adp-btn" data-cl-isend>Enviar invitación</button><button type="button" class="adp-btn ghost-dark" data-cl-invite-cancel>Cancelar</button></div>
   </form>
@@ -332,9 +333,9 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
     }
     // Approved request or a direct invitation → an account (Edge Function "equipo", role Columnista) and a profile,
     // turned off until their first column is out. Returns '' or the problem to show.
-    async function makeColumnist(name: string, email: string, title: string, bio: string | null, reason: 'solicitud' | 'invitacion'): Promise<string> {
+    async function makeColumnist(name: string, email: string, title: string, bio: string | null, reason: 'solicitud' | 'invitacion', message = ''): Promise<string> {
       if (!live()) return `${notLive()}: sin la base de datos no se envían invitaciones.`;
-      const res = await teamAdmin('invite', { email, name: name.slice(0, 40), role: 'columnist', reason });
+      const res = await teamAdmin('invite', { email, name: name.slice(0, 40), role: 'columnist', reason, message: message.slice(0, 600) });
       if (!res?.ok) return res?.error ?? 'No se pudo enviar la invitación.';
       if (!rows.length) { const all = await listColumnists(); if (Array.isArray(all)) rows = all; } // the list may not have loaded yet
       const slug = slugify(name);
@@ -392,7 +393,7 @@ const start = COLUMNISTS.map((c, i) => ({ slug: c.slug, name: c.name, role: c.ro
       if (g('iname').length < 3) return err('Escribe su nombre completo.');
       if (!/^\S+@\S+\.\S+$/.test(g('imail'))) return err('Escribe un correo válido.');
       const btn = $<HTMLButtonElement>('[data-cl-isend]'); btn.disabled = true; err('');
-      const problem = await makeColumnist(g('iname').replace(/\s+/g, ' '), g('imail').toLowerCase(), g('irole'), null, 'invitacion');
+      const problem = await makeColumnist(g('iname').replace(/\s+/g, ' '), g('imail').toLowerCase(), g('irole'), null, 'invitacion', g('imsg'));
       btn.disabled = false;
       if (problem) return err(problem);
       fm.hidden = true; toast(`Invitación enviada a ${g('imail')}. Su perfil quedó apagado: enciéndelo cuando salga su primera columna.`);
