@@ -16,7 +16,7 @@
   <div class="hr-list" data-hr-off></div>
 
   <h2 class="pnl-h3">Personas</h2>
-  <p class="pnl-muted pnl-small">Toca «Ver ficha» para ver todo de cada persona: datos personales, días libres, documentos y notas. Solo la administración los ve.</p>
+  <p class="pnl-muted pnl-small">Toca «Ver perfil» para ver todo de cada persona: datos personales, días libres, documentos y notas. Solo la administración los ve.</p>
   <div class="hr-list" data-hr-people></div>
 
   <dialog class="sd-dlg pnl-acct" data-off-dlg aria-labelledby="off-h">
@@ -126,7 +126,7 @@
     const used = (id?: string) => offs.filter((o) => o.user_id === id && o.status === 'aprobado' && o.kind === 'vacaciones' && o.day_from.slice(0, 4) === today.slice(0, 4)).reduce((n, o) => n + days(o), 0);
     $('[data-hr-people]').innerHTML = people.map((p, i) => { const r = (p.id && recs[p.id]) || {};
       return `<div class="hr-row"><span><b>${esc(p.name)}</b><small>${esc(r.title || ROLE[p.role] || p.role)}${r.kind ? ` · ${esc(r.kind)}` : ''}${r.start ? ` · desde ${new Date(`${r.start}T12:00:00`).toLocaleDateString('es-PR', { month: 'short', year: 'numeric' })}` : ''}${r.vacDays ? ` · vacaciones: ${used(p.id)} de ${r.vacDays} días usados` : ''}</small></span>
-        <button type="button" class="adp-btn ghost-dark" data-hr-edit="${i}">Ver ficha</button></div>`; }).join('') || '<p class="pnl-muted">Abre Equipo para cargar la lista del equipo.</p>';
+        <button type="button" class="adp-btn ghost-dark" data-hr-edit="${i}">Ver perfil</button></div>`; }).join('') || '<p class="pnl-muted">Abre Equipo para cargar la lista del equipo.</p>';
   }
   async function decide(o: Off, status: 'aprobado' | 'negado') {
     if (status === 'negado' && !(await ask(`¿Negar los días libres de ${o.name} (${span(o)})?`, { ok: 'Negar', danger: true }))) return;
