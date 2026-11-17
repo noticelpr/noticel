@@ -2245,7 +2245,8 @@ const TABS = [
 
     let pinging = false;
     function start() {
-      if (isDemo() && !me()) { set('nc-staff', { name: 'Invitado', role: 'admin' }); dispatchEvent(new Event('nc-staff-change')); } // demo: straight in, as the administrator
+      let demoOut = false; try { demoOut = sessionStorage.getItem('nc-demo-out') === '1'; } catch { /* storage blocked */ }
+      if (isDemo() && !me() && !demoOut) { set('nc-staff', { name: 'Invitado', role: 'admin' }); dispatchEvent(new Event('nc-staff-change')); } // demo: straight in, as the administrator
       // Real accounts: a session without the second step goes to the code screen first (the database requires it too)
       if (hasBackend() && !isDemo() && me() && staffToken() && !codeOk() && !verifiedOff) { void gate(); return; }
       if (hasBackend() && !isDemo() && me() && !staffToken()) set('nc-staff', null);
@@ -2274,6 +2275,7 @@ const TABS = [
     if (hasBackend()) { $('[data-real]').hidden = false; $('[data-forgot]').hidden = false; $$('[data-prevlogin]').forEach((e) => (e.hidden = true)); }
     $<HTMLFormElement>('[data-login]').addEventListener('submit', async (e) => {
       e.preventDefault();
+      try { sessionStorage.removeItem('nc-demo-out'); } catch { /* storage blocked */ }
       if (hasBackend()) {
         const er = $('[data-err]'); er.hidden = true;
         const ok = await staffLogin($<HTMLInputElement>('#pnl-mail').value.trim(), $<HTMLInputElement>('#pnl-pass').value);
@@ -2294,7 +2296,7 @@ const TABS = [
       box.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-mob]'); if (b) $(`[${b.dataset.mob}]`).click(); });
       new MutationObserver(sync).observe($('.pnl-side'), { subtree: true, attributes: true, attributeFilter: ['hidden'] }); sync();
     }
-    $('[data-logout]').addEventListener('click', () => { try { const sid = JSON.parse(atob(String(staffToken()).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).session_id; if (sid) set('nc-panel-out', sid); } catch { /* no sign-in */ } staffLogout(); /* the panel won't take the site's sign-in again (adoptSiteSession) */ teamStatus = {}; set('nc-staff', null); set('nc-staff-pending', null); dispatchEvent(new Event('nc-staff-change')); start(); });
+    $('[data-logout]').addEventListener('click', () => { try { const sid = JSON.parse(atob(String(staffToken()).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).session_id; if (sid) set('nc-panel-out', sid); } catch { /* no sign-in */ } staffLogout(); /* the panel won't take the site's sign-in again (adoptSiteSession) */ teamStatus = {}; set('nc-staff', null); set('nc-staff-pending', null); dispatchEvent(new Event('nc-staff-change')); if (isDemo()) { try { sessionStorage.setItem('nc-demo-out', '1'); } catch { /* storage blocked */ } } /* demo: Salir stays out */ start(); });
     // The comment and ad queues change counts when used
     root.addEventListener('click', () => setTimeout(paintCounts, 50));
     // An invitation or "forgot password" link opened the panel: create the password (and the second step) first
