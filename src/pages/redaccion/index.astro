@@ -548,16 +548,27 @@ const TABS = [
         <section class="pnl-pane" data-pane="equipo" hidden>
           <h1 class="pnl-h">Equipo</h1>
           <p class="pnl-muted">Quién entra al panel y qué puede hacer.</p>
-          {hasBackendBuild && <p class="pnl-muted pnl-small">Para añadir a alguien: escribe su nombre, su correo y su rol, y toca <b>Invitar</b>. Le llega un correo para crear su contraseña. Cada vez que entra al panel recibe además un código por correo (verificación en dos pasos). Si ya tiene cuenta en el sitio, solo recibe el rol.</p>}
-          <div class="pnl-range team-bar" role="group" aria-label="Filtrar por rol" data-team-bar></div>
-          <ul class="pnl-team" data-team></ul>
-          <form class="pnl-add" data-add novalidate>
-            <input placeholder="Nombre" data-add-name maxlength="30" aria-label="Nombre" />
-            <input placeholder={hasBackendBuild ? 'Correo' : 'Correo o @usuario'} data-add-mail maxlength="80" aria-label="Correo" autocapitalize="off" type={hasBackendBuild ? 'email' : 'text'} />
-            <select data-add-role aria-label="Rol"><option value="editor">Editor en jefe</option><option value="desk">Editor</option><option value="ads">Ventas</option><option value="reporter">Periodista</option><option value="manager">Gerente</option><option value="photo">Fotoperiodista</option><option value="columnist">Columnista</option><option value="admin">Administrador</option></select>
-            <button type="submit" class="adp-btn">{hasBackendBuild ? 'Invitar' : 'Añadir'}</button>
+          {/* Invite: at the top, in its own card (owner, 2026-11-17) */}
+          <form class="pnl-card pnl-add pnl-add-card" data-add novalidate>
+            <h2 class="pnl-h3">Invitar a alguien</h2>
+            {hasBackendBuild && <p class="pnl-muted pnl-small">Para añadir a alguien: escribe su nombre, su correo y su rol, y toca <b>Invitar</b>. Le llega un correo para crear su contraseña. Cada vez que entra al panel recibe además un código por correo (verificación en dos pasos). Si ya tiene cuenta en el sitio, solo recibe el rol.</p>}
+            <div class="pnl-add-row">
+              <label>Nombre
+                <input placeholder="Nombre" data-add-name maxlength="30" aria-label="Nombre" />
+              </label>
+              <label>Correo
+                <input placeholder={hasBackendBuild ? 'Correo' : 'Correo o @usuario'} data-add-mail maxlength="80" aria-label="Correo" autocapitalize="off" type={hasBackendBuild ? 'email' : 'text'} />
+              </label>
+              <label>Rol
+                <select data-add-role aria-label="Rol"><option value="editor">Editor en jefe</option><option value="desk">Editor</option><option value="ads">Ventas</option><option value="reporter">Periodista</option><option value="manager">Gerente</option><option value="photo">Fotoperiodista</option><option value="columnist">Columnista</option><option value="admin">Administrador</option></select>
+              </label>
+              <button type="submit" class="adp-btn">{hasBackendBuild ? 'Invitar' : 'Añadir'}</button>
+            </div>
             <label class="pnl-hide-chk" data-add-hidden-wrap hidden><input type="checkbox" data-add-hidden /> Oculto: solo tú lo ves en el equipo</label>
           </form>
+          <h2 class="pnl-h2 team-h">Personas en el equipo</h2>
+          <div class="pnl-range team-bar" role="group" aria-label="Filtrar por rol" data-team-bar></div>
+          <ul class="pnl-team" data-team></ul>
           {/* Folded: tap the title to see the table */}
           <details class="pnl-perms">
             <summary><h2 class="pnl-h2">Qué puede hacer cada rol</h2></summary>

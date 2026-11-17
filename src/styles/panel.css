@@ -1635,3 +1635,17 @@ canvas.apr-drag:active{cursor:grabbing}
 .pnl-team li[hidden]{display:none}
 /* Columnistas: Borrar perfil (administrator) */
 .cl-actions .cl-del{margin-left:auto}
+/* Equipo: the invite card at the top (owner, 2026-11-17) */
+.pnl-add-card{display:grid;gap:10px;margin:14px 0 18px}
+.pnl-add-card[hidden]{display:none}
+.pnl-add-card .pnl-h3{margin:0}
+.pnl-add-card p{margin:0}
+.pnl-add-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(150px,auto) auto;gap:10px;align-items:end}
+.pnl-add-row label{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
+.pnl-add-row input,.pnl-add-row select{width:100%}
+.team-h{margin:4px 0 0}
+@media (max-width:760px){.pnl-add-row{grid-template-columns:1fr}.pnl-add-row .adp-btn{width:100%}}
+form.pnl-add.pnl-add-card{display:grid!important;grid-template-columns:minmax(0,1fr)!important;flex-direction:column;align-items:stretch}
+form.pnl-add.pnl-add-card[hidden]{display:none!important}
+form.pnl-add.pnl-add-card > *{flex:none;width:auto;max-width:none}
+.pnl-add-card .pnl-hide-chk[hidden]{display:none}
