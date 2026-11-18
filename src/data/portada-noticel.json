@@ -1,38 +1,38 @@
 {
  "home": [
   "/noticias/20261117/gobernadora-rechaza-doble-vara-y-justifica-estadia-de-roig-fuertes-hasta-diciembre/",
+  "/noticias/20261117/gobernadora-decreta-dia-de-duelo-por-muerte-del-exsenador-oreste-ramos-diaz/",
+  "/noticias/20261117/amplian-a-cinco-municipios-las-advertencias-de-inundaciones-en-el-oeste/",
+  "/noticias/20261117/cossec-descarta-interrupciones-en-cooperativas-tras-fallas-bancarias-en-estados-unidos/",
   "/noticias/20261117/directora-de-la-oficina-de-base-de-fe-del-senado-lanza-ataques-transfobicos-contra-aspirante-popular/",
-  "/ultima-hora/20261117/otra-falla-en-pocos-dias-la-red-de-la-agencia-de-seguridad-nacional-nsa-colapsa/",
   "/ultima-hora/20261117/puertos-crea-comite-para-mejorar-operaciones-en-la-bahia-de-san-juan/",
-  "/ultima-hora/20261117/silencio-de-la-opm-en-cuanto-a-proyecto-sobre-atletas-trans-que-afecta-a-las-ninas/",
   "/noticias/20261117/legisladores-piden-que-la-renuncia-de-suzanne-roig-sea-inmediata/",
   "/noticias/20261116/suzanne-roig-renuncia-al-departamento-de-la-familia-en-medio-de-controversias-por-contratos/",
   "/noticias/20261116/amazon-inaugura-su-primera-instalacion-en-puerto-rico-y-promete-entregas-en-dos-dias/",
-  "/noticias/20261116/mas-de-1100-abonados-sin-agua-en-ponce-por-rotura-de-tuberia/",
-  "/ultima-hora/20261116/no-se-perdio-ni-un-dolar-alcalde-de-yauco-rechaza-senalamientos-de-la-contralora/",
-  "/ultima-hora/20261116/la-contralora-refiere-al-alcalde-de-yauco-a-justicia-el-fbi-y-etica-por-irregularidades/",
-  "/noticias/20261117/estados-unidos-mexico-y-bolivia-dejan-de-ser-paises-libres-de-sarampion/"
+  "/opiniones/20261117/se-va-la-secretaria-se-queda-la-crisis-en-familia/",
+  "/noticias/20261117/estados-unidos-mexico-y-bolivia-dejan-de-ser-paises-libres-de-sarampion/",
+  "/en/mas/noticel-factcheck/20240420/elecciones-2024-continuas-las-falsedades-en-la-competencia-presidencial/"
  ],
  "sections": {
   "noticias": [
+   "/noticias/20261117/amplian-a-cinco-municipios-las-advertencias-de-inundaciones-en-el-oeste/",
    "/noticias/20261117/cossec-descarta-interrupciones-en-cooperativas-tras-fallas-bancarias-en-estados-unidos/",
    "/noticias/20261117/estados-unidos-mexico-y-bolivia-dejan-de-ser-paises-libres-de-sarampion/",
    "/noticias/20261117/gobernadora-rechaza-doble-vara-y-justifica-estadia-de-roig-fuertes-hasta-diciembre/",
    "/noticias/20261117/directora-de-la-oficina-de-base-de-fe-del-senado-lanza-ataques-transfobicos-contra-aspirante-popular/",
    "/ultima-hora/20261117/otra-falla-en-pocos-dias-la-red-de-la-agencia-de-seguridad-nacional-nsa-colapsa/",
    "/noticias/20261117/jensen-huang-admite-errores-y-dice-que-quiere-volver-a-ser-consejero-delegado-de-nvidia/",
-   "/ultima-hora/20261117/puertos-crea-comite-para-mejorar-operaciones-en-la-bahia-de-san-juan/",
-   "/noticias/20261117/confinados-presentan-libro-de-ensayos-producto-de-curso-de-historia-oral/"
+   "/ultima-hora/20261117/puertos-crea-comite-para-mejorar-operaciones-en-la-bahia-de-san-juan/"
   ],
   "gobierno": [
+   "/noticias/20261117/gobernadora-decreta-dia-de-duelo-por-muerte-del-exsenador-oreste-ramos-diaz/",
    "/noticias/20261117/amplian-a-cinco-municipios-las-advertencias-de-inundaciones-en-el-oeste/",
    "/noticias/20261117/cossec-descarta-interrupciones-en-cooperativas-tras-fallas-bancarias-en-estados-unidos/",
    "/noticias/20261117/gobernadora-rechaza-doble-vara-y-justifica-estadia-de-roig-fuertes-hasta-diciembre/",
    "/ultima-hora/20261117/puertos-crea-comite-para-mejorar-operaciones-en-la-bahia-de-san-juan/",
    "/noticias/20261117/legisladores-piden-que-la-renuncia-de-suzanne-roig-sea-inmediata/",
    "/noticias/20261116/suzanne-roig-renuncia-al-departamento-de-la-familia-en-medio-de-controversias-por-contratos/",
-   "/noticias/20261116/amazon-inaugura-su-primera-instalacion-en-puerto-rico-y-promete-entregas-en-dos-dias/",
-   "/noticias/20261116/mas-de-1100-abonados-sin-agua-en-ponce-por-rotura-de-tuberia/"
+   "/noticias/20261116/amazon-inaugura-su-primera-instalacion-en-puerto-rico-y-promete-entregas-en-dos-dias/"
   ],
   "legislatura": [
    "/ultima-hora/20261117/silencio-de-la-opm-en-cuanto-a-proyecto-sobre-atletas-trans-que-afecta-a-las-ninas/",
@@ -55,14 +55,14 @@
    "/noticias/20261105/federales-acusan-a-tres-sujetos-por-pornografia-infantil/"
   ],
   "policiacas": [
+   "/noticias/20261117/hombre-fallece-en-accidente-de-transito-en-villalba/",
    "/noticias/20261116/una-pareja-enfrenta-cargos-por-presunto-maltrato-y-explotacion-financiera-de-adultos-mayores-en-vega-alta/",
    "/noticias/20261116/la-policia-ejecuta-operativos-en-cuatro-residenciales-de-catano/",
    "/noticias/20261115/doble-asesinato-y-varios-heridos-de-bala-en-la-perla-san-juan/",
    "/noticias/20261115/hombre-muere-luego-de-sufrir-percance-de-salud-mientras-se-ejercitaba-en-canovanas/",
    "/noticias/20261115/investigan-posible-feminicidio-y-suicidio-en-coamo/",
    "/noticias/20261114/hombre-muere-atropellado-en-lares/",
-   "/noticias/20261114/motorista-muere-en-accidente-de-transito-en-corozal/",
-   "/ultima-hora/20261113/muere-mujer-al-caerle-una-palma-encima-en-pinones/"
+   "/noticias/20261114/motorista-muere-en-accidente-de-transito-en-corozal/"
   ],
   "politica": [
    "/noticias/20261117/directora-de-la-oficina-de-base-de-fe-del-senado-lanza-ataques-transfobicos-contra-aspirante-popular/",
@@ -85,14 +85,14 @@
    "/ultima-hora/20261111/las-ventas-de-vehiculos-nuevos-bajan-en-11-81-y-van-camino-a-su-peor-ano-desde-el-2020/"
   ],
   "deportes": [
+   "/deportes/20261117/lista-la-seleccion-sub-18-para-el-campeonato-panamericano/",
+   "/deportes/20261117/criollos-se-afianzan-en-el-primer-lugar/",
+   "/deportes/20261117/los-warriors-en-picada-sin-curry-tropiezo-de-los-celtics-y-39-puntos-de-donovan-mitchell/",
+   "/deportes/20261117/maceteras-y-poetas-avanzan-a-las-finales-de-seccion-en-el-beisbol-femenino/",
    "/deportes/20261116/cangrejeros-de-santurce-llevan-el-beisbol-a-ninos-de-vivienda-publica/",
    "/deportes/20261116/omb-reconoce-a-jesfred-chucky-torres-tras-conquistar-el-oro-olimpico-juvenil-en-senegal/",
    "/deportes/20261116/juan-igor-gonzalez-recibe-reconocimiento-en-nicaragua/",
-   "/deportes/beisbol/20261116/santurce-ponce-y-mayaguez-con-victorias-en-la-lbprc/",
-   "/deportes/20261115/criollos-leones-e-indios-suman-triunfos-en-el-beisbol-invernal/",
-   "/deportes/20261114/bsnf-cangrejeras-fuerzan-un-juego-decisivo-ante-las-gigantes/",
-   "/deportes/20261114/leones-apabullan-a-los-senadores-criollos-dominan-a-los-indios-y-gigantes-blanquean/",
-   "/deportes/20261114/puerto-rico-cae-ante-el-invicto-venezuela-en-el-mundial-sub-23/"
+   "/deportes/beisbol/20261116/santurce-ponce-y-mayaguez-con-victorias-en-la-lbprc/"
   ],
   "entretenimiento": [
    "/entretenimiento/20261117/conmemoraran-los-50-anos-de-los-garcia-con-un-especial-de-television/",
@@ -125,14 +125,14 @@
    "/vida-y-bienestar/20260822/estudios-cientificos-el-azucar-es-el-enemigo-de-la-salud-de-los-ninos/"
   ],
   "el-tiempo": [
+   "/noticias/20261117/se-espera-un-aumento-gradual-en-la-cantidad-de-aguaceros/",
    "/el-tiempo/20261116/se-espera-un-dia-mayormente-soleado-2/",
    "/ultima-hora/20261116/seis-dias-consecutivos-igualando-o-superando-las-temperaturas-maximas-segun-snm/",
    "/noticias/20261114/llega-a-5-dias-la-racha-de-records-de-temperatura-en-san-juan/",
    "/noticias/20261114/pronostican-para-hoy-un-dia-mayormente-soleado-y-caluroso/",
    "/noticias/20261113/se-espera-hoy-un-dia-mayormente-soleado-8/",
    "/el-tiempo/20261112/snm-emite-hoy-advertencia-de-calor-para-todo-puerto-rico/",
-   "/noticias/20261111/continua-el-patron-de-aguaceros-pasajeros-sobre-puerto-rico/",
-   "/noticias/20261110/tendremos-otro-dia-mayormente-nublado-con-aguaceros-aislados/"
+   "/noticias/20261111/continua-el-patron-de-aguaceros-pasajeros-sobre-puerto-rico/"
   ],
   "mundo": [
    "/noticias/20261117/el-reino-unido-se-plantea-volver-a-la-union-europea/",
@@ -145,15 +145,15 @@
    "/ultima-hora/20261116/china-confirma-la-reunion-entre-xi-trump-y-putin-este-jueves-en-shenzhen/"
   ],
   "estados-unidos": [
-   "/ultima-hora/20261117/otra-falla-en-pocos-dias-la-red-de-la-agencia-de-seguridad-nacional-nsa-colapsa/",
-   "/noticias/20261117/jensen-huang-admite-errores-y-dice-que-quiere-volver-a-ser-consejero-delegado-de-nvidia/",
    "/noticias/20261117/un-juez-anula-la-reforma-de-trump-que-endurece-las-visas-a-periodistas-y-estudiantes-extranjeros/",
    "/noticias/20261116/peticion-para-restituir-a-jensen-huang-como-ceo-de-nvidia-supera-las-170000-firmas/",
    "/noticias/20261115/trump-urge-al-congreso-aprobar-mas-fondos-para-modernizar-el-sistema-aereo-de-ee-uu/",
    "/ultima-hora/20261113/ordenan-que-todos-los-vuelos-en-estados-unidos-permanezcan-en-tierra/",
    "/noticias/20261113/lluvia-y-lagrimas-en-el-corazon-del-pequeno-caribe-tras-el-derrumbe-mortal-en-brooklyn/",
-   "/noticias/20261112/microsoft-reporta-fallas-en-outlook-y-teams-en-norteamerica/"
+   "/noticias/20261112/microsoft-reporta-fallas-en-outlook-y-teams-en-norteamerica/",
+   "/ultima-hora/20261112/estados-unidos-supera-las-483000-deportaciones-en-2026-la-cifra-mas-alta-en-la-historia-de-ice/",
+   "/noticias/20261112/ascienden-a-8-los-muertos-y-a-19-los-heridos-por-el-derrumbe-de-un-edificio-en-nueva-york/"
   ]
  },
- "updated": "2026-11-17T21:30:20.841Z"
+ "updated": "2026-11-18T03:08:34.006Z"
 }
