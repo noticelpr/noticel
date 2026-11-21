@@ -5,13 +5,13 @@
   "/ultima-hora/20261120/alcaldes-populares-denuncian-discrimen-en-reparticion-de-fondos-de-maquinas-de-azar/",
   "/ultima-hora/20261120/el-gobierno-pagara-el-bono-el-miercoles-y-los-no-afiliados-a-afscme-recibiran-un-pago-adicional/",
   "/ultima-hora/20261120/luma-informa-una-insuficiencia-de-45-1-millones-en-el-cargo-de-combustible-para-octubre/",
-  "/ultima-hora/20261120/se-pueden-resolver-hablando-dice-la-gobernadora-sobre-diferencias-en-reforma-de-permisos/",
-  "/noticias/20261120/nfenergia-se-canta-listo-para-recibir-gas-natural-de-suplidor-alterno/",
-  "/noticias/20261120/trump-regresa-a-un-washington-tras-una-trilateral-con-china-y-rusia-con-mas-gestos-que-logros/",
-  "/noticias/20261119/rosachely-rivera-asumira-la-gobernacion-interinamente-por-viaje-de-jenniffer-gonzalez/",
-  "/noticias/20261119/sorprendida-la-gobernadora-por-especulacion-sobre-la-resolucion-de-un-pleito-judicial/",
-  "/noticias/20261119/gobernadora-anuncia-acuerdo-con-crowley-para-suplir-gas-natural-a-san-juan-y-palo-seco/",
-  "/ultima-hora/20261120/tribunal-autoriza-financiamiento-de-hasta-433000-a-encanto-restaurants/"
+  "/en/ultima-hora/20261120/alcaldes-populares-denuncian-discrimen-en-reparticion-de-fondos-de-maquinas-de-azar/",
+  "/en/ultima-hora/20261120/luma-informa-una-insuficiencia-de-45-1-millones-en-el-cargo-de-combustible-para-octubre/",
+  "/en/ultima-hora/20261120/se-pueden-resolver-hablando-dice-la-gobernadora-sobre-diferencias-en-reforma-de-permisos/",
+  "/en/noticias/20261120/nfenergia-se-canta-listo-para-recibir-gas-natural-de-suplidor-alterno/",
+  "/en/noticias/20261120/trump-regresa-a-un-washington-tras-una-trilateral-con-china-y-rusia-con-mas-gestos-que-logros/",
+  "/en/noticias/20261119/rosachely-rivera-asumira-la-gobernacion-interinamente-por-viaje-de-jenniffer-gonzalez/",
+  "/en/noticias/20261119/sorprendida-la-gobernadora-por-especulacion-sobre-la-resolucion-de-un-pleito-judicial/"
  ],
  "sections": {
   "noticias": [
@@ -25,14 +25,14 @@
    "/noticias/20261120/carjacking-en-bayamon-le-chocan-la-motora-para-robarsela/"
   ],
   "gobierno": [
-   "/ultima-hora/20261120/luma-informa-una-insuficiencia-de-45-1-millones-en-el-cargo-de-combustible-para-octubre/",
    "/ultima-hora/20261120/se-pueden-resolver-hablando-dice-la-gobernadora-sobre-diferencias-en-reforma-de-permisos/",
    "/noticias/20261120/nfenergia-se-canta-listo-para-recibir-gas-natural-de-suplidor-alterno/",
    "/noticias/20261120/trump-regresa-a-un-washington-tras-una-trilateral-con-china-y-rusia-con-mas-gestos-que-logros/",
    "/noticias/20261119/rosachely-rivera-asumira-la-gobernacion-interinamente-por-viaje-de-jenniffer-gonzalez/",
    "/noticias/20261119/sorprendida-la-gobernadora-por-especulacion-sobre-la-resolucion-de-un-pleito-judicial/",
    "/noticias/20261119/gobernadora-anuncia-acuerdo-con-crowley-para-suplir-gas-natural-a-san-juan-y-palo-seco/",
-   "/noticias/20261119/emiten-aviso-de-inundaciones-repentinas-para-naguabo/"
+   "/noticias/20261119/emiten-aviso-de-inundaciones-repentinas-para-naguabo/",
+   "/noticias/20261119/hacienda-anuncia-servicios-y-cierres-de-oficinas-para-el-20-y-25-de-noviembre/"
   ],
   "legislatura": [
    "/noticias/20261120/la-lengua-de-senas-puertorriquena-ya-es-oficial/",
@@ -55,14 +55,14 @@
    "/noticias/20261113/poder-judicial-limitara-acceso-a-sistemas-del-19-al-22-de-noviembre-por-mantenimiento/"
   ],
   "policiacas": [
+   "/noticias/20261120/carjacking-en-bayamon-le-chocan-la-motora-para-robarsela/",
    "/noticias/20261120/policia-doblegara-esfuerzos-para-desalentar-el-uso-de-pirotecnica-ilegal/",
    "/noticias/20261119/hombre-recibe-descarga-de-16-mil-voltios-en-fajardo/",
    "/ultima-hora/20261118/acusan-a-55-personas-por-narcotrafico-y-armas-en-aguas-buenas-y-cidra/",
    "/noticias/20261118/adulto-mayor-muere-al-caer-con-su-carro-por-precipicio-en-aguas-buenas/",
    "/noticias/20261118/reportan-asesinato-y-herido-de-bala-en-arecibo/",
    "/noticias/20261118/asesinan-hombre-a-tiros-en-loiza/",
-   "/noticias/20261117/muere-hombre-aplastado-por-vehiculo-mientras-realizaba-trabajos-en-garaje-de-mayaguez/",
-   "/noticias/20261117/hombre-fallece-en-accidente-de-transito-en-villalba/"
+   "/noticias/20261117/muere-hombre-aplastado-por-vehiculo-mientras-realizaba-trabajos-en-garaje-de-mayaguez/"
   ],
   "politica": [
    "/ultima-hora/20261120/rivera-schatz-insiste-en-que-jenniffer-gonzalez-colon-no-aspire-a-la-reeleccion/",
@@ -95,14 +95,14 @@
    "/deportes/20261119/puerto-rico-abre-manana-ante-panama-en-el-panamericano-sub-12/"
   ],
   "entretenimiento": [
-   "/entretenimiento/20261120/tres-galardones-para-yele/",
-   "/entretenimiento/20261120/draco-rosa-recibira-el-reconocimiento-de-leyenda-rolling-stone-en-espanol-2026/",
    "/economia/20261120/gta-vi-genera-2360-millones-de-dolares-estimados-en-su-lanzamiento/",
    "/noticias/20261120/dayanara-torres-regresa-a-su-patria-colmada-de-jubilo-por-miss-universe-2026/",
-   "/noticias/20261120/dalvin-la-melodia-se-le-viro-a-sus-productores-y-amenaza-con-no-hacer-conciertos-del-choli/",
    "/entretenimiento/20261119/gilberto-santa-rosa-lleva-la-musica-de-jose-madera-al-escenario-de-bellas-artes/",
    "/noticias/20261119/mas-teatro-conciertos-y-encendidos-este-fin-de-semana-cultural/",
-   "/ultima-hora/20261118/a-horas-del-estreno-de-gta-vi-estas-son-reacciones-de-los-jugadores/"
+   "/ultima-hora/20261118/a-horas-del-estreno-de-gta-vi-estas-son-reacciones-de-los-jugadores/",
+   "/entretenimiento/20261118/milo-j-confirma-fecha-en-el-choliseo/",
+   "/noticias/20261118/waba-la-grande-cumple-75-anos-de-transmision-radial/",
+   "/entretenimiento/20261118/candidatas-de-miss-universe-2026-donan-piezas-para-el-beneficio-de-ser-de-puerto-rico/"
   ],
   "opiniones": [
    "/opiniones/20261117/se-va-la-secretaria-se-queda-la-crisis-en-familia/",
@@ -125,14 +125,14 @@
    "/vida-y-bienestar/20260822/estudios-cientificos-el-azucar-es-el-enemigo-de-la-salud-de-los-ninos/"
   ],
   "el-tiempo": [
-   "/noticias/20261120/tendremos-un-dia-mayormente-nublado-con-lluvias-pasajeras/",
    "/noticias/20261119/condiciones-variables-desde-hoy-hasta-el-sabado-segun-el-snm/",
    "/noticias/20261118/indice-de-calor-alcanza-los-111-grados-en-bayamon/",
    "/noticias/20261118/hoy-se-espera-un-dia-lluvioso-principalmente-por-la-tarde/",
    "/noticias/20261117/se-espera-un-aumento-gradual-en-la-cantidad-de-aguaceros/",
    "/el-tiempo/20261116/se-espera-un-dia-mayormente-soleado-2/",
    "/ultima-hora/20261116/seis-dias-consecutivos-igualando-o-superando-las-temperaturas-maximas-segun-snm/",
-   "/noticias/20261114/llega-a-5-dias-la-racha-de-records-de-temperatura-en-san-juan/"
+   "/noticias/20261114/llega-a-5-dias-la-racha-de-records-de-temperatura-en-san-juan/",
+   "/noticias/20261114/pronostican-para-hoy-un-dia-mayormente-soleado-y-caluroso/"
   ],
   "mundo": [
    "/ultima-hora/20261120/onu-los-jovenes-latinoamericanos-tienen-cada-vez-menos-hijos-y-se-alejan-del-matrimonio/",
@@ -155,5 +155,5 @@
    "/noticias/20261116/peticion-para-restituir-a-jensen-huang-como-ceo-de-nvidia-supera-las-170000-firmas/"
   ]
  },
- "updated": "2026-11-21T10:00:20.564Z"
+ "updated": "2026-11-21T12:00:25.107Z"
 }
